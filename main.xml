@@ -1,0 +1,8 @@
+<!-- The interface. Save this file while the program runs and the window follows. -->
+<Window Title="Hello World" Width="480" Height="240">
+	<VBox Spacing="12" Slot.Padding="24">
+		<Label Text="Hello, World!" TextSize="24"/>
+		<Label Name="status" Text="Not clicked yet" Opacity="0.7"/>
+		<Button Text="Click me" Style="Primary" OnClicked="hello.clicked" Slot.HAlign="Left"/>
+	</VBox>
+</Window>

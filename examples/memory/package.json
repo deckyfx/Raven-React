@@ -1,0 +1,19 @@
+{
+  "name": "example-memory",
+  "description": "Where the memory of the library comes from, and how to watch it: Raven's memory example in TSX",
+  "module": "src/index.tsx",
+  "type": "module",
+  "private": true,
+  "scripts": {
+    "dev": "bun run src/index.tsx",
+    "typecheck": "bun check"
+  },
+  "dependencies": {
+    "@decky.fx/raven-react": "workspace:*",
+    "react": "^19.2.0"
+  },
+  "devDependencies": {
+    "@types/bun": "latest",
+    "@types/react": "^19"
+  }
+}

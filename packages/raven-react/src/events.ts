@@ -19,6 +19,8 @@ type PaintHandler = (painter: Pointer | null, width: number, height: number) => 
 type MeasureHandler = () => MeasuredSize;
 type ListTextHandler = (index: number) => string;
 type TileFillHandler = (index: number, item: r.RTileItem) => void;
+type CellTextHandler = (row: number, column: number) => string;
+type SortHandler = (column: number, descending: boolean) => void;
 
 /** The priority React asks about: discrete while a native event runs, as a click in React DOM. */
 class UpdatePriority {
@@ -178,6 +180,44 @@ const idEvent = (connect: Connect): NativeEvent => valueEvent<r.Rid>(connect, "u
 const floatEvent = (connect: Connect): NativeEvent => valueEvent<number>(connect, "f32", Number);
 const doubleEvent = (connect: Connect): NativeEvent => valueEvent<number>(connect, "f64", Number);
 
+/** Two digits, for a date or a time. */
+const two = (value: number): string => String(value).padStart(2, "0");
+
+/** An event that gives three numbers from C as one text: a date or a time, as its attribute is written. */
+function threeNumbersEvent(connect: Connect, write: (a: number, b: number, c: number) => string): NativeEvent {
+	return new NativeEvent(connect, (handlerOf) => new JSCallback(
+		(widget: number, a: number, b: number, c: number): void => {
+			const handler = handlerOf(widget) as ((value: string) => void) | undefined;
+			if (handler) {
+				eventScope.run(() => handler(write(a, b, c)), () => controlledSync.run(widget));
+			}
+		},
+		{ args: ["u32", "i32", "i32", "i32", "ptr"], returns: "void" },
+	));
+}
+
+/** `OnSort` of a Table: the column, and the direction. */
+const sortEvent = new NativeEvent(r.Rtable_set_sort_callback, (handlerOf) => new JSCallback(
+	(widget: number, column: number, descending: number): void => {
+		const handler = handlerOf(widget) as SortHandler | undefined;
+		if (handler) {
+			eventScope.run(() => handler(column, descending !== 0));
+		}
+	},
+	{ args: ["u32", "i32", "i32", "ptr"], returns: "void" },
+));
+
+/** `OnClicked` of a Toast: the button of its message. */
+const toastActionEvent = new NativeEvent(r.Rtoast_set_action_callback, (handlerOf) => new JSCallback(
+	(widget: number): void => {
+		const handler = handlerOf(widget) as (() => void) | undefined;
+		if (handler) {
+			eventScope.run(handler);
+		}
+	},
+	{ args: ["u32", "ptr"], returns: "void" },
+));
+
 /** `OnPaint`: runs while a frame is drawn, so nothing is committed after it. */
 const paintEvent = new NativeEvent(r.Rcustom_set_paint_callback, (handlerOf) => new JSCallback(
 	(widget: number, painter: Pointer | null, width: number, height: number): void => {
@@ -233,6 +273,17 @@ const WIDGET_EVENTS: Readonly<Record<string, Readonly<Record<string, NativeEvent
 		OnActivated: indexEvent(r.Rtile_view_set_activated_callback),
 	},
 	Custom: { OnPaint: paintEvent, OnMeasure: measureEvent },
+	Table: {
+		OnChanged: indexEvent(r.Rtable_set_selection_changed_callback),
+		OnActivated: indexEvent(r.Rtable_set_activated_callback),
+		OnSort: sortEvent,
+	},
+	DatePicker: { OnChanged: threeNumbersEvent(r.Rdate_picker_set_changed_callback, (year, month, day) => `${year}-${two(month)}-${two(day)}`) },
+	TimePicker: { OnChanged: threeNumbersEvent(r.Rtime_picker_set_changed_callback, (hour, minute, second) => `${two(hour)}:${two(minute)}:${two(second)}`) },
+	Rating: { OnChanged: floatEvent(r.Rrating_set_changed_callback) },
+	Pagination: { OnChanged: indexEvent(r.Rpagination_set_changed_callback) },
+	Breadcrumb: { OnClicked: indexEvent(r.Rbreadcrumb_set_clicked_callback) },
+	Toast: { OnClicked: toastActionEvent },
 };
 
 /** The items of a list asked for as they are shown: `ItemCount`, and a function for one item. */
@@ -270,8 +321,15 @@ let listText: Buffer = Buffer.from([0]);
 /** The structure C reads when the callback returns, with the texts it points to. */
 let tileItem: r.RTileItem | null = null;
 
-const VIRTUAL_ITEMS: Readonly<Record<string, { readonly prop: string; readonly items: VirtualItems }>> = {
+/** What makes a list virtual: the prop with its number of items, and the prop with its function. */
+export interface VirtualItemsProps {
+	readonly count: string;
+	readonly prop: string;
+}
+
+const VIRTUAL_ITEMS: Readonly<Record<string, VirtualItemsProps & { readonly items: VirtualItems }>> = {
 	ListView: {
+		count: "ItemCount",
 		prop: "ItemText",
 		items: new VirtualItems(r.Rlist_view_set_virtual_items, (handlerOf) => new JSCallback(
 			(widget: number, index: number): Pointer | null => {
@@ -285,6 +343,7 @@ const VIRTUAL_ITEMS: Readonly<Record<string, { readonly prop: string; readonly i
 		)),
 	},
 	TileView: {
+		count: "ItemCount",
 		prop: "ItemFill",
 		items: new VirtualItems(r.Rtile_view_set_items, (handlerOf) => new JSCallback(
 			(widget: number, index: number, item: Pointer | null): void => {
@@ -298,14 +357,25 @@ const VIRTUAL_ITEMS: Readonly<Record<string, { readonly prop: string; readonly i
 			{ args: ["u32", "i32", "ptr", "ptr"], returns: "void" },
 		)),
 	},
+	Table: {
+		count: "RowCount",
+		prop: "CellText",
+		items: new VirtualItems(r.Rtable_set_virtual_rows, (handlerOf) => new JSCallback(
+			(widget: number, row: number, column: number): Pointer | null => {
+				const handler = handlerOf(widget) as CellTextHandler | undefined;
+				eventScope.guard(() => {
+					listText = Buffer.from(`${handler?.(row, column) ?? ""}\0`);
+				});
+				return ptr(listText);
+			},
+			{ args: ["u32", "i32", "i32", "ptr"], returns: "ptr" },
+		)),
+	},
 };
 
-/** The attribute that says how many items a list has: it is not an attribute of Raven. */
-export const ITEM_COUNT = "ItemCount";
-
-/** The name of the prop that gives the items of a tag, if it has one. */
-export function virtualItemsProp(tag: string): string | undefined {
-	return VIRTUAL_ITEMS[tag]?.prop;
+/** The props that give the items of a tag, if it has them. */
+export function virtualItemsOf(tag: string): VirtualItemsProps | undefined {
+	return VIRTUAL_ITEMS[tag];
 }
 
 /** Gives a list its items. */
@@ -325,6 +395,12 @@ export const EVENT_VALUE_TYPES: Readonly<Record<string, Readonly<Record<string, 
 	ListView: { OnChanged: "number", OnActivated: "number" },
 	TreeView: { OnChanged: "number", OnActivated: "number" },
 	TileView: { OnChanged: "number", OnActivated: "number" },
+	Table: { OnActivated: "number" },
+	DatePicker: { OnChanged: "string" },
+	TimePicker: { OnChanged: "string" },
+	Rating: { OnChanged: "number" },
+	Pagination: { OnChanged: "number" },
+	Breadcrumb: { OnClicked: "number" },
 };
 
 /** The props this package adds to those in Raven's schema, as TypeScript, for the generator. */
@@ -336,6 +412,12 @@ export const EXTRA_PROPS: Readonly<Record<string, readonly string[]>> = {
 	ListView: ["readonly ItemCount?: number", "readonly ItemText?: (index: number) => string"],
 	// (the schema of Raven does not list this event, which exists)
 	TileView: ["readonly ItemCount?: number", "readonly ItemFill?: (index: number, item: RTileItem) => void", "readonly OnChanged?: (value: number) => void"],
+	Table: [
+		"readonly RowCount?: number",
+		"readonly CellText?: (row: number, column: number) => string",
+		"readonly OnChanged?: (row: number) => void",
+		"readonly OnSort?: (column: number, descending: boolean) => void",
+	],
 };
 
 /**
@@ -440,7 +522,7 @@ export const closeEvents = new CloseEvents();
 /** Sets, changes or removes the handlers of a widget, from one state of its props to the next. */
 export function applyHandlers(tag: string, widget: r.Rid, previous: ReadonlyMap<string, EventHandler>, next: ReadonlyMap<string, EventHandler>): void {
 	const events = WIDGET_EVENTS[tag];
-	const itemsProp = virtualItemsProp(tag);
+	const itemsProp = VIRTUAL_ITEMS[tag]?.prop;
 	for (const [name, handler] of next) {
 		if (name === itemsProp) {
 			continue;

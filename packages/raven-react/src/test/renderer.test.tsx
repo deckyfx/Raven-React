@@ -5,7 +5,7 @@ import { Component, createRef, useEffect, useState, type ReactNode } from "react
 import * as r from "../raven";
 import { eventStats } from "../events";
 import {
-	Border, Button, Checkbox, ComboBox, createWindow, Custom, Expander, HBox, Label, ListView, raven, RavenRoot, Slider, SpinBox, TabView, TextInput, TileView, TreeView, VBox, Window,
+	Border, Breadcrumb, Button, Checkbox, ComboBox, createWindow, Custom, DatePicker, Expander, HBox, Label, ListView, Overlay, Pagination, raven, RavenRoot, Rating, Slider, SpinBox, Table, TabView, TextInput, TileView, TimePicker, Toast, TreeView, VBox, Window,
 	type WidgetInstance, type WindowInstance,
 } from "../index";
 
@@ -672,4 +672,191 @@ test("a widget outside a window is said clearly", async () => {
 	console.error = report;
 	expect(reported.join()).toContain("must be inside a <Window>");
 	windows.unmount();
+});
+
+test("a Table takes its columns and rows, and gives the row and the sort", async () => {
+	const selected: number[] = [];
+	const activated: number[] = [];
+	const sorts: [number, boolean][] = [];
+	const rows = [["Ada", "36"], ["Grace", "85"], ["Bob", "9"]];
+	const table = createRef<WidgetInstance>();
+	await mount(
+		<VBox>
+			<Table
+				ref={table}
+				Name="t"
+				Height={200}
+				Columns={["Name", "Age"]}
+				RowCount={rows.length}
+				CellText={(row, column) => rows[row]?.[column] ?? ""}
+				OnChanged={(row) => selected.push(row)}
+				OnActivated={(row) => activated.push(row)}
+				OnSort={(column, descending) => sorts.push([column, descending])}
+			/>
+		</VBox>,
+	);
+	const widget = find("t");
+	expect(r.Rtable_get_column_count(widget)).toBe(2);
+	expect(r.Rtable_get_column_header(widget, 1)).toBe("Age");
+	expect(r.Rtable_get_row_count(widget)).toBe(3);
+	expect(r.Rtable_get_cell(widget, 1, 0)).toBe("Grace");
+	table.current?.focus();
+	press(r.R_KEY_DOWN);
+	expect(selected.at(-1)).toBe(r.Rtable_get_selected(widget));
+	press(r.R_KEY_ENTER);
+	expect(activated.at(-1)).toBe(r.Rtable_get_selected(widget));
+	const [x, y] = r.Rwidget_get_rect(widget);
+	clickAt(x + 20, y + 6);
+	expect(sorts).toEqual([[0, false]]);
+});
+
+test("a DatePicker gives the date as its attribute writes it, and can be controlled", async () => {
+	const seen: string[] = [];
+	function Picker({ locked }: { locked: boolean }): ReactNode {
+		const [date, setDate] = useState("2026-11-03");
+		return (
+			<VBox>
+				<Label Name="value">{date}</Label>
+				<DatePicker
+					Name="d"
+					Date={date}
+					OnChanged={(value) => {
+						seen.push(value);
+						if (!locked) {
+							setDate(value);
+						}
+					}}
+				/>
+			</VBox>
+		);
+	}
+	await mount(<Picker locked={false} />);
+	click("d");
+	press(r.R_KEY_DOWN);
+	press(r.R_KEY_ENTER);
+	expect(seen).toEqual(["2026-11-10"]);
+	expect(text("value")).toBe("2026-11-10");
+	root?.render(<Picker locked />);
+	await settle();
+	click("d");
+	press(r.R_KEY_DOWN);
+	press(r.R_KEY_ENTER);
+	expect(seen.at(-1)).toBe("2026-11-17");
+	expect(r.Rdate_picker_get_date(find("d"))).toEqual([2026, 11, 10]);
+});
+
+test("a TimePicker gives the time, and does not fight its own value", async () => {
+	const seen: string[] = [];
+	const picker = createRef<WidgetInstance>();
+	function Clock(): ReactNode {
+		const [time, setTime] = useState("09:30");
+		return (
+			<VBox>
+				<TimePicker
+					ref={picker}
+					Name="t"
+					Time={time}
+					MinuteStep={15}
+					OnChanged={(value) => {
+						seen.push(value);
+						setTime(value);
+					}}
+				/>
+			</VBox>
+		);
+	}
+	await mount(<Clock />);
+	picker.current?.focus();
+	press(r.R_KEY_DOWN);
+	expect(seen).toEqual(["08:30:00"]);
+	press(r.R_KEY_RIGHT);
+	press(r.R_KEY_UP);
+	expect(seen.at(-1)).toBe("08:45:00");
+	expect(r.Rtime_picker_get_time(find("t"))).toEqual([8, 45, 0]);
+});
+
+test("a Rating gives its score as a number", async () => {
+	const seen: number[] = [];
+	await mount(<HBox><Rating Name="r" Value={2} AllowHalf OnChanged={(value) => seen.push(value)} /></HBox>);
+	const [x, y, , height] = r.Rwidget_get_rect(find("r"));
+	clickAt(x + 2 + 22 * 3 + 14, y + height / 2);
+	expect(seen).toEqual([4]);
+	clickAt(x + 2 + 22 * 3 + 3, y + height / 2);
+	expect(seen.at(-1)).toBe(3.5);
+});
+
+test("a Pagination gives the page, and a controlled one stays where the state says", async () => {
+	const seen: number[] = [];
+	function Pages({ locked }: { locked: boolean }): ReactNode {
+		const [page, setPage] = useState(9);
+		return (
+			<HBox>
+				<Pagination
+					Name="p"
+					PageCount={20}
+					Page={page}
+					OnChanged={(value) => {
+						seen.push(value);
+						if (!locked) {
+							setPage(value);
+						}
+					}}
+				/>
+			</HBox>
+		);
+	}
+	await mount(<Pages locked={false} />);
+	const [x, y, , height] = r.Rwidget_get_rect(find("p"));
+	const button = r.Rtheme_get_metric(r.R_METRIC_CONTROL_HEIGHT);
+	clickAt(x + button / 2, y + height / 2);
+	expect(seen).toEqual([8]);
+	expect(r.Rpagination_get_page(find("p"))).toBe(8);
+	root?.render(<Pages locked />);
+	await settle();
+	const [x2, y2, , height2] = r.Rwidget_get_rect(find("p"));
+	clickAt(x2 + button / 2, y2 + height2 / 2);
+	expect(seen.at(-1)).toBe(7);
+	expect(r.Rpagination_get_page(find("p"))).toBe(8);
+});
+
+test("a Breadcrumb gives the index of the item", async () => {
+	const seen: number[] = [];
+	await mount(<HBox><Breadcrumb Name="b" Items={["Home", "Documents", "Report"]} OnClicked={(index) => seen.push(index)} /></HBox>);
+	expect(r.Rbreadcrumb_get_item_count(find("b"))).toBe(3);
+	const [x, y, , height] = r.Rwidget_get_rect(find("b"));
+	clickAt(x + 8, y + height / 2);
+	expect(seen).toEqual([0]);
+});
+
+test("a Toast is shown through its ref, and its button calls back", async () => {
+	let undone = 0;
+	const toast = createRef<WidgetInstance>();
+	await mount(
+		<Overlay>
+			<Button Name="under">under</Button>
+			<Toast ref={toast} Name="toast" ActionText="Undo" Kind="Success" Slot={{ HAlign: "Center", VAlign: "Bottom" }} OnClicked={() => undone++} />
+		</Overlay>,
+	);
+	const widget = toast.current?.widget ?? r.R_INVALID_ID;
+	expect(r.Rtoast_is_shown(widget)).toBe(0);
+	raven.Rtoast_show(widget, "Saved", 0);
+	await settle();
+	expect(r.Rtoast_is_shown(widget)).toBe(1);
+	expect(r.Rtoast_get_text(widget)).toBe("Saved");
+	const [x, y, width, height] = r.Rwidget_get_rect(widget);
+	clickAt(x + width - 20, y + height / 2);
+	expect(undone).toBe(1);
+	expect(r.Rtoast_is_shown(widget)).toBe(0);
+});
+
+test("a system notification goes through the C API, with the fallback on the JavaScript thread", async () => {
+	const seen: string[] = [];
+	raven.Rnotification_set_fallback((title, body) => {
+		seen.push(`${title}: ${body}`);
+		expect(r.Ris_ui_thread()).toBe(1);
+	});
+	await mount(<VBox><Label>x</Label></VBox>);
+	const shown = raven.Rnotification_show("Backup", "Finished", raven.R_NOTIFICATION_NORMAL);
+	expect(shown === 1 || seen.includes("Backup: Finished")).toBe(true);
+	raven.Rnotification_set_fallback(null);
 });

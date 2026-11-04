@@ -1,6 +1,6 @@
 import * as r from "./raven";
 import { RavenError } from "./errors";
-import { applyHandlers, controlledSync, eventScope, forgetHandlers, ITEM_COUNT, setVirtualItems, virtualItemsProp } from "./events";
+import { applyHandlers, controlledSync, eventScope, forgetHandlers, setVirtualItems, virtualItemsOf } from "./events";
 import { resolveProps, type RavenProps, type ResolvedProps } from "./props";
 
 /** What React's tree is made of: a widget, or a window, which is no widget of its parent. */
@@ -29,6 +29,7 @@ interface ControlledValue {
 }
 
 const numberText = (value: number): string => String(value);
+const twoDigits = (value: number): string => String(value).padStart(2, "0");
 
 /** The widgets the user changes directly. Their attribute must not be set to what they already hold. */
 const CONTROLLED: Readonly<Record<string, ControlledValue>> = {
@@ -40,11 +41,26 @@ const CONTROLLED: Readonly<Record<string, ControlledValue>> = {
 	ListView: { attribute: "Selected", read: (widget) => numberText(r.Rlist_view_get_selected(widget)) },
 	TabView: { attribute: "ActiveTab", read: (widget) => numberText(r.Rtab_view_get_active(widget)) },
 	Expander: { attribute: "Expanded", read: (widget) => (r.Rexpander_is_expanded(widget) ? "true" : "false") },
+	Table: { attribute: "Selected", read: (widget) => numberText(r.Rtable_get_selected(widget)) },
+	Rating: { attribute: "Value", read: (widget) => numberText(r.Rrating_get_value(widget)) },
+	Pagination: { attribute: "Page", read: (widget) => numberText(r.Rpagination_get_page(widget)) },
+	DatePicker: {
+		attribute: "Date",
+		read: (widget) => {
+			const [year, month, day] = r.Rdate_picker_get_date(widget);
+			return `${year}-${twoDigits(month)}-${twoDigits(day)}`;
+		},
+	},
+	TimePicker: {
+		attribute: "Time",
+		read: (widget) => r.Rtime_picker_get_time(widget).map(twoDigits).join(":"),
+	},
 };
 
 /** Whether two values of an attribute are the same. A Slider holds a float: its value comes back rounded. */
 function sameValue(held: string, wanted: string): boolean {
-	if (held === wanted) {
+	// (a TimePicker holds "09:30:00" for "09:30")
+	if (held === wanted || held === `${wanted}:00`) {
 		return true;
 	}
 	const a = Number(held);
@@ -116,7 +132,7 @@ export class WidgetInstance implements HostNode {
 
 	/** Sets one attribute. What the types let through and Raven refuses is said, not lost. */
 	private setAttribute(name: string, value: string): void {
-		if (name === ITEM_COUNT && virtualItemsProp(this.tag)) {
+		if (name === virtualItemsOf(this.tag)?.count) {
 			return;
 		}
 		const controlled = CONTROLLED[this.tag];
@@ -145,16 +161,18 @@ export class WidgetInstance implements HostNode {
 
 	/** Gives a list its items when their number or their function changed, and shows them. */
 	private applyVirtualItems(previous: ResolvedProps | null, next: ResolvedProps): void {
-		const prop = virtualItemsProp(this.tag);
-		const handler = prop ? next.handlers.get(prop) : undefined;
-		if (!handler) {
+		const virtual = virtualItemsOf(this.tag);
+		const handler = virtual ? next.handlers.get(virtual.prop) : undefined;
+		if (!virtual || !handler) {
 			return;
 		}
-		const count = next.attributes.get(ITEM_COUNT);
-		if (previous?.attributes.get(ITEM_COUNT) !== count || !previous?.handlers.has(prop ?? "")) {
-			setVirtualItems(this.tag, this.id, Number(count ?? 0), handler);
-		} else if (previous.handlers.get(prop ?? "") !== handler) {
-			setVirtualItems(this.tag, this.id, Number(count ?? 0), handler);
+		const count = next.attributes.get(virtual.count);
+		const before = previous?.handlers.get(virtual.prop);
+		if (before === handler && previous?.attributes.get(virtual.count) === count) {
+			return;
+		}
+		setVirtualItems(this.tag, this.id, Number(count ?? 0), handler);
+		if (before) {
 			r.Rwidget_invalidate(this.id);
 		}
 	}

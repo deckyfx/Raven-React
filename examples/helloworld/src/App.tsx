@@ -1,5 +1,5 @@
-import { useEffect, useState, type ReactNode } from "react";
-import { Button, Checkbox, ComboBox, Custom, Expander, HBox, Label, ListView, raven, Slider, SpinBox, TabView, TextInput, VBox, Window } from "@deckyfx/raven-react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
+import { Breadcrumb, Button, Checkbox, ComboBox, Custom, DatePicker, Expander, HBox, Label, ListView, Overlay, Pagination, raven, Rating, Slider, SpinBox, Table, TabView, TextInput, TimePicker, Toast, VBox, Window, type WidgetInstance } from "@deckyfx/raven-react";
 
 /** A row of the list. Two rows can have the same text, so the id is what tells them apart. */
 interface Item {
@@ -103,6 +103,58 @@ function Painting(): ReactNode {
 	);
 }
 
+const PEOPLE = [["Ada", "36", "London"], ["Grace", "85", "New York"], ["Linus", "56", "Portland"], ["Margaret", "88", "Boston"], ["Oscar", "27", "Paris"]];
+
+/** The newer widgets: a sortable table, dates, stars, pages, and messages. */
+function NewWidgets(): ReactNode {
+	const [rows, setRows] = useState(PEOPLE);
+	const [row, setRow] = useState(-1);
+	const [date, setDate] = useState("2026-11-04");
+	const [time, setTime] = useState("09:30");
+	const [stars, setStars] = useState(3);
+	const [page, setPage] = useState(0);
+	const toast = useRef<WidgetInstance>(null);
+
+	const sort = (column: number, descending: boolean): void => {
+		const number = column === 1;
+		const sorted = [...rows].sort((a, b) => {
+			const [x, y] = [a[column] ?? "", b[column] ?? ""];
+			return number ? Number(x) - Number(y) : x.localeCompare(y);
+		});
+		setRows(descending ? sorted.reverse() : sorted);
+	};
+	const say = (message: string): void => {
+		if (toast.current) {
+			raven.Rtoast_show(toast.current.widget, message, 3);
+		}
+	};
+
+	return (
+		<Overlay Slot={{ Title: "New" }}>
+			<VBox Spacing={10} Slot={{ Padding: 16 }}>
+				<Table Height={150} Columns={["Name", "Age", "City"]} RowCount={rows.length} CellText={(r, c) => rows[r]?.[c] ?? ""} Selected={row} OnChanged={setRow} OnSort={sort} />
+				<Label Opacity={0.7}>{row < 0 ? "Pick a row, or click a header to sort" : `Row ${row}: ${rows[row]?.[0]}`}</Label>
+				<HBox Spacing={12}>
+					<DatePicker Date={date} Width={140} OnChanged={setDate} />
+					<TimePicker Time={time} OnChanged={setTime} />
+				</HBox>
+				<Label Opacity={0.7}>{date} at {time}</Label>
+				<HBox Spacing={12}>
+					<Rating Value={stars} AllowHalf OnChanged={setStars} />
+					<Label Opacity={0.7}>{stars} of 5</Label>
+				</HBox>
+				<Breadcrumb Items={["Home", "Documents", "Report"]} OnClicked={(index) => say(`Item ${index}`)} />
+				<Pagination PageCount={12} Page={page} OnChanged={setPage} />
+				<HBox Spacing={8}>
+					<Button OnClicked={() => say(`Page ${page + 1}, ${stars} stars`)}>Show a toast</Button>
+					<Button OnClicked={() => raven.Rnotification_show("Hello World", "From raven-react", raven.R_NOTIFICATION_NORMAL)}>Notify the system</Button>
+				</HBox>
+			</VBox>
+			<Toast ref={toast} Kind="Success" Slot={{ HAlign: "Center", VAlign: "Bottom" }} />
+		</Overlay>
+	);
+}
+
 /** The testing ground of raven-react. */
 export function App(): ReactNode {
 	const [extraOpen, setExtraOpen] = useState(false);
@@ -120,6 +172,7 @@ export function App(): ReactNode {
 					/>
 					<Inputs />
 					<Painting />
+					<NewWidgets />
 				</TabView>
 			</Window>
 			{extraOpen && (

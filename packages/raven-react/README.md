@@ -76,6 +76,13 @@ Events with a value give it to the function, at each change. A `TextInput` gives
 | `ComboBox`, `TabView` | `OnChanged` | index |
 | `ListView`, `TileView` | `OnChanged`, `OnActivated` | index |
 | `TreeView` | `OnChanged`, `OnActivated` | handle of the item |
+| `Table` | `OnChanged`, `OnActivated` | row |
+| `Table` | `OnSort` | column, and whether it is descending |
+| `DatePicker` | `OnChanged` | `"YYYY-MM-DD"` |
+| `TimePicker` | `OnChanged` | `"HH:MM:SS"` |
+| `Rating` | `OnChanged` | `number` |
+| `Pagination` | `OnChanged` | page, from 0 |
+| `Breadcrumb` | `OnClicked` | index |
 
 Other events give nothing, and share the one action a widget has in Raven: give a widget one of them.
 
@@ -130,7 +137,17 @@ Long lists ask for their rows as they are shown, and a million rows cost nothing
 ```tsx
 <ListView ItemCount={1_000_000} ItemText={(index) => `Row ${index}`} />
 <TileView ItemCount={200} ItemFill={(index, item) => { item.text = names[index]; }} />
+<Table Columns={["Name", "Age"]} RowCount={people.length} CellText={(row, column) => cell(people[row], column)} />
 ```
+
+Some things are done through a `ref`, as they are actions and not state:
+
+```tsx
+raven.Rtoast_show(toast.current.widget, "Saved", 3);
+raven.Rnotification_show("Backup", "It is finished", raven.R_NOTIFICATION_NORMAL);
+```
+
+An `Image` shows an SVG file like any other: `<Image Source="logo.svg" />`.
 
 ## What to expect
 

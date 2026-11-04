@@ -5,6 +5,83 @@
     "": {
       "name": "raven-react-workspace",
     },
+    "examples/animations": {
+      "name": "example-animations",
+      "dependencies": {
+        "@decky.fx/raven-react": "workspace:*",
+        "react": "^19.2.0",
+      },
+      "devDependencies": {
+        "@types/bun": "latest",
+        "@types/react": "^19",
+      },
+    },
+    "examples/browser": {
+      "name": "example-browser",
+      "dependencies": {
+        "@decky.fx/raven-react": "workspace:*",
+        "react": "^19.2.0",
+      },
+      "devDependencies": {
+        "@types/bun": "latest",
+        "@types/react": "^19",
+      },
+    },
+    "examples/components": {
+      "name": "example-components",
+      "dependencies": {
+        "@decky.fx/raven-react": "workspace:*",
+        "react": "^19.2.0",
+      },
+      "devDependencies": {
+        "@types/bun": "latest",
+        "@types/react": "^19",
+      },
+    },
+    "examples/editor": {
+      "name": "example-editor",
+      "dependencies": {
+        "@decky.fx/raven-react": "workspace:*",
+        "react": "^19.2.0",
+      },
+      "devDependencies": {
+        "@types/bun": "latest",
+        "@types/react": "^19",
+      },
+    },
+    "examples/effects": {
+      "name": "example-effects",
+      "dependencies": {
+        "@decky.fx/raven-react": "workspace:*",
+        "react": "^19.2.0",
+      },
+      "devDependencies": {
+        "@types/bun": "latest",
+        "@types/react": "^19",
+      },
+    },
+    "examples/glass": {
+      "name": "example-glass",
+      "dependencies": {
+        "@decky.fx/raven-react": "workspace:*",
+        "react": "^19.2.0",
+      },
+      "devDependencies": {
+        "@types/bun": "latest",
+        "@types/react": "^19",
+      },
+    },
+    "examples/hello": {
+      "name": "example-hello",
+      "dependencies": {
+        "@decky.fx/raven-react": "workspace:*",
+        "react": "^19.2.0",
+      },
+      "devDependencies": {
+        "@types/bun": "latest",
+        "@types/react": "^19",
+      },
+    },
     "examples/helloworld": {
       "name": "helloworld",
       "dependencies": {
@@ -17,6 +94,105 @@
       },
       "peerDependencies": {
         "typescript": "^6",
+      },
+    },
+    "examples/memory": {
+      "name": "example-memory",
+      "dependencies": {
+        "@decky.fx/raven-react": "workspace:*",
+        "react": "^19.2.0",
+      },
+      "devDependencies": {
+        "@types/bun": "latest",
+        "@types/react": "^19",
+      },
+    },
+    "examples/music": {
+      "name": "example-music",
+      "dependencies": {
+        "@decky.fx/raven-react": "workspace:*",
+        "react": "^19.2.0",
+      },
+      "devDependencies": {
+        "@types/bun": "latest",
+        "@types/react": "^19",
+      },
+    },
+    "examples/notepad": {
+      "name": "example-notepad",
+      "dependencies": {
+        "@decky.fx/raven-react": "workspace:*",
+        "react": "^19.2.0",
+      },
+      "devDependencies": {
+        "@types/bun": "latest",
+        "@types/react": "^19",
+      },
+    },
+    "examples/overlay": {
+      "name": "example-overlay",
+      "dependencies": {
+        "@decky.fx/raven-react": "workspace:*",
+        "react": "^19.2.0",
+      },
+      "devDependencies": {
+        "@types/bun": "latest",
+        "@types/react": "^19",
+      },
+    },
+    "examples/studio": {
+      "name": "example-studio",
+      "dependencies": {
+        "@decky.fx/raven-react": "workspace:*",
+        "react": "^19.2.0",
+      },
+      "devDependencies": {
+        "@types/bun": "latest",
+        "@types/react": "^19",
+      },
+    },
+    "examples/themes": {
+      "name": "example-themes",
+      "dependencies": {
+        "@decky.fx/raven-react": "workspace:*",
+        "react": "^19.2.0",
+      },
+      "devDependencies": {
+        "@types/bun": "latest",
+        "@types/react": "^19",
+      },
+    },
+    "examples/viewport_opengl": {
+      "name": "example-viewport_opengl",
+      "dependencies": {
+        "@decky.fx/raven-react": "workspace:*",
+        "react": "^19.2.0",
+      },
+      "devDependencies": {
+        "@types/bun": "latest",
+        "@types/react": "^19",
+      },
+    },
+    "examples/viewport_vulkan": {
+      "name": "example-viewport_vulkan",
+      "dependencies": {
+        "@decky.fx/raven-react": "workspace:*",
+        "react": "^19.2.0",
+      },
+      "devDependencies": {
+        "@types/bun": "latest",
+        "@types/react": "^19",
+      },
+    },
+    "examples/workspace": {
+      "name": "example-workspace",
+      "dependencies": {
+        "@decky.fx/raven-react": "workspace:*",
+        "react": "^19.2.0",
+      },
+      "devDependencies": {
+        "@types/bun": "latest",
+        "@types/react": "^19",
       },
     },
     "packages/raven-react": {
@@ -63,6 +239,38 @@
     "bun-types": ["bun-types@1.4.4", "", { "dependencies": { "@types/node": "*", "undici-types": "*" } }, "sha512-yjrJh5oGX7mMPKGd19YXyIjmEuj4G4zNC30bs7PM9Az7NQ3ndF3j6hbeRdvJTRQEhJ/FYQwW0a2moweEi2hMxQ=="],
 
     "csstype": ["csstype@3.2.3", "", {}, "sha512-z1HGKcYy2xA8AGQfwrn0PAy+PB7X/GSj3UVJW9qKyn43xWa+gl5nXmU4qqLMRzWVLFC8KusUX8T/0kCiOYpAIQ=="],
+
+    "example-animations": ["example-animations@workspace:examples/animations"],
+
+    "example-browser": ["example-browser@workspace:examples/browser"],
+
+    "example-components": ["example-components@workspace:examples/components"],
+
+    "example-editor": ["example-editor@workspace:examples/editor"],
+
+    "example-effects": ["example-effects@workspace:examples/effects"],
+
+    "example-glass": ["example-glass@workspace:examples/glass"],
+
+    "example-hello": ["example-hello@workspace:examples/hello"],
+
+    "example-memory": ["example-memory@workspace:examples/memory"],
+
+    "example-music": ["example-music@workspace:examples/music"],
+
+    "example-notepad": ["example-notepad@workspace:examples/notepad"],
+
+    "example-overlay": ["example-overlay@workspace:examples/overlay"],
+
+    "example-studio": ["example-studio@workspace:examples/studio"],
+
+    "example-themes": ["example-themes@workspace:examples/themes"],
+
+    "example-viewport_opengl": ["example-viewport_opengl@workspace:examples/viewport_opengl"],
+
+    "example-viewport_vulkan": ["example-viewport_vulkan@workspace:examples/viewport_vulkan"],
+
+    "example-workspace": ["example-workspace@workspace:examples/workspace"],
 
     "helloworld": ["helloworld@workspace:examples/helloworld"],
 

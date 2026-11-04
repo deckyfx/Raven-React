@@ -1,0 +1,19 @@
+{
+  "name": "example-browser",
+  "description": "Web pages in the interface: Raven's browser example in TSX, with raven_web declared through bun:ffi",
+  "module": "src/index.tsx",
+  "type": "module",
+  "private": true,
+  "scripts": {
+    "dev": "bun run src/index.tsx",
+    "typecheck": "bun check"
+  },
+  "dependencies": {
+    "@decky.fx/raven-react": "workspace:*",
+    "react": "^19.2.0"
+  },
+  "devDependencies": {
+    "@types/bun": "latest",
+    "@types/react": "^19"
+  }
+}

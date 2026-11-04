@@ -6,3 +6,5 @@
 import "./native";
 
 export * from "./vendor/raven";
+// (shared with useFrame: a name given here has priority over the one of `export *`)
+export { Rset_frame_callback } from "./frame";

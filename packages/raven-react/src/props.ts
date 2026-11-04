@@ -3,11 +3,21 @@ import type { ReactNode } from "react";
 /** A function given to an `On...` prop. What it receives depends on the widget and the event. */
 export type EventHandler = (...values: never[]) => void;
 
+/** A row of a `TreeView` given by its `Items` prop, with the rows inside it. */
+export interface TreeItem {
+	readonly Text: string;
+	readonly Expanded?: boolean;
+	readonly Children?: readonly TreeItem[];
+}
+
 /** One value of an attribute, in the forms a component accepts. */
-export type AttributeValue = string | number | boolean | readonly string[] | readonly number[];
+export type AttributeValue = string | number | boolean | readonly string[] | readonly number[] | readonly TreeItem[];
 
 /** `Slot={{ Padding: 24 }}`: JSX has no dots in names, so `Slot.Padding` is written as a group. */
-export type AttributeGroup = { readonly [key: string]: AttributeValue | undefined };
+export type AttributeGroup = { readonly [key: string]: AttributeValue | null | undefined };
+
+/** What an attribute holds for `null` in a group: `Color={{ Text: null }}` takes the override away. */
+export const CLEARED = "\0cleared";
 
 /** A prop of a component. */
 export type PropValue = AttributeValue | AttributeGroup | EventHandler | ReactNode;
@@ -41,6 +51,9 @@ function toText(value: AttributeValue): string {
 	if (typeof value === "number" || typeof value === "boolean") {
 		return String(value);
 	}
+	if (value.some((item) => typeof item === "object")) {
+		return JSON.stringify(value);
+	}
 	return value.every((item) => typeof item === "number") ? value.join(",") : value.join("|");
 }
 
@@ -71,7 +84,7 @@ export function resolveProps(props: RavenProps): ResolvedProps {
 		} else if (isGroup(value)) {
 			for (const [key, item] of Object.entries(value)) {
 				if (item !== undefined) {
-					attributes.set(`${name}.${key}`, toText(item));
+					attributes.set(`${name}.${key}`, item === null ? CLEARED : toText(item));
 				}
 			}
 		} else if (typeof value === "string" || typeof value === "number" || typeof value === "boolean" || Array.isArray(value)) {

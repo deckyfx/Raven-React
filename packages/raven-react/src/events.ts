@@ -14,8 +14,11 @@ export interface MeasuredSize {
 	readonly Height: number;
 }
 
-/** What `OnPaint` of a `Custom` receives: the painter for the `Rdraw_` functions, and the size. */
-type PaintHandler = (painter: Pointer | null, width: number, height: number) => void;
+/** The painter `OnPaint` of a `Custom` receives, for the `Rdraw_` functions. */
+export type Painter = Pointer | null;
+
+/** What `OnPaint` of a `Custom` receives: the painter, and the size. */
+type PaintHandler = (painter: Painter, width: number, height: number) => void;
 type MeasureHandler = () => MeasuredSize;
 type ListTextHandler = (index: number) => string;
 type TileFillHandler = (index: number, item: r.RTileItem) => void;
@@ -93,6 +96,23 @@ class EventScope {
 export const eventScope = new EventScope();
 
 /**
+ * Makes a function for a callback of the C API behave as a prop would: an exception stays on this
+ * side, and what it changes in React is committed before the next event, not some time later.
+ * What it returns goes back to C, or `otherwise` if it threw.
+ *
+ *     raven.Rwidget_set_gesture_callback(widget, inEventScope((_widget, event) => { setZoom(event.scale); return 1; }, 0));
+ */
+export function inEventScope<A extends readonly (number | string | object | null)[], R>(callback: (...values: A) => R, otherwise?: R): (...values: A) => R {
+	return (...values) => {
+		let result = otherwise as R;
+		eventScope.run(() => {
+			result = callback(...values);
+		});
+		return result;
+	};
+}
+
+/**
  * A widget that holds its own value, which the user changes before React knows: what the
  * props say comes back when a handler refused the change, as a controlled input in React DOM.
  */
@@ -148,6 +168,11 @@ class NativeEvent {
 		}
 	}
 
+	/** The C function that connects it, for the tests. */
+	get connectName(): string {
+		return this.connect.name;
+	}
+
 	/** How many widgets have a function, for the tests. */
 	get size(): number {
 		return this.handlers.size;
@@ -180,6 +205,92 @@ const idEvent = (connect: Connect): NativeEvent => valueEvent<r.Rid>(connect, "u
 const floatEvent = (connect: Connect): NativeEvent => valueEvent<number>(connect, "f32", Number);
 const doubleEvent = (connect: Connect): NativeEvent => valueEvent<number>(connect, "f64", Number);
 
+/** An event that gives what C gives as it is. `args` are the types after the widget. */
+function directEvent(connect: Connect, args: readonly FFITypeOrString[]): NativeEvent {
+	return new NativeEvent(connect, (handlerOf) => new JSCallback(
+		(widget: number, ...values: number[]): void => {
+			const handler = handlerOf(widget) as ((...values: number[]) => void) | undefined;
+			if (handler) {
+				eventScope.run(() => handler(...values.slice(0, args.length)), () => controlledSync.run(widget));
+			}
+		},
+		{ args: ["u32", ...args, "ptr"], returns: "void" },
+	));
+}
+
+/** An event whose value is read from the widget, as C gives none of it, or not as its attribute is written. */
+function readEvent<V>(connect: Connect, args: readonly FFITypeOrString[], read: (widget: r.Rid) => V): NativeEvent {
+	return new NativeEvent(connect, (handlerOf) => new JSCallback(
+		(widget: number): void => {
+			const handler = handlerOf(widget) as ((value: V) => void) | undefined;
+			if (handler) {
+				eventScope.run(() => handler(read(widget)), () => controlledSync.run(widget));
+			}
+		},
+		{ args: ["u32", ...args, "ptr"], returns: "void" },
+	));
+}
+
+/**
+ * An event that asks: the function says yes by returning true, and anything else is no, an
+ * exception included. A change made by the renderer is not asked about.
+ */
+function requestEvent(connect: Connect, args: readonly FFITypeOrString[]): NativeEvent {
+	return new NativeEvent(connect, (handlerOf) => new JSCallback(
+		(widget: number, ...values: number[]): number => {
+			const handler = handlerOf(widget) as ((...values: number[]) => boolean | void) | undefined;
+			let answer = 1;
+			if (handler) {
+				eventScope.run(() => {
+					answer = 0;
+					answer = handler(...values.slice(0, args.length)) === true ? 1 : 0;
+				});
+			}
+			return answer;
+		},
+		{ args: ["u32", ...args, "ptr"], returns: "i32" },
+	));
+}
+
+/** A right click: what is under the pointer, and where. */
+const contextEvent = (connect: Connect, item: FFITypeOrString): NativeEvent => directEvent(connect, [item, "f32", "f32"]);
+
+/**
+ * An event that gives a structure, valid during the call, and consumes what it receives when
+ * the function returns true.
+ */
+function structEvent<S>(connect: Connect, read: (raw: Pointer | null) => S | null): NativeEvent {
+	return new NativeEvent(connect, (handlerOf) => new JSCallback(
+		(widget: number, raw: Pointer | null): number => {
+			const handler = handlerOf(widget) as ((event: S) => boolean | void) | undefined;
+			const event = read(raw);
+			let consumed = 0;
+			if (handler && event) {
+				eventScope.run(() => {
+					consumed = handler(event) === true ? 1 : 0;
+				});
+			}
+			return consumed;
+		},
+		{ args: ["u32", "ptr", "ptr"], returns: "i32" },
+	));
+}
+
+/** The events of a window, which are not widgets. `OnClose` is apart: without it, Raven closes. */
+export const WINDOW_EVENTS: Readonly<Record<string, NativeEvent>> = {
+	OnResize: directEvent(r.Rwindow_set_resize_callback, ["i32", "i32"]),
+	OnDrop: structEvent(r.Rwindow_set_drop_callback, (raw) => r.RDropEvent.from(raw)),
+};
+
+/**
+ * The events every widget has. `OnEvent` is its input before the widget sees it, for what has no
+ * prop of its own, as the pointer over a `Custom`. `OnDrop` is what is dropped on it.
+ */
+const COMMON_EVENTS: Readonly<Record<string, NativeEvent>> = {
+	OnEvent: structEvent(r.Rwidget_set_event_callback, (raw) => r.REvent.from(raw)),
+	OnDrop: structEvent(r.Rwidget_set_drop_callback, (raw) => r.RDropEvent.from(raw)),
+};
+
 /** Two digits, for a date or a time. */
 const two = (value: number): string => String(value).padStart(2, "0");
 
@@ -201,7 +312,7 @@ const sortEvent = new NativeEvent(r.Rtable_set_sort_callback, (handlerOf) => new
 	(widget: number, column: number, descending: number): void => {
 		const handler = handlerOf(widget) as SortHandler | undefined;
 		if (handler) {
-			eventScope.run(() => handler(column, descending !== 0));
+			eventScope.run(() => handler(column, descending !== 0), () => controlledSync.run(widget));
 		}
 	},
 	{ args: ["u32", "i32", "i32", "ptr"], returns: "void" },
@@ -258,7 +369,10 @@ const WIDGET_EVENTS: Readonly<Record<string, Readonly<Record<string, NativeEvent
 	Slider: { OnChanged: floatEvent(r.Rslider_set_changed_callback) },
 	SpinBox: { OnChanged: doubleEvent(r.Rspin_box_set_changed_callback) },
 	ComboBox: { OnChanged: indexEvent(r.Rcombo_box_set_changed_callback) },
-	TabView: { OnChanged: indexEvent(r.Rtab_view_set_changed_callback) },
+	TabView: {
+		OnChanged: indexEvent(r.Rtab_view_set_changed_callback),
+		OnClose: requestEvent(r.Rtab_view_set_close_callback, ["i32", "u32"]),
+	},
 	Expander: { OnChanged: flagEvent(r.Rexpander_set_changed_callback) },
 	ListView: {
 		OnChanged: indexEvent(r.Rlist_view_set_selection_changed_callback),
@@ -267,10 +381,12 @@ const WIDGET_EVENTS: Readonly<Record<string, Readonly<Record<string, NativeEvent
 	TreeView: {
 		OnChanged: idEvent(r.Rtree_view_set_selection_changed_callback),
 		OnActivated: idEvent(r.Rtree_view_set_activated_callback),
+		OnContext: contextEvent(r.Rtree_view_set_context_callback, "u32"),
 	},
 	TileView: {
 		OnChanged: indexEvent(r.Rtile_view_set_selection_changed_callback),
 		OnActivated: indexEvent(r.Rtile_view_set_activated_callback),
+		OnContext: contextEvent(r.Rtile_view_set_context_callback, "i32"),
 	},
 	Custom: { OnPaint: paintEvent, OnMeasure: measureEvent },
 	Table: {
@@ -284,6 +400,47 @@ const WIDGET_EVENTS: Readonly<Record<string, Readonly<Record<string, NativeEvent
 	Pagination: { OnChanged: indexEvent(r.Rpagination_set_changed_callback) },
 	Breadcrumb: { OnClicked: indexEvent(r.Rbreadcrumb_set_clicked_callback) },
 	Toast: { OnClicked: toastActionEvent },
+	TextEditor: {
+		OnChanged: readEvent(r.Rtext_editor_set_changed_callback, [], (widget) => r.Rtext_editor_get_text(widget) ?? ""),
+		OnZoom: floatEvent(r.Rtext_editor_set_zoom_callback),
+		OnCompletion: textEvent(r.Rtext_editor_set_completion_callback),
+	},
+	ColorPicker: { OnChanged: readEvent(r.Rcolor_picker_set_changed_callback, ["f32", "f32", "f32", "f32"], (widget) => r.Rcolor_picker_get_hex(widget) ?? "") },
+	Label: { OnLink: textEvent(r.Rlabel_set_link_callback) },
+	MenuItem: { OnClicked: readEvent(r.Rmenu_item_set_clicked_callback, [], (widget) => r.Rmenu_item_is_checked(widget) !== 0) },
+	Island: { OnChanged: flagEvent(r.Risland_set_changed_callback) },
+	Viewport: { OnResize: directEvent(r.Rviewport_set_resize_callback, ["i32", "i32"]) },
+	FileBrowser: {
+		OnChanged: textEvent(r.Rfile_browser_set_selection_changed_callback),
+		OnAccepted: textEvent(r.Rfile_browser_set_accepted_callback),
+		OnCancelled: textEvent(r.Rfile_browser_set_cancelled_callback),
+	},
+	DockArea: {
+		OnChanged: readEvent(r.Rdock_area_set_changed_callback, [], (widget) => r.Rdock_area_save_layout(widget) ?? ""),
+		OnClose: requestEvent(r.Rdock_area_set_close_callback, ["u32"]),
+	},
+	Timeline: {
+		OnTime: doubleEvent(r.Rtimeline_set_time_callback),
+		OnItemChanged: indexEvent(r.Rtimeline_set_changed_callback),
+		OnSelection: indexEvent(r.Rtimeline_set_selection_callback),
+		OnActivated: indexEvent(r.Rtimeline_set_activated_callback),
+		OnRemoved: indexEvent(r.Rtimeline_set_removed_callback),
+	},
+	NodeGraph: {
+		OnLinked: indexEvent(r.Rnode_graph_set_linked_callback),
+		OnUnlinked: indexEvent(r.Rnode_graph_set_unlinked_callback),
+		OnMoved: indexEvent(r.Rnode_graph_set_moved_callback),
+		OnSelection: indexEvent(r.Rnode_graph_set_selection_callback),
+		OnRemoved: indexEvent(r.Rnode_graph_set_removed_callback),
+		OnActivated: indexEvent(r.Rnode_graph_set_activated_callback),
+		OnContext: contextEvent(r.Rnode_graph_set_context_callback, "i32"),
+		OnConnect: requestEvent(r.Rnode_graph_set_connect_callback, ["i32", "i32"]),
+	},
+	BlockEditor: {
+		OnChanged: indexEvent(r.Rblock_editor_set_changed_callback),
+		OnClicked: indexEvent(r.Rblock_editor_set_clicked_callback),
+		OnContext: contextEvent(r.Rblock_editor_set_context_callback, "i32"),
+	},
 };
 
 /** The items of a list asked for as they are shown: `ItemCount`, and a function for one item. */
@@ -308,6 +465,11 @@ class VirtualItems {
 		if (this.handlers.delete(widget) && alive) {
 			this.connect(widget, 0, null);
 		}
+	}
+
+	/** The C function that connects it, for the tests. */
+	get connectName(): string {
+		return this.connect.name;
 	}
 
 	/** How many widgets have a function, for the tests. */
@@ -401,31 +563,98 @@ export const EVENT_VALUE_TYPES: Readonly<Record<string, Readonly<Record<string, 
 	Rating: { OnChanged: "number" },
 	Pagination: { OnChanged: "number" },
 	Breadcrumb: { OnClicked: "number" },
+	TextEditor: { OnChanged: "string" },
+	ColorPicker: { OnChanged: "string" },
+	MenuItem: { OnClicked: "boolean" },
+	BlockEditor: { OnChanged: "number" },
 };
+
+/** What fills a widget from the elements XML takes inside it: `<Track>`, `<Node>`... */
+const MARKUP = "readonly Markup?: string";
 
 /** The props this package adds to those in Raven's schema, as TypeScript, for the generator. */
 export const EXTRA_PROPS: Readonly<Record<string, readonly string[]>> = {
+	Window: ["readonly Opacity?: number", "readonly ContinuousRedraw?: boolean"],
 	Custom: [
-		"readonly OnPaint?: (painter: Pointer | null, width: number, height: number) => void",
+		"readonly OnPaint?: (painter: Painter, width: number, height: number) => void",
 		"readonly OnMeasure?: () => MeasuredSize",
 	],
 	ListView: ["readonly ItemCount?: number", "readonly ItemText?: (index: number) => string"],
 	// (the schema of Raven does not list this event, which exists)
-	TileView: ["readonly ItemCount?: number", "readonly ItemFill?: (index: number, item: RTileItem) => void", "readonly OnChanged?: (value: number) => void"],
+	TileView: [
+		"readonly ItemCount?: number",
+		"readonly ItemFill?: (index: number, item: RTileItem) => void",
+		"readonly OnChanged?: (value: number) => void",
+		"readonly OnContext?: (index: number, x: number, y: number) => void",
+	],
 	Table: [
 		"readonly RowCount?: number",
 		"readonly CellText?: (row: number, column: number) => string",
 		"readonly OnChanged?: (row: number) => void",
 		"readonly OnSort?: (column: number, descending: boolean) => void",
+		MARKUP,
+	],
+	Image: ["readonly Texture?: Rid"],
+	TabView: [
+		"readonly Documents?: boolean",
+		"readonly OnClose?: (index: number, content: Rid) => boolean | void",
+	],
+	TreeView: [
+		"readonly Items?: readonly TreeItem[]",
+		"readonly OnContext?: (item: Rid, x: number, y: number) => void",
+		MARKUP,
+	],
+	TextEditor: ["readonly OnZoom?: (zoom: number) => void", "readonly OnCompletion?: (prefix: string) => void"],
+	Label: ['readonly FontStyle?: "Regular" | "Bold" | "Italic" | "BoldItalic"', "readonly OnLink?: (url: string) => void"],
+	Island: ["readonly OnChanged?: (expanded: boolean) => void"],
+	Viewport: ["readonly OnResize?: (width: number, height: number) => void"],
+	FileBrowser: [
+		"readonly OnChanged?: (path: string) => void",
+		"readonly OnAccepted?: (path: string) => void",
+		"readonly OnCancelled?: () => void",
+	],
+	DockArea: [
+		"readonly OnChanged?: (layout: string) => void",
+		"readonly OnClose?: (panel: Rid) => boolean | void",
+	],
+	Timeline: [
+		"readonly OnTime?: (seconds: number) => void",
+		"readonly OnItemChanged?: (item: number) => void",
+		"readonly OnSelection?: (item: number) => void",
+		"readonly OnActivated?: (item: number) => void",
+		"readonly OnRemoved?: (item: number) => void",
+		MARKUP,
+	],
+	NodeGraph: [
+		"readonly OnLinked?: (link: number) => void",
+		"readonly OnUnlinked?: (link: number) => void",
+		"readonly OnMoved?: (node: number) => void",
+		"readonly OnSelection?: (node: number) => void",
+		"readonly OnRemoved?: (node: number) => void",
+		"readonly OnActivated?: (node: number) => void",
+		"readonly OnContext?: (node: number, x: number, y: number) => void",
+		"readonly OnConnect?: (outputPin: number, inputPin: number) => boolean",
+		MARKUP,
+	],
+	BlockEditor: [
+		"readonly OnClicked?: (block: number) => void",
+		"readonly OnContext?: (block: number, x: number, y: number) => void",
+		MARKUP,
 	],
 };
+
+/** The props every widget has from this package, as TypeScript, for the generator. */
+export const COMMON_PROPS: readonly string[] = [
+	"readonly OnEvent?: (event: REvent) => boolean | void",
+	"readonly OnDrop?: (event: RDropEvent) => boolean | void",
+];
 
 /**
  * Events without a value, through the action of the widget: `OnClicked` of a Button, for
  * one. One action name per widget, and one native callback for them all.
  */
 class ActionEvents {
-	private readonly handlers = new Map<string, () => void>();
+	private readonly handlers = new Map<string, (sender: r.Rid) => void>();
 	private readonly nameOf = new Map<r.Rid, string>();
 	private callback: JSCallback | null = null;
 	private next = 0;
@@ -433,10 +662,10 @@ class ActionEvents {
 	/** The callback of every action, made the first time it is needed. */
 	private pointer(): Pointer | null {
 		this.callback ??= new JSCallback(
-			(_sender: number, action: Pointer | null): void => {
+			(sender: number, action: Pointer | null): void => {
 				const handler = action ? this.handlers.get(new CString(action).toString()) : undefined;
 				if (handler) {
-					eventScope.run(handler);
+					eventScope.run(() => handler(sender));
 				}
 			},
 			{ args: ["u32", "ptr", "ptr"], returns: "void" },
@@ -453,7 +682,20 @@ class ActionEvents {
 			r.Raction_bind(name, this.pointer());
 			r.Rwidget_set_action(widget, name);
 		}
-		this.handlers.set(name, handler as () => void);
+		// (a prop receives nothing, as its type says: `OnClicked={toggle}` must not get a handle)
+		this.handlers.set(name, () => (handler as () => void)());
+	}
+
+	/** Gives a function to an action of a name chosen by the application. It receives the sender. */
+	bind(name: string, handler: (sender: r.Rid) => void): void {
+		this.handlers.set(name, handler);
+		r.Raction_bind(name, this.pointer());
+	}
+
+	/** Takes the function of such an action away. */
+	unbind(name: string): void {
+		this.handlers.delete(name);
+		r.Raction_unbind(name);
 	}
 
 	/** Removes the function of a widget. */
@@ -475,7 +717,7 @@ class ActionEvents {
 	}
 }
 
-const actionEvents = new ActionEvents();
+export const actionEvents = new ActionEvents();
 
 /**
  * `OnClose` of a window. With a function, closing is a request: Raven keeps the window, and
@@ -519,15 +761,17 @@ class CloseEvents {
 
 export const closeEvents = new CloseEvents();
 
+/** The native event of a prop of a tag, if it has one: the rest goes through the action of the widget. */
+const eventOf = (tag: string, name: string): NativeEvent | undefined => WIDGET_EVENTS[tag]?.[name] ?? COMMON_EVENTS[name];
+
 /** Sets, changes or removes the handlers of a widget, from one state of its props to the next. */
 export function applyHandlers(tag: string, widget: r.Rid, previous: ReadonlyMap<string, EventHandler>, next: ReadonlyMap<string, EventHandler>): void {
-	const events = WIDGET_EVENTS[tag];
 	const itemsProp = VIRTUAL_ITEMS[tag]?.prop;
 	for (const [name, handler] of next) {
 		if (name === itemsProp) {
 			continue;
 		}
-		const event = events?.[name];
+		const event = eventOf(tag, name);
 		if (event) {
 			event.on(widget, handler);
 		} else {
@@ -538,10 +782,10 @@ export function applyHandlers(tag: string, widget: r.Rid, previous: ReadonlyMap<
 		if (next.has(name) || name === itemsProp) {
 			continue;
 		}
-		const event = events?.[name];
+		const event = eventOf(tag, name);
 		if (event) {
 			event.off(widget, true);
-		} else if (![...next.keys()].some((other) => other !== itemsProp && !events?.[other])) {
+		} else if (![...next.keys()].some((other) => other !== itemsProp && !eventOf(tag, other))) {
 			actionEvents.off(widget, true);
 		}
 	}
@@ -552,17 +796,37 @@ export function forgetHandlers(tag: string, widget: r.Rid, alive: boolean): void
 	for (const event of Object.values(WIDGET_EVENTS[tag] ?? {})) {
 		event.off(widget, alive);
 	}
+	for (const event of Object.values(COMMON_EVENTS)) {
+		event.off(widget, alive);
+	}
 	VIRTUAL_ITEMS[tag]?.items.clear(widget, alive);
 	actionEvents.off(widget, alive);
 	controlledSync.forget(widget);
 }
 
+/** Every native event. */
+const allEvents = (): NativeEvent[] => [...Object.values(WIDGET_EVENTS).flatMap((group) => Object.values(group)), ...Object.values(COMMON_EVENTS), ...Object.values(WINDOW_EVENTS)];
+
 /** What the tests read to see that nothing grows. */
 export function eventStats(): { handlers: number; nativeCallbacks: number } {
-	const events = Object.values(WIDGET_EVENTS).flatMap((group) => Object.values(group));
+	const events = allEvents();
 	const virtual = Object.values(VIRTUAL_ITEMS).reduce((sum, entry) => sum + entry.items.size, 0);
 	return {
 		handlers: actionEvents.size + closeEvents.size + virtual + events.reduce((sum, event) => sum + event.size, 0),
 		nativeCallbacks: 1 + events.filter((event) => event.hasCallback).length,
 	};
+}
+
+/** The C functions the tables above connect, for the test of what is covered. */
+export function wiredCallbacks(): string[] {
+	return [
+		...allEvents().map((event) => event.connectName),
+		...Object.values(VIRTUAL_ITEMS).map((entry) => entry.items.connectName),
+		r.Rwindow_set_close_callback.name,
+	];
+}
+
+/** Which props of which tags have a native event, for the test of what is covered. */
+export function wiredProps(): Array<readonly [string, string]> {
+	return Object.entries(WIDGET_EVENTS).flatMap(([tag, group]) => Object.keys(group).map((name) => [tag, name] as const));
 }

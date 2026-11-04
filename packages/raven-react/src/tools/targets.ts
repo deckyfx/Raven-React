@@ -1,7 +1,8 @@
 /** The platforms a native package exists for, shared by the tools. */
 
-import { mkdirSync, rmSync } from "node:fs";
+import { mkdirSync, readdirSync, renameSync, rmSync } from "node:fs";
 import { resolve } from "node:path";
+import { STAMP_FILE, type LibraryStamp } from "../library-check";
 
 export interface Target {
 	readonly os: string;
@@ -44,7 +45,17 @@ export function argument(name: string): string {
 	return value;
 }
 
-/** Writes the package of a platform: the library, and the module that says where it is. */
+/**
+ * Writes a file beside its place and moves it there: a program running from the old library
+ * keeps it, and a program starting now finds a whole one.
+ */
+async function replaceFile(path: string, content: Blob | string): Promise<void> {
+	const beside = `${path}.${process.pid}.tmp`;
+	await Bun.write(beside, content);
+	renameSync(beside, path);
+}
+
+/** Writes the package of a platform: the library, its stamp, and the module that says where it is. */
 export async function writePlatformPackage(options: {
 	readonly mainName: string;
 	readonly version: string;
@@ -52,19 +63,21 @@ export async function writePlatformPackage(options: {
 	readonly libraryPath: string;
 	readonly directory: string;
 	readonly licensesFrom?: string;
+	/** What the library is, for `raven.json`. */
+	readonly stamp: LibraryStamp;
 }): Promise<void> {
-	const { mainName, version, target, libraryPath, licensesFrom } = options;
+	const { mainName, version, target, libraryPath, licensesFrom, stamp } = options;
 	const { os, cpu, library } = targetOf(target);
-	const files = ["index.ts", library];
+	const files = ["index.ts", library, STAMP_FILE];
 	// (absolute: removing a path that holds ".." fails on Windows, in Bun.$ and in rmSync)
 	const directory = resolve(options.directory);
-	rmSync(directory, { recursive: true, force: true });
 	mkdirSync(directory, { recursive: true });
-	await Bun.write(`${directory}/${library}`, Bun.file(libraryPath));
-	await Bun.write(`${directory}/index.ts`, `import path from "./${library}" with { type: "file" };\n\nexport default path;\n`);
+	await replaceFile(`${directory}/${library}`, Bun.file(libraryPath));
+	await replaceFile(`${directory}/${STAMP_FILE}`, `${JSON.stringify(stamp, null, 2)}\n`);
+	await replaceFile(`${directory}/index.ts`, `import path from "./${library}" with { type: "file" };\n\nexport default path;\n`);
 	for (const name of ["LICENSE", "NOTICE", "THIRD_PARTY.md"]) {
 		if (licensesFrom && (await Bun.file(`${licensesFrom}/${name}`).exists())) {
-			await Bun.write(`${directory}/${name}`, Bun.file(`${licensesFrom}/${name}`));
+			await replaceFile(`${directory}/${name}`, Bun.file(`${licensesFrom}/${name}`));
 			files.push(name);
 		}
 	}
@@ -80,5 +93,10 @@ export async function writePlatformPackage(options: {
 		files,
 		repository: { type: "git", url: "git+https://github.com/deckyfx/Raven-React.git" },
 	};
-	await Bun.write(`${directory}/package.json`, `${JSON.stringify(manifest, null, 2)}\n`);
+	await replaceFile(`${directory}/package.json`, `${JSON.stringify(manifest, null, 2)}\n`);
+	for (const name of readdirSync(directory)) {
+		if (name !== "package.json" && !files.includes(name)) {
+			rmSync(`${directory}/${name}`, { recursive: true, force: true });
+		}
+	}
 }

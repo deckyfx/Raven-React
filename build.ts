@@ -22,7 +22,7 @@ const result = await Bun.build({
 	entrypoints: ["./src/index.tsx"],
 	compile: {
 		outfile,
-		...(windows ? { target: "bun-windows-x64" as const } : {}),
+		...(windows ? { target: "bun-windows-x64" as const, windows: { hideConsole: true } } : {}),
 		// The binary must behave the same wherever it runs, whatever .env is there.
 		autoloadDotenv: false,
 		autoloadBunfig: false,

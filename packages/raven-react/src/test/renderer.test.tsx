@@ -5,7 +5,7 @@ import { Component, createRef, useEffect, useState, type ReactNode } from "react
 import * as r from "../raven";
 import { eventStats } from "../events";
 import {
-	Border, Breadcrumb, Button, Checkbox, ComboBox, createWindow, Custom, DatePicker, Expander, HBox, Label, ListView, Overlay, Pagination, raven, RavenRoot, Rating, Slider, SpinBox, Table, TabView, TextInput, TileView, TimePicker, Toast, TreeView, VBox, Window,
+	Border, Breadcrumb, Button, parseKeys, useAction, useShortcut, Checkbox, ComboBox, createWindow, Custom, DatePicker, Expander, HBox, Label, ListView, Overlay, Pagination, raven, RavenRoot, Rating, Slider, SpinBox, Table, TabView, TextInput, TileView, TimePicker, Toast, TreeView, VBox, Window,
 	type WidgetInstance, type WindowInstance,
 } from "../index";
 
@@ -859,4 +859,45 @@ test("a system notification goes through the C API, with the fallback on the Jav
 	const shown = raven.Rnotification_show("Backup", "Finished", raven.R_NOTIFICATION_NORMAL);
 	expect(shown === 1 || seen.includes("Backup: Finished")).toBe(true);
 	raven.Rnotification_set_fallback(null);
+});
+
+test("shortcuts are read, fire on their window, and go away with their component", async () => {
+	expect(parseKeys("F5")).toEqual({ key: r.R_KEY_F5, modifiers: 0 });
+	expect(parseKeys("Ctrl+Shift+S")).toEqual({ key: r.R_KEY_S, modifiers: r.R_MOD_CTRL | r.R_MOD_SHIFT });
+	expect(parseKeys("Esc").key).toBe(r.R_KEY_ESCAPE);
+	let fired = 0;
+	const owner = createRef<WindowInstance>();
+	function Keys({ count }: { count: number }): ReactNode {
+		useShortcut(owner, "Ctrl+K", () => {
+			fired += count;
+		});
+		return <Label>x</Label>;
+	}
+	const windows = new RavenRoot();
+	windows.render(<Window ref={owner}><Keys count={1} /></Window>);
+	await settle();
+	const id = owner.current?.window ?? r.R_INVALID_ID;
+	r.Rwindow_inject_key(id, r.R_KEY_K, 1, r.R_MOD_CTRL);
+	r.Rwindow_inject_key(id, r.R_KEY_K, 0, r.R_MOD_CTRL);
+	expect(fired).toBe(1);
+	windows.render(<Window ref={owner}><Keys count={10} /></Window>);
+	await settle();
+	r.Rwindow_inject_key(id, r.R_KEY_K, 1, r.R_MOD_CTRL);
+	r.Rwindow_inject_key(id, r.R_KEY_K, 0, r.R_MOD_CTRL);
+	expect(fired).toBe(11);
+	windows.unmount();
+	expect(eventStats().handlers).toBe(0);
+});
+
+test("useAction names a function, and an On prop takes a name", async () => {
+	let fired = 0;
+	function Named(): ReactNode {
+		useAction("test.named", () => fired++);
+		return <VBox><Button Name="go" OnClicked="test.named">go</Button></VBox>;
+	}
+	await mount(<Named />);
+	click("go");
+	expect(fired).toBe(1);
+	r.Raction_fire("test.named", r.R_INVALID_ID);
+	expect(fired).toBe(2);
 });

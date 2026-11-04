@@ -8,6 +8,7 @@
  * `-static` keeps libwinpthread and libgcc inside the DLL: most Windows machines do not have them.
  */
 
+import { fail, flag, makeStamp, mismatchOf, readPin } from "./raven-pin";
 import { writePlatformPackage } from "./targets";
 import manifest from "../../package.json";
 
@@ -20,6 +21,12 @@ if (!Bun.which("x86_64-w64-mingw32-gcc")) {
 	process.exit(1);
 }
 
+const pin = await readPin();
+const mismatch = mismatchOf(raven, pin);
+if (mismatch && !flag("allow-mismatch")) {
+	fail(mismatch);
+}
+
 await Bun.$`cmake --fresh -S ${raven} -B ${build} --toolchain ${root}/cmake/mingw-w64.cmake -DCMAKE_BUILD_TYPE=Release -DRAVEN_BUILD_SHARED=ON -DRAVEN_BUILD_TESTS=OFF -DRAVEN_BUILD_EXAMPLES=OFF -DRAVEN_BUILD_TOOLS=OFF -DCMAKE_SHARED_LINKER_FLAGS=${"-static-libgcc -static"}`.quiet();
 await Bun.$`cmake --build ${build} --parallel`.quiet();
 
@@ -29,5 +36,6 @@ await writePlatformPackage({
 	target: "win32-x64",
 	libraryPath: `${build}/bin/raven.dll`,
 	directory: `${root}/native/win32-x64`,
+	stamp: await makeStamp({ library: `${build}/bin/raven.dll`, checkout: raven, pin, verified: !mismatch, canOpen: false }),
 });
 console.log(`native/win32-x64 from ${build}/bin/raven.dll. Run bun install to link it.`);

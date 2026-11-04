@@ -8,9 +8,13 @@ import { WidgetInstance, type HostNode } from "./widget-instance";
 import { WindowInstance } from "./window-instance";
 
 /** React asks for a context per level of the tree. Raven has no use for one, but it must exist. */
-type HostContext = Record<string, never>;
-const HOST_CONTEXT: HostContext = {};
+type HostContext = { readonly inMenu: boolean };
+const HOST_CONTEXT: HostContext = { inMenu: false };
+const MENU_CONTEXT: HostContext = { inMenu: true };
 const NO_TIMEOUT = -1;
+
+/** A `<Separator>` in a `<Menu>`: a line of the menu, as in XML, which is an item there and no widget of its own. */
+const menuSeparator = (props: RavenProps): RavenProps => ({ ...(props.Name === undefined ? {} : { Name: props.Name }), Separator: true });
 
 /** Widgets whose attributes that need a parent wait for the end of the commit. */
 const placedInThisCommit: HostNode[] = [];
@@ -37,7 +41,12 @@ const hostConfig: RavenHostConfig = {
 	NotPendingTransition: null,
 	HostTransitionContext: createContext<null>(null),
 
-	createInstance: (tag, props) => (tag === "Window" ? WindowInstance.create(props) : WidgetInstance.create(tag, props)),
+	createInstance: (tag, props, _root, context) => {
+		if (tag === "Window") {
+			return WindowInstance.create(props);
+		}
+		return tag === "Separator" && context.inMenu ? WidgetInstance.create("MenuItem", menuSeparator(props)) : WidgetInstance.create(tag, props);
+	},
 	createTextInstance: (text) => RavenError.throw(`raven-react: text must be alone in a widget: "${text}"`),
 	shouldSetTextContent: (_tag, props) => childrenText(props.children) !== null,
 	appendInitialChild: (parent, child) => parent.append(child),
@@ -47,7 +56,10 @@ const hostConfig: RavenHostConfig = {
 	},
 	getPublicInstance: (instance) => instance,
 	getRootHostContext: () => HOST_CONTEXT,
-	getChildHostContext: (parent) => parent,
+	getChildHostContext: (parent, tag) => {
+		const inMenu = tag === "Menu";
+		return inMenu === parent.inMenu ? parent : inMenu ? MENU_CONTEXT : HOST_CONTEXT;
+	},
 	prepareForCommit: () => null,
 	resetAfterCommit: () => {
 		for (const instance of placedInThisCommit.splice(0)) {
@@ -63,7 +75,7 @@ const hostConfig: RavenHostConfig = {
 	insertInContainerBefore: (container, child, before) => container.insertBefore(child, before),
 	removeChild: (parent, child) => parent.remove(child),
 	removeChildFromContainer: (container, child) => container.remove(child),
-	commitUpdate: (instance, _tag, _previous, next) => instance.update(next),
+	commitUpdate: (instance, tag, _previous, next) => instance.update(tag === "Separator" && instance.tag === "MenuItem" ? menuSeparator(next) : next),
 	commitTextUpdate: () => {},
 	hideInstance: () => {},
 	unhideInstance: () => {},

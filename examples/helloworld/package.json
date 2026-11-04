@@ -13,7 +13,7 @@
     "typecheck": "bun check"
   },
   "dependencies": {
-    "@deckyfx/raven-react": "workspace:*",
+    "@decky.fx/raven-react": "workspace:*",
     "react": "^19.2.0"
   },
   "devDependencies": {

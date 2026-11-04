@@ -4,7 +4,8 @@ import { DefaultEventPriority, DiscreteEventPriority } from "react-reconciler/co
 import { RavenError } from "./errors";
 import { eventScope, updatePriority } from "./events";
 import { childrenText, type RavenProps } from "./props";
-import { WidgetInstance } from "./widget-instance";
+import { WidgetInstance, type HostNode } from "./widget-instance";
+import { WindowInstance } from "./window-instance";
 
 /** React asks for a context per level of the tree. Raven has no use for one, but it must exist. */
 type HostContext = Record<string, never>;
@@ -12,13 +13,13 @@ const HOST_CONTEXT: HostContext = {};
 const NO_TIMEOUT = -1;
 
 /** Widgets whose attributes that need a parent wait for the end of the commit. */
-const placedInThisCommit: WidgetInstance[] = [];
+const placedInThisCommit: HostNode[] = [];
 
 updatePriority.default = DefaultEventPriority;
 updatePriority.discreteValue = DiscreteEventPriority;
 
 type RavenHostConfig = ReactReconciler.HostConfig<
-	string, RavenProps, WidgetInstance, WidgetInstance, never, never, never, never, never, WidgetInstance,
+	string, RavenProps, HostNode, HostNode, never, never, never, never, never, HostNode,
 	HostContext, never, ReturnType<typeof setTimeout>, typeof NO_TIMEOUT, null, null, null, never, never, never
 >;
 
@@ -36,7 +37,7 @@ const hostConfig: RavenHostConfig = {
 	NotPendingTransition: null,
 	HostTransitionContext: createContext<null>(null),
 
-	createInstance: (tag, props) => WidgetInstance.create(tag, props),
+	createInstance: (tag, props) => (tag === "Window" ? WindowInstance.create(props) : WidgetInstance.create(tag, props)),
 	createTextInstance: (text) => RavenError.throw(`raven-react: text must be alone in a widget: "${text}"`),
 	shouldSetTextContent: (_tag, props) => childrenText(props.children) !== null,
 	appendInitialChild: (parent, child) => parent.append(child),

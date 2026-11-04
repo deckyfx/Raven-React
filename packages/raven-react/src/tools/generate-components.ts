@@ -6,7 +6,7 @@
  */
 
 import * as r from "../raven";
-import { EVENT_VALUE_TYPES } from "../events";
+import { EVENT_VALUE_TYPES, EXTRA_PROPS } from "../events";
 
 /** The TypeScript of an attribute, from what the schema says of it. */
 function typeOf(tag: string, info: r.RXmlAttributeInfo): string {
@@ -51,6 +51,7 @@ function propsOf(tag: string): string {
 	}
 	// a name can be both an attribute and a group (Color and Color.Window): either form is taken
 	const lines = [...props].filter(([name]) => !groups.has(name)).map(([name, type]) => `readonly ${name}?: ${type}`);
+	lines.push(...(EXTRA_PROPS[tag] ?? []));
 	for (const [name, entries] of groups) {
 		const alone = props.get(name);
 		lines.push(`readonly ${name}?: ${alone ? `${alone} | ` : ""}{ ${entries.join("; ")} }`);
@@ -68,16 +69,22 @@ if (!r.Rinit_ex(desc)) {
 
 const out = [
 	"// Generated from the schema of Raven by src/tools/generate-components.ts: do not edit.",
-	'import { createElement, type Key, type ReactElement, type ReactNode } from "react";',
+	'import { createElement, type Key, type ReactElement, type ReactNode, type Ref } from "react";',
+	'import type { Pointer } from "bun:ffi";',
+	'import type { MeasuredSize } from "./events";',
+	'import type { RTileItem } from "./raven";',
+	'import type { WidgetInstance } from "./widget-instance";',
+	'import type { WindowInstance } from "./window-instance";',
 	"",
 	"/** The props every component has from React. */",
-	"interface ReactProps {",
+	"interface ReactProps<R> {",
 	"\treadonly key?: Key;",
+	"\treadonly ref?: Ref<R>;",
 	"\treadonly children?: ReactNode;",
 	"}",
 	"",
 	"/** A component for a tag of Raven. JSX takes a capitalized name for a value, not for a tag. */",
-	"function tag<P extends object>(name: string): (props: P & ReactProps) => ReactElement {",
+	"function tag<P extends object, R = WidgetInstance>(name: string): (props: P & ReactProps<R>) => ReactElement {",
 	"\treturn (props) => createElement(name, props);",
 	"}",
 ];
@@ -90,8 +97,15 @@ for (let index = 0; index < r.Rxml_get_tag_count(); index++) {
 	const description = r.Rxml_get_tag_description(name);
 	out.push("");
 	if (name === "Window") {
-		// not a widget: it is what createWindow and runApp take
-		out.push("/** The attributes of a window, for `createWindow` and `runApp`. */", `export interface WindowOptions { ${propsOf(name)} }`);
+		// not a widget: its attributes are also what createWindow and runApp take
+		out.push("/** The attributes of a window, for `<Window>`, `createWindow` and `runApp`. */", `export interface WindowOptions { ${propsOf(name)} }`, "");
+		out.push(
+			"/**",
+			" * A window of its own, wherever it is in the tree: it opens with its element and closes with it.",
+			" * With `OnClose`, closing is a request: the window stays until the element is taken out.",
+			" */",
+			'export const Window = tag<WindowOptions & { readonly OnClose?: () => void }, WindowInstance>("Window");',
+		);
 		continue;
 	}
 	if (description) {

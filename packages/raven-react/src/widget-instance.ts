@@ -1,7 +1,25 @@
 import * as r from "./raven";
 import { RavenError } from "./errors";
-import { applyHandlers, controlledSync, eventScope, forgetHandlers } from "./events";
+import { applyHandlers, controlledSync, eventScope, forgetHandlers, ITEM_COUNT, setVirtualItems, virtualItemsProp } from "./events";
 import { resolveProps, type RavenProps, type ResolvedProps } from "./props";
+
+/** What React's tree is made of: a widget, or a window, which is no widget of its parent. */
+export interface HostNode {
+	readonly tag: string;
+	/** The widget to put in a parent, or null for a window, which stands by itself. */
+	readonly nativeWidget: r.Rid | null;
+	/** Says who holds it. */
+	setParent(parent: WidgetInstance | null): void;
+	update(props: RavenProps): void;
+	applyParentAttributes(): void;
+	append(child: HostNode): void;
+	insertBefore(child: HostNode, before: HostNode): void;
+	remove(child: HostNode): void;
+	/** Forgets the handlers of this node and of everything under it. */
+	forgetTree(): void;
+	/** Deletes it, after its parent let it go. */
+	dispose(): void;
+}
 
 /** How to read the value a widget holds by itself, for the attribute that sets it. */
 interface ControlledValue {
@@ -19,6 +37,7 @@ const CONTROLLED: Readonly<Record<string, ControlledValue>> = {
 	Slider: { attribute: "Value", read: (widget) => numberText(r.Rslider_get_value(widget)) },
 	SpinBox: { attribute: "Value", read: (widget) => numberText(r.Rspin_box_get_value(widget)) },
 	ComboBox: { attribute: "Selected", read: (widget) => numberText(r.Rcombo_box_get_selected(widget)) },
+	ListView: { attribute: "Selected", read: (widget) => numberText(r.Rlist_view_get_selected(widget)) },
 	TabView: { attribute: "ActiveTab", read: (widget) => numberText(r.Rtab_view_get_active(widget)) },
 	Expander: { attribute: "Expanded", read: (widget) => (r.Rexpander_is_expanded(widget) ? "true" : "false") },
 };
@@ -34,11 +53,12 @@ function sameValue(held: string, wanted: string): boolean {
 }
 
 /**
- * A widget under React. Raven's handle is here with what the renderer must remember:
- * the tree, because Raven has no way to ask where a child is, and the last props.
+ * A widget under React, and what a `ref` receives. Raven's handle is here with what the
+ * renderer must remember: the tree, because Raven has no way to ask where a child is, and
+ * the last props.
  */
-export class WidgetInstance {
-	private readonly children: WidgetInstance[] = [];
+export class WidgetInstance implements HostNode {
+	private readonly children: HostNode[] = [];
 	private parent: WidgetInstance | null = null;
 	private resolved: ResolvedProps = { attributes: new Map(), handlers: new Map() };
 
@@ -68,9 +88,25 @@ export class WidgetInstance {
 		return id;
 	}
 
-	/** Raven's handle of the widget. It changes if the widget has to be made again. */
+	/**
+	 * Raven's handle of the widget, for the functions of the `raven` export. Read it when you
+	 * need it and do not keep it: it changes if the widget has to be made again.
+	 */
 	get widget(): r.Rid {
 		return this.id;
+	}
+
+	/** Gives the widget the keyboard. */
+	focus(): void {
+		r.Rwidget_focus(this.id);
+	}
+
+	get nativeWidget(): r.Rid {
+		return this.id;
+	}
+
+	setParent(parent: WidgetInstance | null): void {
+		this.parent = parent;
 	}
 
 	/** Whether an attribute needs the widget to have its parent: `Slot.Padding` belongs to the parent's layout. */
@@ -80,6 +116,9 @@ export class WidgetInstance {
 
 	/** Sets one attribute. What the types let through and Raven refuses is said, not lost. */
 	private setAttribute(name: string, value: string): void {
+		if (name === ITEM_COUNT && virtualItemsProp(this.tag)) {
+			return;
+		}
 		const controlled = CONTROLLED[this.tag];
 		if (controlled?.attribute === name && sameValue(controlled.read(this.id), value)) {
 			return;
@@ -99,8 +138,25 @@ export class WidgetInstance {
 			}
 		}
 		applyHandlers(this.tag, this.id, new Map(), next.handlers);
+		this.applyVirtualItems(null, next);
 		this.resolved = next;
 		this.watchControlled();
+	}
+
+	/** Gives a list its items when their number or their function changed, and shows them. */
+	private applyVirtualItems(previous: ResolvedProps | null, next: ResolvedProps): void {
+		const prop = virtualItemsProp(this.tag);
+		const handler = prop ? next.handlers.get(prop) : undefined;
+		if (!handler) {
+			return;
+		}
+		const count = next.attributes.get(ITEM_COUNT);
+		if (previous?.attributes.get(ITEM_COUNT) !== count || !previous?.handlers.has(prop ?? "")) {
+			setVirtualItems(this.tag, this.id, Number(count ?? 0), handler);
+		} else if (previous.handlers.get(prop ?? "") !== handler) {
+			setVirtualItems(this.tag, this.id, Number(count ?? 0), handler);
+			r.Rwidget_invalidate(this.id);
+		}
 	}
 
 	/** After an event, puts back what the props say if a handler refused the change. */
@@ -128,6 +184,10 @@ export class WidgetInstance {
 
 	/** Goes from the last props to new ones, setting only what changed. */
 	update(props: RavenProps): void {
+		// (its window can be gone already: closed by the user, with no OnClose to ask first)
+		if (!r.Rwidget_is_valid(this.id)) {
+			return;
+		}
 		const next = resolveProps(props);
 		const previous = this.resolved;
 		// Raven has no way to give an attribute its default back, and no way to read it:
@@ -142,6 +202,10 @@ export class WidgetInstance {
 			}
 		}
 		applyHandlers(this.tag, this.id, previous.handlers, next.handlers);
+		this.applyVirtualItems(previous, next);
+		if (next.handlers.get("OnPaint") !== previous.handlers.get("OnPaint")) {
+			r.Rwidget_invalidate(this.id);
+		}
 		this.resolved = next;
 	}
 
@@ -149,13 +213,15 @@ export class WidgetInstance {
 	private remake(next: ResolvedProps): void {
 		const old = this.id;
 		const parent = this.parent;
-		const index = parent ? parent.children.indexOf(this) : -1;
+		const index = parent ? parent.nativeIndexOf(this) : -1;
 		forgetHandlers(this.tag, old, true);
 		this.id = WidgetInstance.make(this.tag);
 		this.applyAll(next);
 		for (const child of this.children) {
-			r.Rwidget_remove_child(old, child.id);
-			r.Rwidget_add_child(this.id, child.id);
+			if (child.nativeWidget !== null) {
+				r.Rwidget_remove_child(old, child.nativeWidget);
+				r.Rwidget_add_child(this.id, child.nativeWidget);
+			}
 		}
 		if (parent) {
 			r.Rwidget_remove_child(parent.id, old);
@@ -165,55 +231,80 @@ export class WidgetInstance {
 		this.applyParentAttributes();
 	}
 
+	/** Where a child is among the widgets of this one: a window in the tree is not one of them. */
+	private nativeIndexOf(child: HostNode): number {
+		return this.children.slice(0, this.children.indexOf(child)).filter((other) => other.nativeWidget !== null).length;
+	}
+
+	/** Makes sure a widget has a widget to go in: the top of a root of windows has none. */
+	private checkHolds(child: HostNode): void {
+		if (child.nativeWidget !== null && this.id === r.R_INVALID_ID) {
+			RavenError.throw(`raven-react: <${child.tag}> must be inside a <Window>`);
+		}
+	}
+
 	/** Adds a child at the end. A child already here moves to the end. */
-	append(child: WidgetInstance): void {
+	append(child: HostNode): void {
+		this.checkHolds(child);
 		this.detach(child);
 		this.children.push(child);
-		child.parent = this;
-		r.Rwidget_add_child(this.id, child.id);
+		child.setParent(this);
+		if (child.nativeWidget !== null) {
+			r.Rwidget_add_child(this.id, child.nativeWidget);
+		}
 	}
 
 	/** Puts a child before another one. A child already here moves. */
-	insertBefore(child: WidgetInstance, before: WidgetInstance): void {
+	insertBefore(child: HostNode, before: HostNode): void {
+		this.checkHolds(child);
 		this.detach(child);
 		const index = this.children.indexOf(before);
 		if (index < 0) {
 			RavenError.throw(`raven-react: <${before.tag}> is not a child of <${this.tag}>`);
 		}
 		this.children.splice(index, 0, child);
-		child.parent = this;
-		r.Rwidget_insert_child(this.id, child.id, index);
+		child.setParent(this);
+		if (child.nativeWidget !== null) {
+			r.Rwidget_insert_child(this.id, child.nativeWidget, this.nativeIndexOf(child));
+		}
 	}
 
 	/** Takes a child out without deleting it. */
-	private detach(child: WidgetInstance): void {
+	private detach(child: HostNode): void {
 		const index = this.children.indexOf(child);
 		if (index >= 0) {
 			this.children.splice(index, 1);
-			r.Rwidget_remove_child(this.id, child.id);
+			if (child.nativeWidget !== null) {
+				r.Rwidget_remove_child(this.id, child.nativeWidget);
+			}
 		}
 	}
 
 	/** Removes a child and deletes it with everything under it. */
-	remove(child: WidgetInstance): void {
+	remove(child: HostNode): void {
 		child.forgetTree();
+		// (the window may be gone already, closed by the user, with its widgets)
+		if (child.nativeWidget !== null && r.Rwidget_is_valid(child.nativeWidget)) {
+			r.Rwidget_remove_child(this.id, child.nativeWidget);
+		}
 		const index = this.children.indexOf(child);
 		if (index >= 0) {
 			this.children.splice(index, 1);
 		}
-		child.parent = null;
-		// (the window may be gone already, closed by the user, with its widgets)
-		if (r.Rwidget_is_valid(child.id)) {
-			r.Rwidget_remove_child(this.id, child.id);
-			r.Rwidget_destroy(child.id);
-		}
+		child.setParent(null);
+		child.dispose();
 	}
 
-	/** Forgets the handlers of this widget and of everything under it: Raven deletes them together. */
-	private forgetTree(): void {
+	forgetTree(): void {
 		for (const child of this.children) {
 			child.forgetTree();
 		}
 		forgetHandlers(this.tag, this.id, false);
+	}
+
+	dispose(): void {
+		if (r.Rwidget_is_valid(this.id)) {
+			r.Rwidget_destroy(this.id);
+		}
 	}
 }

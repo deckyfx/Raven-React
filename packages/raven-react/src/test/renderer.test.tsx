@@ -1,10 +1,13 @@
 /** React on real Raven widgets, without a window system or a GPU, clicked and typed into for real. */
 
 import { afterAll, afterEach, beforeAll, expect, test } from "bun:test";
-import { Component, useEffect, useState, type ReactNode } from "react";
+import { Component, createRef, useEffect, useState, type ReactNode } from "react";
 import * as r from "../raven";
 import { eventStats } from "../events";
-import { Border, Button, Checkbox, ComboBox, createWindow, HBox, Label, Slider, TextInput, VBox, type RavenRoot } from "../index";
+import {
+	Border, Button, Checkbox, ComboBox, createWindow, Custom, Expander, HBox, Label, ListView, raven, RavenRoot, Slider, SpinBox, TabView, TextInput, TileView, TreeView, VBox, Window,
+	type WidgetInstance, type WindowInstance,
+} from "../index";
 
 const WINDOW = { Title: "Test", Width: 480, Height: 480 } as const;
 let window: r.Rid = r.R_INVALID_ID;
@@ -387,4 +390,286 @@ test("an error boundary works", async () => {
 	await mount(<VBox><Boundary><Bad /></Boundary></VBox>);
 	console.error = report;
 	expect(text("fallback")).toBe("failed");
+});
+
+/** Presses and releases a key. */
+function press(key: r.RKey): void {
+	r.Rwindow_inject_key(window, key, 1, 0);
+	r.Rwindow_inject_key(window, key, 0, 0);
+}
+
+/** Clicks a place of the window. */
+function clickAt(x: number, y: number): void {
+	r.Rwindow_inject_mouse_move(window, x, y);
+	r.Rwindow_inject_mouse_button(window, r.R_MOUSE_LEFT, 1);
+	r.Rwindow_inject_mouse_button(window, r.R_MOUSE_LEFT, 0);
+}
+
+test("a ref gives the widget, and stays right when the widget is made again", async () => {
+	const input = createRef<WidgetInstance>();
+	const panel = createRef<WidgetInstance>();
+	function Panel({ faded }: { faded: boolean }): ReactNode {
+		return (
+			<VBox>
+				<TextInput ref={input} Name="input" />
+				<Border ref={panel} Name="panel" {...(faded ? { Opacity: 0.5 } : {})} />
+			</VBox>
+		);
+	}
+	await mount(<Panel faded />);
+	expect(input.current?.widget).toBe(find("input"));
+	input.current?.focus();
+	expect(r.Rwidget_is_focused(find("input"))).toBe(1);
+	const before = panel.current?.widget;
+	root?.render(<Panel faded={false} />);
+	await settle();
+	expect(panel.current?.widget).not.toBe(before);
+	expect(panel.current?.widget).toBe(find("panel"));
+	root?.unmount();
+	root = null;
+	expect(input.current).toBe(null);
+});
+
+test("a SpinBox gives its value at each change", async () => {
+	const seen: number[] = [];
+	const spin = createRef<WidgetInstance>();
+	await mount(<VBox><SpinBox ref={spin} Name="spin" Value={3} Step={0.5} OnChanged={(value) => seen.push(value)} /></VBox>);
+	spin.current?.focus();
+	press(r.R_KEY_UP);
+	expect(seen).toEqual([3.5]);
+	r.Rwindow_inject_text(window, "7.25");
+	press(r.R_KEY_ENTER);
+	expect(seen.at(-1)).toBeCloseTo(7.25, 5);
+});
+
+test("a ComboBox gives the index that was picked", async () => {
+	const seen: number[] = [];
+	await mount(<VBox><ComboBox Name="combo" Items={["one", "two", "three"]} OnChanged={(value) => seen.push(value)} /></VBox>);
+	click("combo");
+	press(r.R_KEY_DOWN);
+	press(r.R_KEY_ENTER);
+	expect(seen.length).toBe(1);
+	expect(seen[0]).toBe(r.Rcombo_box_get_selected(find("combo")));
+});
+
+test("a TabView makes a tab per child, and gives the index of the tab", async () => {
+	const seen: number[] = [];
+	await mount(
+		<VBox>
+			<TabView Name="tabs" Height={120} OnChanged={(value) => seen.push(value)}>
+				<Button Name="first" Slot={{ Title: "First" }}>a</Button>
+				<Button Name="second" Slot={{ Title: "Second" }}>b</Button>
+			</TabView>
+		</VBox>,
+	);
+	const tabs = find("tabs");
+	expect(r.Rtab_view_get_tab_count(tabs)).toBe(2);
+	r.Rtab_view_set_active(tabs, 1);
+	await settle();
+	const [x, y] = r.Rwidget_get_rect(tabs);
+	clickAt(x + 10, y + 8);
+	expect(seen.at(-1)).toBe(0);
+	expect(r.Rtab_view_get_active(tabs)).toBe(0);
+});
+
+test("an Expander gives its state", async () => {
+	const seen: boolean[] = [];
+	await mount(
+		<VBox>
+			<Expander Name="more" Title="More" OnChanged={(value) => seen.push(value)}>
+				<Button Name="inside">inside</Button>
+			</Expander>
+		</VBox>,
+	);
+	const [x, y, width] = r.Rwidget_get_rect(find("more"));
+	const before = r.Rexpander_is_expanded(find("more"));
+	clickAt(x + width / 2, y + 8);
+	expect(seen).toEqual([before === 0]);
+});
+
+test("a ListView gives the selected row, and the row that is activated", async () => {
+	const selected: number[] = [];
+	const activated: number[] = [];
+	const list = createRef<WidgetInstance>();
+	await mount(
+		<VBox>
+			<ListView ref={list} Name="list" Height={100} Items={["a", "b", "c"]} OnChanged={(value) => selected.push(value)} OnActivated={(value) => activated.push(value)} />
+		</VBox>,
+	);
+	expect(r.Rlist_view_get_item_count(find("list"))).toBe(3);
+	list.current?.focus();
+	press(r.R_KEY_DOWN);
+	press(r.R_KEY_DOWN);
+	expect(selected.length).toBe(2);
+	expect(selected.at(-1)).toBe(r.Rlist_view_get_selected(find("list")));
+	press(r.R_KEY_ENTER);
+	expect(activated).toEqual([r.Rlist_view_get_selected(find("list"))]);
+});
+
+test("a controlled ListView stays on what the state says", async () => {
+	await mount(<VBox><ListView Name="list" Height={100} Items={["a", "b", "c"]} Selected={1} OnChanged={() => {}} /></VBox>);
+	click("list");
+	expect(r.Rlist_view_get_selected(find("list"))).toBe(1);
+});
+
+test("a virtual ListView asks for its rows, and follows the state", async () => {
+	const asked: number[] = [];
+	function Rows(): ReactNode {
+		const [count, setCount] = useState(1_000_000);
+		const [word, setWord] = useState("Row");
+		return (
+			<VBox>
+				<ListView
+					Name="list"
+					Height={100}
+					ItemCount={count}
+					ItemText={(index) => {
+						asked.push(index);
+						return `${word} ${index}`;
+					}}
+				/>
+				<Button Name="less" OnClicked={() => setCount(5)}>less</Button>
+				<Button Name="word" OnClicked={() => setWord("Line")}>word</Button>
+			</VBox>
+		);
+	}
+	await mount(<Rows />);
+	const list = find("list");
+	expect(r.Rlist_view_get_item_count(list)).toBe(1_000_000);
+	expect(r.Rlist_view_get_item_text(list, 123456)).toBe("Row 123456");
+	expect(asked.length).toBeLessThan(100);
+	Bun.gc(true);
+	expect(r.Rlist_view_get_item_text(list, 7)).toBe("Row 7");
+	click("less");
+	expect(r.Rlist_view_get_item_count(find("list"))).toBe(5);
+	click("word");
+	expect(r.Rlist_view_get_item_text(find("list"), 2)).toBe("Line 2");
+	expect(find("list")).toBe(list);
+});
+
+test("a TreeView is filled through its ref, and gives the handle of the item", async () => {
+	const seen: r.Rid[] = [];
+	const tree = createRef<WidgetInstance>();
+	await mount(<VBox><TreeView ref={tree} Name="tree" Height={100} OnChanged={(item) => seen.push(item)} /></VBox>);
+	const widget = tree.current?.widget ?? r.R_INVALID_ID;
+	const world = raven.Rtree_view_add_item(widget, r.R_INVALID_ID, "World");
+	raven.Rtree_view_add_item(widget, r.R_INVALID_ID, "Sky");
+	await settle();
+	tree.current?.focus();
+	press(r.R_KEY_DOWN);
+	expect(seen.length).toBeGreaterThan(0);
+	expect(seen.at(-1)).toBe(r.Rtree_view_get_selected_item(widget));
+	expect([world, r.Rtree_view_get_selected_item(widget)]).toContain(seen[0] ?? r.R_INVALID_ID);
+});
+
+test("a TileView asks for its items and gives the one picked", async () => {
+	const filled = new Set<number>();
+	const selected: number[] = [];
+	await mount(
+		<VBox>
+			<TileView
+				Name="tiles"
+				Height={200}
+				TileWidth={100}
+				TileHeight={80}
+				ItemCount={3}
+				ItemFill={(index, item) => {
+					filled.add(index);
+					item.text = `Tile ${index} é`;
+				}}
+				OnChanged={(value) => selected.push(value)}
+			/>
+		</VBox>,
+	);
+	const tiles = find("tiles");
+	expect(r.Rtile_view_get_count(tiles)).toBe(3);
+	await settle();
+	expect(filled.size).toBeGreaterThan(0);
+	const [x, y] = r.Rwidget_get_rect(tiles);
+	clickAt(x + 130, y + 20);
+	expect(r.Rtile_view_get_current(tiles)).toBe(1);
+	expect(selected.length).toBeGreaterThan(0);
+});
+
+test("a Custom paints with the C API, and says its size", async () => {
+	const sizes: number[][] = [];
+	await mount(
+		<VBox>
+			<Custom
+				Name="canvas"
+				OnMeasure={() => ({ Width: 200, Height: 77 })}
+				OnPaint={(painter, width, height) => {
+					sizes.push([width, height]);
+					raven.Rdraw_rect(painter, 0, 0, width, height, 4, 1, 0, 0, 1);
+					raven.Rdraw_curve(painter, 0, 0, 10, 10, 20, 10, 30, 0, 2, 1, 1, 0, 1);
+				}}
+			/>
+		</VBox>,
+	);
+	expect(r.Rwidget_get_rect(find("canvas"))[3]).toBe(77);
+	await settle();
+	expect(sizes.length).toBeGreaterThan(0);
+	expect(sizes.at(-1)?.[1]).toBe(77);
+});
+
+test("windows come and go with their elements, and follow their props", async () => {
+	const first = createRef<WindowInstance>();
+	const second = createRef<WindowInstance>();
+	let closing = 0;
+	function Windows({ title, both }: { title: string; both: boolean }): ReactNode {
+		return (
+			<>
+				<Window ref={first} Title={title} Width={300} Height={200}>
+					<Label Name="in-first">one</Label>
+				</Window>
+				{both && (
+					<Window ref={second} Title="Second" Width={200} Height={100} OnClose={() => closing++}>
+						<Label Name="in-second">two</Label>
+					</Window>
+				)}
+			</>
+		);
+	}
+	const windows = new RavenRoot();
+	windows.render(<Windows title="First" both />);
+	await settle();
+	const a = first.current?.window ?? r.R_INVALID_ID;
+	const b = second.current?.window ?? r.R_INVALID_ID;
+	expect(r.Rwindow_get_title(a)).toBe("First");
+	expect(r.Rwindow_get_title(b)).toBe("Second");
+	expect(r.Rlabel_get_text(r.Rwidget_find(b, "in-second"))).toBe("two");
+
+	windows.render(<Windows title="Renamed" both />);
+	await settle();
+	expect(first.current?.window).toBe(a);
+	expect(r.Rwindow_get_title(a)).toBe("Renamed");
+
+	// with OnClose, closing is a request: the window stays until the element goes
+	r.Rwindow_close(b);
+	expect(closing).toBe(1);
+	expect(r.Rwindow_is_valid(b)).toBe(1);
+	windows.render(<Windows title="Renamed" both={false} />);
+	await settle();
+	expect(r.Rwindow_is_valid(b)).toBe(0);
+	expect(r.Rwindow_is_valid(a)).toBe(1);
+
+	// without it, the user can close it at any time, and updates do no harm
+	r.Rwindow_close(a);
+	expect(first.current?.isOpen).toBe(false);
+	windows.render(<Windows title="Again" both={false} />);
+	await settle();
+	windows.unmount();
+	expect(eventStats().handlers).toBe(0);
+});
+
+test("a widget outside a window is said clearly", async () => {
+	const report = console.error;
+	const reported: string[] = [];
+	console.error = (...values: unknown[]): void => void reported.push(values.join(" "));
+	const windows = new RavenRoot();
+	windows.render(<Label>lost</Label>);
+	await settle();
+	console.error = report;
+	expect(reported.join()).toContain("must be inside a <Window>");
+	windows.unmount();
 });

@@ -81,6 +81,57 @@ Other events give nothing, and share the one action a widget has in Raven: give 
 
 Inputs are controlled, as in React DOM. With `Text={value}`, what the state says stays on screen if a handler refuses a change. An update made in an event is committed before the next event, as a click in React DOM.
 
+## Windows
+
+`<Window>` is an element like any other, anywhere in the tree: it opens with its element and closes with it. Without options, `runApp` lets the tree say what windows there are, and ends when the last one closes.
+
+```tsx
+function App() {
+	const [help, setHelp] = useState(false);
+	return (
+		<>
+			<Window Title="Main" Width={640} Height={480}>
+				<Button OnClicked={() => setHelp(true)}>Help</Button>
+			</Window>
+			{help && <Window Title="Help" OnClose={() => setHelp(false)}><Label>...</Label></Window>}
+		</>
+	);
+}
+
+await runApp(<App />);
+```
+
+With `OnClose`, closing is a request: the window stays until the element is taken out. Without it, the user can close the window at any time. `Title`, `Theme`, `Width` and `Height` can change on an open window. Other attributes only count when it is made.
+
+## Going beyond props
+
+A `ref` gives a `WidgetInstance`, and `raven` is all of Raven's C API. Read `.widget` when you need it: the handle changes if the widget is made again.
+
+```tsx
+const input = useRef<WidgetInstance>(null);
+useEffect(() => input.current?.focus(), []);
+<TextInput ref={input} />
+
+// a TreeView is filled this way
+raven.Rtree_view_add_item(tree.current.widget, raven.R_INVALID_ID, "World");
+```
+
+A `Custom` draws with the `Rdraw_` functions. `OnPaint` runs while a frame is drawn, so it must not change state.
+
+```tsx
+<Custom
+	OnMeasure={() => ({ Width: 400, Height: 200 })}
+	OnPaint={(painter, width, height) => raven.Rdraw_rect(painter, 0, 0, width, height, 8, 0.2, 0.3, 0.4, 1)}
+/>
+```
+
+Long lists ask for their rows as they are shown, and a million rows cost nothing:
+
+```tsx
+<ListView ItemCount={1_000_000} ItemText={(index) => `Row ${index}`} />
+<TileView ItemCount={200} ItemFill={(index, item) => { item.text = names[index]; }} />
+```
+
 ## What to expect
 
 - Removing a prop makes the widget again, in its place, with the same children: Raven has no way to give an attribute its default back. What the widget held by itself (focus, typed text, scrolling) is lost. To avoid that, keep the prop and change its value.
@@ -88,28 +139,28 @@ Inputs are controlled, as in React DOM. With `Text={value}`, what the state says
 
 ## Working on this package
 
-It lives in a Bun workspace beside a Raven checkout, with an application to try it in:
+The repository is a Bun workspace, with this package in `packages/raven-react` and an application to try it in `examples/helloworld`. It expects a Raven checkout two folders up, at `../../raven` from the root:
 
     raven/                 github.com/oscar-soirey/Raven
-    bun/package.json       workspaces: raven-react, raven-react/native/*, helloworld
-    bun/bunfig.toml        linker = "hoisted"
     bun/raven-react/       this repository
-    bun/helloworld/
 
 Build Raven, then make the native package of your platform from it:
 
     cmake -S raven -B raven/build-shared -DCMAKE_BUILD_TYPE=Release -DRAVEN_BUILD_SHARED=ON
     cmake --build raven/build-shared --parallel
-    cd bun/raven-react
+    cd bun/raven-react/packages/raven-react
     bun run native:local
     bun install
     bun test
+
+Then, in `examples/helloworld`: `bun run dev`, or `bun run build`.
 
 | Task | Command |
 |---|---|
 | Regenerate the components | `bun run generate` |
 | Cross-build `raven.dll` on Linux with MinGW-w64, then `bun install` | `bun run native:windows` |
-| Move to another Raven | Set `RAVEN_VERSION`, then `bun run sync-binding --raven ../../raven` |
+| Compile a Windows `.exe` of the example, after that | `bun run build:windows` in `examples/helloworld` |
+| Move to another Raven | Set `RAVEN_VERSION`, then `bun run sync-binding --raven ../../../../raven` |
 
 Every push builds Raven at `RAVEN_VERSION` on each platform, and runs the tests there.
 

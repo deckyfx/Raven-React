@@ -1,0 +1,140 @@
+# Builds Raven for every platform, tests raven-react on each, and on a version tag publishes
+# one npm package per platform and the main package that lists them.
+#
+# Publishing is off until the repository variable NPM_PUBLISH is set to "true": the name of
+# the package on npm is not decided yet. It also needs the secret NPM_TOKEN.
+name: release
+
+on:
+  push:
+    branches: [main]
+    tags: ["v*"]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  native:
+    name: native (${{ matrix.target }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          # the oldest Ubuntu available: a library built here runs on newer glibc, not older
+          - { target: linux-x64, os: ubuntu-22.04, library: build/libraven.so, test: true }
+          - { target: linux-arm64, os: ubuntu-22.04-arm, library: build/libraven.so, test: true }
+          - { target: darwin-arm64, os: macos-14, library: build/libraven.dylib, cmake: "-DCMAKE_OSX_ARCHITECTURES=arm64", test: true }
+          # built on Apple Silicon for Intel, so it cannot run here
+          - { target: darwin-x64, os: macos-14, library: build/libraven.dylib, cmake: "-DCMAKE_OSX_ARCHITECTURES=x86_64", test: false }
+          # the C runtime inside the DLL, so that nothing needs installing with it
+          - { target: win32-x64, os: windows-latest, library: build/bin/Release/raven.dll, cmake: "-A x64 -DRAVEN_MSVC_STATIC_RUNTIME=ON", test: true }
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Read the version of Raven
+        run: echo "RAVEN_REF=$(cat RAVEN_VERSION)" >> "$GITHUB_ENV"
+
+      - uses: actions/checkout@v4
+        with:
+          repository: oscar-soirey/Raven
+          ref: ${{ env.RAVEN_REF }}
+          path: raven-source
+
+      - name: Install the X11 headers
+        if: runner.os == 'Linux'
+        run: sudo apt-get update && sudo apt-get install -y --no-install-recommends libx11-dev
+
+      - name: Build Raven
+        working-directory: raven-source
+        run: |
+          cmake -S . -B build ${{ matrix.cmake }} \
+            -DCMAKE_BUILD_TYPE=Release \
+            -DRAVEN_BUILD_SHARED=ON \
+            -DRAVEN_BUILD_TESTS=OFF \
+            -DRAVEN_BUILD_EXAMPLES=OFF \
+            -DRAVEN_BUILD_TOOLS=OFF
+          cmake --build build --config Release --parallel
+
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: 1.4.4
+
+      - name: Install
+        run: bun install
+
+      - name: Check the binding and the types
+        run: |
+          bun run sync-binding --raven raven-source --check
+          bun run typecheck
+
+      - name: Test
+        if: matrix.test
+        env:
+          RAVEN_LIBRARY: ${{ github.workspace }}/raven-source/${{ matrix.library }}
+        run: bun test
+
+      - name: Make the package of this platform
+        run: |
+          bun run pack:platform --target ${{ matrix.target }} --lib "raven-source/${{ matrix.library }}" --raven raven-source --out dist/npm
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: npm-${{ matrix.target }}
+          path: dist/npm/${{ matrix.target }}
+          if-no-files-found: error
+
+  publish:
+    name: publish
+    if: vars.NPM_PUBLISH == 'true' && startsWith(github.ref, 'refs/tags/v')
+    needs: native
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write
+    env:
+      NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: The tag must be the version of the package
+        run: |
+          version="$(node -p 'require("./package.json").version')"
+          test "$GITHUB_REF_NAME" = "v$version" || { echo "tag $GITHUB_REF_NAME, package $version"; exit 1; }
+
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: 1.4.4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          registry-url: https://registry.npmjs.org
+
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: npm-*
+          path: dist/artifacts
+
+      - name: Make the main package
+        run: |
+          bun install
+          bun run prepare:publish --out dist/npm
+
+      # the platforms first: the main package depends on them
+      - name: Publish
+        run: |
+          for directory in dist/artifacts/npm-* dist/npm/main; do
+            name="$(node -p "require('./$directory/package.json').name")"
+            version="$(node -p "require('./$directory/package.json').version")"
+            if npm view "$name@$version" version >/dev/null 2>&1; then
+              echo "$name@$version is already published"
+            else
+              (cd "$directory" && npm publish --access public --provenance)
+            fi
+          done

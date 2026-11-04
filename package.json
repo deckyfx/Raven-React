@@ -1,0 +1,40 @@
+{
+  "name": "@deckyfx/raven-react",
+  "version": "0.1.0",
+  "description": "A React renderer for Raven, for Bun: write native desktop interfaces in TSX, with typed components made from Raven's schema",
+  "license": "Apache-2.0",
+  "type": "module",
+  "module": "src/index.ts",
+  "exports": "./src/index.ts",
+  "engines": {
+    "bun": ">=1.4.4"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/deckyfx/Raven-React.git"
+  },
+  "keywords": ["raven", "react", "bun", "gui", "desktop", "tsx", "renderer", "vulkan"],
+  "scripts": {
+    "generate": "bun run src/tools/generate-components.ts src/components.generated.ts",
+    "native:local": "bun run src/tools/native-local.ts",
+    "native:windows": "bun run src/tools/native-windows.ts",
+    "sync-binding": "bun run src/tools/sync-binding.ts",
+    "pack:platform": "bun run src/tools/pack-platform.ts",
+    "prepare:publish": "bun run src/tools/prepare-publish.ts",
+    "test": "bun test",
+    "typecheck": "bun check"
+  },
+  "dependencies": {
+    "@types/react": "^19",
+    "@types/react-reconciler": "^0.34",
+    "react-reconciler": "^0.34.0"
+  },
+  "peerDependencies": {
+    "react": "^19.2.0"
+  },
+  "devDependencies": {
+    "@types/bun": "latest",
+    "react": "^19.2.0",
+    "typescript": "^6"
+  }
+}

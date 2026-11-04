@@ -1,6 +1,7 @@
 /** The platforms a native package exists for, shared by the tools. */
 
 import { mkdirSync, rmSync } from "node:fs";
+import { resolve } from "node:path";
 
 export interface Target {
 	readonly os: string;
@@ -52,10 +53,11 @@ export async function writePlatformPackage(options: {
 	readonly directory: string;
 	readonly licensesFrom?: string;
 }): Promise<void> {
-	const { mainName, version, target, libraryPath, directory, licensesFrom } = options;
+	const { mainName, version, target, libraryPath, licensesFrom } = options;
 	const { os, cpu, library } = targetOf(target);
 	const files = ["index.ts", library];
-	// (not Bun.$: its rm fails on Windows with a path that mixes both kinds of slash)
+	// (absolute: removing a path that holds ".." fails on Windows, in Bun.$ and in rmSync)
+	const directory = resolve(options.directory);
 	rmSync(directory, { recursive: true, force: true });
 	mkdirSync(directory, { recursive: true });
 	await Bun.write(`${directory}/${library}`, Bun.file(libraryPath));

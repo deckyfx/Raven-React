@@ -9,7 +9,8 @@
 import { mkdirSync, rmSync } from "node:fs";
 
 const windows = process.argv.includes("--windows");
-const outfile = windows ? "./binaries/helloworld-windows-x64.exe" : `./binaries/helloworld-${process.platform}-${process.arch}`;
+// (on Windows Bun adds .exe to the name by itself, so the name must already have it)
+const outfile = windows ? "./binaries/helloworld-windows-x64.exe" : `./binaries/helloworld-${process.platform}-${process.arch}${process.platform === "win32" ? ".exe" : ""}`;
 
 if (windows && !(await Bun.file("../../node_modules/@deckyfx/raven-react-win32-x64/raven.dll").exists())) {
 	// the executable would still compile, and only fail when it starts on Windows

@@ -20,7 +20,7 @@ if (!Bun.which("x86_64-w64-mingw32-gcc")) {
 	process.exit(1);
 }
 
-await Bun.$`cmake -S ${raven} -B ${build} --toolchain ${root}/cmake/mingw-w64.cmake -DCMAKE_BUILD_TYPE=Release -DRAVEN_BUILD_SHARED=ON -DRAVEN_BUILD_TESTS=OFF -DRAVEN_BUILD_EXAMPLES=OFF -DRAVEN_BUILD_TOOLS=OFF -DCMAKE_SHARED_LINKER_FLAGS=${"-static-libgcc -static"}`.quiet();
+await Bun.$`cmake --fresh -S ${raven} -B ${build} --toolchain ${root}/cmake/mingw-w64.cmake -DCMAKE_BUILD_TYPE=Release -DRAVEN_BUILD_SHARED=ON -DRAVEN_BUILD_TESTS=OFF -DRAVEN_BUILD_EXAMPLES=OFF -DRAVEN_BUILD_TOOLS=OFF -DCMAKE_SHARED_LINKER_FLAGS=${"-static-libgcc -static"}`.quiet();
 await Bun.$`cmake --build ${build} --parallel`.quiet();
 
 await writePlatformPackage({

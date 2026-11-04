@@ -1,4 +1,5 @@
 node_modules/
 dist/
+binaries/
 # made from a Raven you built, by bun run native:local
 native/

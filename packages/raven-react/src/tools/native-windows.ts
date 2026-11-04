@@ -12,7 +12,7 @@ import { writePlatformPackage } from "./targets";
 import manifest from "../../package.json";
 
 const root = `${import.meta.dir}/../..`;
-const raven = `${root}/../../raven`;
+const raven = `${root}/../../../../raven`;
 const build = `${raven}/build-windows`;
 
 if (!Bun.which("x86_64-w64-mingw32-gcc")) {

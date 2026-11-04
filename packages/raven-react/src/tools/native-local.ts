@@ -6,19 +6,20 @@
  *     cmake --build raven/build-shared --parallel
  *     bun run native:local
  *
- * `--raven-build <folder>` says where the library is built, if not in ../../raven/build-shared.
+ * `--raven-build <folder>` says where the library is built, if not in the raven folder beside this repo.
  */
 
 import { TARGETS, targetOf, writePlatformPackage } from "./targets";
 import manifest from "../../package.json";
 
 const root = `${import.meta.dir}/../..`;
+const raven = `${root}/../../../../raven`;
 const target = `${process.platform}-${process.arch}`;
 const { library } = targetOf(target);
 
 const index = process.argv.indexOf("--raven-build");
-const build = (index >= 0 ? process.argv[index + 1] : undefined) ?? `${root}/../../raven/build-shared`;
-const found = [`${build}/${library}`, `${build}/bin/${library}`, `${build}/Release/${library}`];
+const build = (index >= 0 ? process.argv[index + 1] : undefined) ?? `${raven}/build-shared`;
+const found = [`${build}/${library}`, `${build}/bin/${library}`, `${build}/Release/${library}`, `${build}/bin/Release/${library}`];
 let libraryPath: string | undefined;
 for (const path of found) {
 	if (await Bun.file(path).exists()) {

@@ -2,8 +2,8 @@
  * Copies the Bun binding of a Raven checkout to `src/vendor`: it is not on npm, so this package
  * carries the one of the Raven it is pinned to (`RAVEN_VERSION`).
  *
- *     bun run sync-binding --raven ../../raven           copies it
- *     bun run sync-binding --raven ../../raven --check   fails if the copy differs
+ *     bun run sync-binding --raven ../../../../raven     copies it
+ *     bun run sync-binding --raven ../../../../raven --check  fails if the copy differs
  */
 
 import { argument } from "./targets";

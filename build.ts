@@ -1,20 +1,28 @@
 /**
- * Compiles the program into one executable holding Bun, the code, libraven.so
- * and main.xml. For this machine only: the embedded libraven.so is built for
- * one platform, so another target needs the library built there.
+ * Compiles the program into one executable holding Bun, the code, React and Raven's library.
+ *
+ *     bun run build            for this machine
+ *     bun run build:windows    a Windows x64 .exe, from any machine. It needs the Windows
+ *                              package of the workspace: see the message below.
  */
 
-export {};
+const windows = process.argv.includes("--windows");
+const outfile = windows ? "./binaries/helloworld-windows-x64.exe" : `./binaries/helloworld-${process.platform}-${process.arch}`;
 
-const outfile = `./binaries/helloworld-${process.platform}-${process.arch}`;
+if (windows && !(await Bun.file("../node_modules/@deckyfx/raven-react-win32-x64/raven.dll").exists())) {
+	// the executable would still compile, and only fail when it starts on Windows
+	console.error("raven.dll is not in the workspace. First: cd ../raven-react && bun run native:windows && bun install");
+	process.exit(1);
+}
 
-console.log("Building helloworld");
-await Bun.$`rm -rf ./binaries && mkdir -p ./binaries`;
+console.log(`Building ${outfile}`);
+await Bun.$`mkdir -p ./binaries && rm -f ${outfile}`;
 
 const result = await Bun.build({
-	entrypoints: ["./src/index.ts"],
+	entrypoints: ["./src/index.tsx"],
 	compile: {
 		outfile,
+		...(windows ? { target: "bun-windows-x64" as const } : {}),
 		// The binary must behave the same wherever it runs, whatever .env is there.
 		autoloadDotenv: false,
 		autoloadBunfig: false,

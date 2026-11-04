@@ -4,15 +4,13 @@
     "module": "Preserve",
     "moduleResolution": "bundler",
     "lib": ["ESNext"],
-    "types": ["bun"],
+    "types": ["bun", "react"],
+    "jsx": "react-jsx",
     "strict": true,
     "noUncheckedIndexedAccess": true,
     "verbatimModuleSyntax": true,
     "skipLibCheck": true,
-    "noEmit": true,
-    "paths": {
-      "raven": ["../../raven/bindings/bun/src/raven.ts"]
-    }
+    "noEmit": true
   },
   "include": ["src", "build.ts"]
 }

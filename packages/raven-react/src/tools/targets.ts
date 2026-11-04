@@ -1,5 +1,7 @@
 /** The platforms a native package exists for, shared by the tools. */
 
+import { mkdirSync, rmSync } from "node:fs";
+
 export interface Target {
 	readonly os: string;
 	readonly cpu: string;
@@ -53,7 +55,9 @@ export async function writePlatformPackage(options: {
 	const { mainName, version, target, libraryPath, directory, licensesFrom } = options;
 	const { os, cpu, library } = targetOf(target);
 	const files = ["index.ts", library];
-	await Bun.$`rm -rf ${directory} && mkdir -p ${directory}`;
+	// (not Bun.$: its rm fails on Windows with a path that mixes both kinds of slash)
+	rmSync(directory, { recursive: true, force: true });
+	mkdirSync(directory, { recursive: true });
 	await Bun.write(`${directory}/${library}`, Bun.file(libraryPath));
 	await Bun.write(`${directory}/index.ts`, `import path from "./${library}" with { type: "file" };\n\nexport default path;\n`);
 	for (const name of ["LICENSE", "NOTICE", "THIRD_PARTY.md"]) {

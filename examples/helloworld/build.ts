@@ -6,6 +6,8 @@
  *                              package of the workspace: see the message below.
  */
 
+import { mkdirSync, rmSync } from "node:fs";
+
 const windows = process.argv.includes("--windows");
 const outfile = windows ? "./binaries/helloworld-windows-x64.exe" : `./binaries/helloworld-${process.platform}-${process.arch}`;
 
@@ -16,7 +18,8 @@ if (windows && !(await Bun.file("../../node_modules/@deckyfx/raven-react-win32-x
 }
 
 console.log(`Building ${outfile}`);
-await Bun.$`mkdir -p ./binaries && rm -f ${outfile}`;
+mkdirSync("./binaries", { recursive: true });
+rmSync(outfile, { force: true });
 
 const result = await Bun.build({
 	entrypoints: ["./src/index.tsx"],

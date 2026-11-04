@@ -1,0 +1,26 @@
+{
+  "name": "helloworld",
+  "module": "src/index.tsx",
+  "type": "module",
+  "private": true,
+  "engines": {
+    "bun": ">=1.4.4"
+  },
+  "scripts": {
+    "dev": "bun run src/index.tsx",
+    "build": "bun run typecheck && bun run ./build.ts",
+    "build:windows": "bun run typecheck && bun run ./build.ts --windows",
+    "typecheck": "bun check"
+  },
+  "dependencies": {
+    "@deckyfx/raven-react": "workspace:*",
+    "react": "^19.2.0"
+  },
+  "devDependencies": {
+    "@types/bun": "latest",
+    "@types/react": "^19"
+  },
+  "peerDependencies": {
+    "typescript": "^6"
+  }
+}

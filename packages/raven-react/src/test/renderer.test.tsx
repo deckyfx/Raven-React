@@ -1,7 +1,7 @@
 /** React on real Raven widgets, without a window system or a GPU, clicked and typed into for real. */
 
 import { afterAll, afterEach, beforeAll, expect, test } from "bun:test";
-import { Component, createRef, useEffect, useState, type ReactNode } from "react";
+import { Component, createRef, useEffect, useState, type ReactNode, type RefObject } from "react";
 import * as r from "../raven";
 import { eventStats } from "../events";
 import {
@@ -412,6 +412,40 @@ test("a prop whose setter throws leaves the other handlers listening", async () 
 	expect(text("fallback")).toBe("failed");
 	click("after");
 	expect(clicks).toBe(1);
+});
+
+const treeContext = (): void => {};
+/** A TreeView under a boundary. Losing `tooltip` makes it again, and Items that are not JSON stop that halfway. */
+const treeThatRemakes = (tree: RefObject<WidgetInstance | null>, items: readonly TreeItem[], tooltip?: string): ReactNode => (
+	<VBox Name="box">
+		<Boundary fallback={<Label Name="fallback">failed</Label>}>
+			<TreeView ref={tree} Name="tree" Height={100} Tooltip={tooltip} Items={items} OnContext={treeContext} />
+		</Boundary>
+	</VBox>
+);
+
+test("a widget that cannot be made again stays what it was", async () => {
+	const tree = createRef<WidgetInstance>();
+	await mount(treeThatRemakes(tree, [{ Text: "row" }], "a tip"));
+	const instance = tree.current as WidgetInstance;
+	const before = instance.widget;
+	const handlers = eventStats().handlers;
+	expect(() => instance.update({ Name: "tree", Height: 100, Items: "not json", OnContext: treeContext })).toThrow();
+	expect(instance.widget).toBe(before);
+	expect(find("tree")).toBe(before);
+	expect(eventStats().handlers).toBe(handlers);
+});
+
+test("a boundary takes away a widget that could not be made again", async () => {
+	const report = console.error;
+	console.error = (): void => {};
+	const tree = createRef<WidgetInstance>();
+	await mount(treeThatRemakes(tree, [{ Text: "row" }], "a tip"));
+	// @ts-expect-error Text that is not JSON, as a value from outside the types can be.
+	root?.render(treeThatRemakes(tree, "not json"));
+	await settle();
+	console.error = report;
+	expect(namesUnder("box")).toEqual(["fallback"]);
 });
 
 /** Presses and releases a key. */

@@ -396,15 +396,25 @@ export class WidgetInstance implements HostNode {
 	/**
 	 * Replaces the widget by a new one in the same place, with the same children: those React does
 	 * not know of too, added by the application. What a new widget holds by itself stays with it.
+	 * If the new one cannot take the props, the old one stays as it was, and React hears of it.
 	 */
 	private remake(next: ResolvedProps): void {
 		const old = this.id;
+		const previous = this.resolved;
 		const parent = this.parent;
 		const placed = parent?.holds(this) === true;
 		const index = placed ? parent.nativeIndexOf(this, true) : -1;
-		forgetHandlers(this.tag, old, true);
 		this.id = WidgetInstance.make(this.tag, next.attributes.get(MARKUP));
-		this.applyAll(next);
+		try {
+			this.applyAll(next);
+		} catch (error) {
+			forgetHandlers(this.tag, this.id, true);
+			r.Rwidget_destroy(this.id);
+			this.id = old;
+			this.resolved = previous;
+			throw error;
+		}
+		forgetHandlers(this.tag, old, true);
 		const own = r.Rwidget_get_child_count(this.id);
 		const moving = Array.from({ length: Math.max(r.Rwidget_get_child_count(old) - own, 0) }, (_, position) => r.Rwidget_get_child(old, own + position));
 		for (const child of moving) {

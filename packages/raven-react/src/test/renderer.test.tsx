@@ -1,12 +1,12 @@
 /** React on real Raven widgets, without a window system or a GPU, clicked and typed into for real. */
 
-import { afterAll, afterEach, beforeAll, expect, test } from "bun:test";
-import { Component, createRef, useEffect, useState, type ReactNode } from "react";
+import { afterAll, afterEach, beforeAll, expect, spyOn, test } from "bun:test";
+import { Component, createRef, useEffect, useState, type ReactNode, type RefObject } from "react";
 import * as r from "../raven";
 import { eventStats } from "../events";
 import {
-	Border, Breadcrumb, Button, Checkbox, ComboBox, createWindow, Custom, DatePicker, Expander, HBox, Label, ListView, Overlay, Pagination, raven, RavenRoot, Rating, Slider, SpinBox, Table, TabView, TextInput, TileView, TimePicker, Toast, TreeView, VBox, Window,
-	type WidgetInstance, type WindowInstance,
+	Border, Breadcrumb, Button, parseKeys, useAction, useShortcut, Checkbox, ComboBox, createWindow, Custom, DatePicker, Expander, HBox, Label, ListView, NodeGraph, Overlay, Pagination, raven, RavenRoot, Rating, Slider, SpinBox, Table, TabView, TextInput, TileView, TimePicker, Toast, TreeView, VBox, Window,
+	type TreeItem, type WidgetInstance, type WindowInstance,
 } from "../index";
 
 const WINDOW = { Title: "Test", Width: 480, Height: 480 } as const;
@@ -308,6 +308,50 @@ test("a removed prop remakes the widget, in its place, with its children working
 	expect(namesUnder("outer")).toEqual(["before", "panel", "after", "toggle"]);
 });
 
+test("a NodeGraph with less Markup does not keep what the old nodes held", async () => {
+	const node = (name: string, inner: string): string => `<Node Name="${name}" Title="${name}" X="0" Y="0">${inner}</Node>`;
+	const app = (markup: string): ReactNode => <VBox><NodeGraph Name="graph" Height={100} Markup={markup} /></VBox>;
+	await mount(app(node("a", '<Label Name="old-a"/>') + node("b", '<Label Name="old-b"/>')));
+	expect(namesUnder("graph")).toEqual(["old-a", "old-b"]);
+	root?.render(app(node("c", '<Label Name="new-c"/>')));
+	await settle();
+	expect(namesUnder("graph")).toEqual(["new-c"]);
+});
+
+test("a change of Markup keeps the children after it, also where the types do not offer Markup", async () => {
+	let clicks = 0;
+	const app = (markup: string): ReactNode => (
+		// @ts-expect-error A VBox has no Markup in its types: JavaScript can still give it one.
+		<VBox Name="box" Markup={markup}>
+			<Button Name="react" OnClicked={() => clicks++}>react</Button>
+		</VBox>
+	);
+	await mount(app('<Label Name="m1"/>'));
+	const button = find("react");
+	expect(namesUnder("box")).toEqual(["m1", "react"]);
+	root?.render(app('<Label Name="m1"/><Label Name="m2"/>'));
+	await settle();
+	expect(namesUnder("box")).toEqual(["m1", "m2", "react"]);
+	expect(find("react")).toBe(button);
+	root?.render(app('<Label Name="m3"/>'));
+	await settle();
+	expect(namesUnder("box")).toEqual(["m3", "react"]);
+	expect(find("react")).toBe(button);
+	click("react");
+	expect(clicks).toBe(1);
+});
+
+test("what a window holds fills it, follows its Slot, and lies on top of the rest", async () => {
+	await mount(
+		<>
+			<VBox Name="fills" />
+			<VBox Name="centered" Width={100} Height={40} Slot={{ HAlign: "Center", VAlign: "Center" }} />
+		</>,
+	);
+	expect([...r.Rwidget_get_rect(find("fills"))]).toEqual([0, 0, WINDOW.Width, WINDOW.Height]);
+	expect([...r.Rwidget_get_rect(find("centered"))]).toEqual([190, 220, 100, 40]);
+});
+
 test("effects run, and their cleanups run on unmount", async () => {
 	const log: string[] = [];
 	function Timer(): ReactNode {
@@ -372,24 +416,110 @@ test("an exception in a handler does not cross C", async () => {
 	expect(text("alive")).toBe("still here");
 });
 
+/** Shows its fallback once what it holds has thrown. */
+class Boundary extends Component<{ children: ReactNode; fallback: ReactNode }, { failed: boolean }> {
+	override state = { failed: false };
+	static getDerivedStateFromError(): { failed: boolean } {
+		return { failed: true };
+	}
+	override render(): ReactNode {
+		return this.state.failed ? this.props.fallback : this.props.children;
+	}
+}
+
 test("an error boundary works", async () => {
 	const report = console.error;
 	console.error = (): void => {};
-	class Boundary extends Component<{ children: ReactNode }, { failed: boolean }> {
-		override state = { failed: false };
-		static getDerivedStateFromError(): { failed: boolean } {
-			return { failed: true };
-		}
-		override render(): ReactNode {
-			return this.state.failed ? <Label Name="fallback">failed</Label> : this.props.children;
-		}
-	}
 	function Bad(): ReactNode {
 		throw new Error("in a render");
 	}
-	await mount(<VBox><Boundary><Bad /></Boundary></VBox>);
+	await mount(<VBox><Boundary fallback={<Label Name="fallback">failed</Label>}><Bad /></Boundary></VBox>);
 	console.error = report;
 	expect(text("fallback")).toBe("failed");
+});
+
+test("a prop whose setter throws leaves the other handlers listening", async () => {
+	const report = console.error;
+	console.error = (): void => {};
+	let clicks = 0;
+	const app = (items: readonly TreeItem[]): ReactNode => (
+		<VBox>
+			<Button Name="after" OnClicked={() => clicks++}>after</Button>
+			<Boundary fallback={<Label Name="fallback">failed</Label>}><TreeView Name="tree" Height={100} Items={items} /></Boundary>
+		</VBox>
+	);
+	await mount(app([{ Text: "row" }]));
+	// @ts-expect-error Text that is not JSON, as a value from outside the types can be.
+	root?.render(app("not json"));
+	await settle();
+	console.error = report;
+	expect(text("fallback")).toBe("failed");
+	click("after");
+	expect(clicks).toBe(1);
+});
+
+const treeContext = (): void => {};
+/** A TreeView under a boundary. Losing `tooltip` makes it again, and Items that are not JSON stop that halfway. */
+const treeThatRemakes = (tree: RefObject<WidgetInstance | null>, items: readonly TreeItem[], tooltip?: string): ReactNode => (
+	<VBox Name="box">
+		<Boundary fallback={<Label Name="fallback">failed</Label>}>
+			<TreeView ref={tree} Name="tree" Height={100} Tooltip={tooltip} Items={items} OnContext={treeContext} />
+		</Boundary>
+	</VBox>
+);
+
+test("a widget that cannot be made again stays what it was", async () => {
+	const tree = createRef<WidgetInstance>();
+	await mount(treeThatRemakes(tree, [{ Text: "row" }], "a tip"));
+	const instance = tree.current as WidgetInstance;
+	const before = instance.widget;
+	const handlers = eventStats().handlers;
+	expect(() => instance.update({ Name: "tree", Height: 100, Items: "not json", OnContext: treeContext })).toThrow();
+	expect(instance.widget).toBe(before);
+	expect(find("tree")).toBe(before);
+	expect(eventStats().handlers).toBe(handlers);
+});
+
+test("a boundary takes away a widget that could not be made again", async () => {
+	const report = console.error;
+	console.error = (): void => {};
+	const tree = createRef<WidgetInstance>();
+	await mount(treeThatRemakes(tree, [{ Text: "row" }], "a tip"));
+	// @ts-expect-error Text that is not JSON, as a value from outside the types can be.
+	root?.render(treeThatRemakes(tree, "not json"));
+	await settle();
+	console.error = report;
+	expect(namesUnder("box")).toEqual(["fallback"]);
+});
+
+test("Items that are not rows leave the rows of a TreeView as they were", async () => {
+	const tree = createRef<WidgetInstance>();
+	await mount(treeThatRemakes(tree, [{ Text: "row" }], "a tip"));
+	const instance = tree.current as WidgetInstance;
+	const wrong = ["not json", "5", '{"Text":"new"}', '[{"Text":"new"},null]', '[{"Text":"new"},{"Text":5}]', '[{"Text":"new","Children":[null]}]'];
+	for (const Items of wrong) {
+		expect(() => instance.update({ Name: "tree", Height: 100, Tooltip: "a tip", Items, OnContext: treeContext })).toThrow();
+		expect(r.Rtree_view_get_item_count(instance.widget)).toBe(1);
+		expect(r.Rtree_item_get_text(r.Rtree_view_get_item(instance.widget, 0))).toBe("row");
+	}
+});
+
+test("a widget that cannot be made leaves nothing in Raven", async () => {
+	const report = console.error;
+	console.error = (): void => {};
+	const made = spyOn(r, "Rwidget_create_from_xml");
+	await mount(
+		<Boundary fallback={<Label Name="fallback">failed</Label>}>
+			{/* @ts-expect-error Text that is not JSON, as a value from outside the types can be. */}
+			<TreeView Items="not json" />
+		</Boundary>,
+	);
+	const trees = made.mock.calls.flatMap(([xml], call) => (xml?.startsWith("<TreeView") ? [made.mock.results[call]?.value as r.Rid] : []));
+	made.mockRestore();
+	console.error = report;
+	expect(text("fallback")).toBe("failed");
+	expect(trees.length).toBeGreaterThan(0);
+	expect(trees.filter((tree) => r.Rwidget_is_valid(tree))).toEqual([]);
 });
 
 /** Presses and releases a key. */
@@ -859,4 +989,61 @@ test("a system notification goes through the C API, with the fallback on the Jav
 	const shown = raven.Rnotification_show("Backup", "Finished", raven.R_NOTIFICATION_NORMAL);
 	expect(shown === 1 || seen.includes("Backup: Finished")).toBe(true);
 	raven.Rnotification_set_fallback(null);
+});
+
+test("shortcuts are read, fire on their window, and go away with their component", async () => {
+	expect(parseKeys("F5")).toEqual({ key: r.R_KEY_F5, modifiers: 0 });
+	expect(parseKeys("Ctrl+Shift+S")).toEqual({ key: r.R_KEY_S, modifiers: r.R_MOD_CTRL | r.R_MOD_SHIFT });
+	expect(parseKeys("Esc").key).toBe(r.R_KEY_ESCAPE);
+	let fired = 0;
+	const owner = createRef<WindowInstance>();
+	function Keys({ count }: { count: number }): ReactNode {
+		useShortcut(owner, "Ctrl+K", () => {
+			fired += count;
+		});
+		return <Label>x</Label>;
+	}
+	const windows = new RavenRoot();
+	windows.render(<Window ref={owner}><Keys count={1} /></Window>);
+	await settle();
+	const id = owner.current?.window ?? r.R_INVALID_ID;
+	r.Rwindow_inject_key(id, r.R_KEY_K, 1, r.R_MOD_CTRL);
+	r.Rwindow_inject_key(id, r.R_KEY_K, 0, r.R_MOD_CTRL);
+	expect(fired).toBe(1);
+	windows.render(<Window ref={owner}><Keys count={10} /></Window>);
+	await settle();
+	r.Rwindow_inject_key(id, r.R_KEY_K, 1, r.R_MOD_CTRL);
+	r.Rwindow_inject_key(id, r.R_KEY_K, 0, r.R_MOD_CTRL);
+	expect(fired).toBe(11);
+	windows.unmount();
+	expect(eventStats().handlers).toBe(0);
+});
+
+test("useAction names a function, and an On prop takes a name", async () => {
+	let fired = 0;
+	function Named(): ReactNode {
+		useAction("test.named", () => fired++);
+		return <VBox><Button Name="go" OnClicked="test.named">go</Button></VBox>;
+	}
+	await mount(<Named />);
+	click("go");
+	expect(fired).toBe(1);
+	r.Raction_fire("test.named", r.R_INVALID_ID);
+	expect(fired).toBe(2);
+});
+
+test("an On prop that goes from a function to a name keeps the name", async () => {
+	let named = 0;
+	let direct = 0;
+	function Switching({ byName }: { byName: boolean }): ReactNode {
+		useAction("test.switching", () => named++);
+		return <VBox><Button Name="go" OnClicked={byName ? "test.switching" : () => direct++}>go</Button></VBox>;
+	}
+	await mount(<Switching byName={false} />);
+	click("go");
+	expect([named, direct]).toEqual([0, 1]);
+	root?.render(<Switching byName />);
+	await settle();
+	click("go");
+	expect([named, direct]).toEqual([1, 1]);
 });

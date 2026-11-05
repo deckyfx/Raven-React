@@ -8,6 +8,7 @@
 
 import { readFileSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
+import { checkLibrary } from "./library-check";
 
 /** What a package of a platform exports: the path of its library. */
 interface PlatformPackage {
@@ -26,19 +27,19 @@ function findPackagedLibrary(): string | undefined {
 	try {
 		switch (`${process.platform}-${process.arch}`) {
 			case "linux-x64":
-				found = require("@deckyfx/raven-react-linux-x64");
+				found = require("@decky.fx/raven-react-linux-x64");
 				break;
 			case "linux-arm64":
-				found = require("@deckyfx/raven-react-linux-arm64");
+				found = require("@decky.fx/raven-react-linux-arm64");
 				break;
 			case "darwin-arm64":
-				found = require("@deckyfx/raven-react-darwin-arm64");
+				found = require("@decky.fx/raven-react-darwin-arm64");
 				break;
 			case "darwin-x64":
-				found = require("@deckyfx/raven-react-darwin-x64");
+				found = require("@decky.fx/raven-react-darwin-x64");
 				break;
 			case "win32-x64":
-				found = require("@deckyfx/raven-react-win32-x64");
+				found = require("@decky.fx/raven-react-win32-x64");
 				break;
 		}
 	} catch {
@@ -72,8 +73,10 @@ if (!process.env.RAVEN_LIBRARY) {
 	if (!packaged) {
 		throw new Error(
 			`raven-react: no native library for ${process.platform}-${process.arch}. ` +
-				`Install @deckyfx/raven-react-${process.platform}-${process.arch}, or set RAVEN_LIBRARY to the path of a library you built.`,
+				`Install @decky.fx/raven-react-${process.platform}-${process.arch}, or set RAVEN_LIBRARY to the path of a library you built.`,
 		);
 	}
 	process.env.RAVEN_LIBRARY = loadablePath(packaged);
 }
+
+checkLibrary(process.env.RAVEN_LIBRARY ?? "");

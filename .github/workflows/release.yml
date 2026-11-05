@@ -1,8 +1,8 @@
 # Builds Raven for every platform, tests raven-react on each, compiles the example, and on a
 # version tag publishes one npm package per platform and the main package that lists them.
 #
-# Publishing is off until the repository variable NPM_PUBLISH is set to "true": the name of
-# the package on npm is not decided yet. It also needs the secret NPM_TOKEN.
+# Publishing is off until the repository variable NPM_PUBLISH is set to "true". It also needs
+# the secret NPM_TOKEN, with the right to publish in the @decky.fx scope on npm.
 name: release
 
 on:
@@ -38,7 +38,8 @@ jobs:
       - uses: actions/checkout@v4
 
       - name: Read the version of Raven
-        run: echo "RAVEN_REF=$(cat packages/raven-react/RAVEN_VERSION)" >> "$GITHUB_ENV"
+        # (a full commit or a tag; on Windows the line can end in a carriage return)
+        run: echo "RAVEN_REF=$(tr -d '\r\n' < packages/raven-react/RAVEN_VERSION)" >> "$GITHUB_ENV"
 
       - uses: actions/checkout@v4
         with:
@@ -65,12 +66,20 @@ jobs:
         with:
           bun-version: 1.4.4
 
+      # built here for another processor, this one does not run on the machine: raven:check says
+      # less about it. native:local refuses a library that is not of the pinned commit.
+      - name: Package the library of this platform
+        if: matrix.test
+        working-directory: packages/raven-react
+        run: bun run native:local --raven-build ../../raven-source/build
+
       - name: Install
         run: bun install
 
-      - name: Check the binding and the types
+      - name: Check that everything agrees with RAVEN_VERSION, and the types
         working-directory: packages/raven-react
         run: |
+          bun run raven:check --raven ../../raven-source ${{ !matrix.test && '--no-library' || '' }}
           bun run sync-binding --raven ../../raven-source --check
           bun run typecheck
 
@@ -79,13 +88,12 @@ jobs:
         working-directory: packages/raven-react
         env:
           RAVEN_LIBRARY: ${{ github.workspace }}/raven-source/${{ matrix.library }}
+          RAVEN_CHECKOUT: ${{ github.workspace }}/raven-source
         run: bun test
 
       - name: Compile the example
         if: matrix.test
         run: |
-          (cd packages/raven-react && bun run native:local --raven-build ../../raven-source/build)
-          bun install
           cd examples/helloworld
           bun run typecheck
           bun run ./build.ts

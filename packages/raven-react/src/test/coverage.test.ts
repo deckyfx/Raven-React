@@ -259,12 +259,20 @@ test("what differs between two APIs is said by name", () => {
 	expect(countOf(diffApi(before, before))).toBe(0);
 });
 
-/** The API read from the sources of the pin, when there is a checkout to read them from. */
+/**
+ * The API read from the sources of the pin. Without a checkout there is nothing to read, and that
+ * is fine on a machine that has none. `RAVEN_CHECKOUT` says there is one, as in CI: then it must
+ * work, so that this check cannot stop running without anyone seeing.
+ */
 async function apiOfCheckout(): Promise<RavenApi | null> {
-	const checkout = resolve(`${import.meta.dir}/../../../../../../raven`);
+	const required = process.env.RAVEN_CHECKOUT;
+	const checkout = resolve(required ?? `${import.meta.dir}/../../../../../../raven`);
 	const pin = await readPin();
 	const commit = existsSync(checkout) ? commitOf(checkout, pin) : null;
 	if (!commit) {
+		if (required) {
+			throw new Error(`RAVEN_CHECKOUT is ${required}, which does not have ${pin}`);
+		}
 		return null;
 	}
 	return apiAt(checkout, commit);

@@ -401,7 +401,7 @@ export class WidgetInstance implements HostNode {
 		const old = this.id;
 		const parent = this.parent;
 		const placed = parent?.holds(this) === true;
-		const index = placed ? parent.nativeIndexOf(this) : -1;
+		const index = placed ? parent.nativeIndexOf(this, true) : -1;
 		forgetHandlers(this.tag, old, true);
 		this.id = WidgetInstance.make(this.tag, next.attributes.get(MARKUP));
 		this.applyAll(next);
@@ -425,12 +425,13 @@ export class WidgetInstance implements HostNode {
 	/**
 	 * Where a child goes among the widgets of this one. Those React knows are enough, unless the
 	 * application added others: then it is just before the next child React knows.
+	 * `attached` says whether Raven already has the child, so that it counts among what Raven holds.
 	 */
-	private nativeIndexOf(child: HostNode): number {
+	private nativeIndexOf(child: HostNode, attached: boolean): number {
 		const held = this.children.filter((other) => this.holds(other));
 		const index = held.indexOf(child);
 		const count = r.Rwidget_get_child_count(this.id);
-		if (count <= held.length) {
+		if (count <= (attached ? held.length : held.length - 1)) {
 			return index;
 		}
 		const positionOf = (widget: r.Rid | null): number => {
@@ -478,7 +479,7 @@ export class WidgetInstance implements HostNode {
 		this.children.splice(index, 0, child);
 		child.setParent(this);
 		if (this.holds(child)) {
-			r.Rwidget_insert_child(this.id, child.nativeWidget as r.Rid, this.nativeIndexOf(child));
+			r.Rwidget_insert_child(this.id, child.nativeWidget as r.Rid, this.nativeIndexOf(child, false));
 		}
 	}
 

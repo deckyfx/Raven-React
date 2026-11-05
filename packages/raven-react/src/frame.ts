@@ -6,7 +6,7 @@
  */
 
 import "./native";
-import { CFunction, JSCallback, type Pointer } from "bun:ffi";
+import { CFunction, JSCallback, ptr, type Pointer } from "bun:ffi";
 import { Rset_frame_callback as connectNative, type RFrameCallback, type RPointer } from "./vendor/raven";
 
 /** What is called at each frame, with the seconds since the last one. */
@@ -46,7 +46,8 @@ class FrameSlot {
 			const native = CFunction({ ptr: callback, args: ["f64", "ptr"], returns: "void" });
 			this.application = (delta) => void native(delta, userData);
 		} else if (callback) {
-			this.application = (delta) => void callback(delta, null);
+			// an address, as C would give it. An array stays alive for as long as this function does.
+			this.application = (delta) => void callback(delta, userData === null || typeof userData === "number" ? userData : ptr(userData));
 		} else {
 			this.application = null;
 		}

@@ -1,6 +1,7 @@
 /** The events, props and tree rules added after the first ones, on real widgets, with real input where it can be injected. */
 
 import { afterAll, afterEach, beforeAll, expect, test } from "bun:test";
+import { ptr, type Pointer } from "bun:ffi";
 import { tmpdir } from "node:os";
 import { createContext, createRef, useContext, useLayoutEffect, useRef, useState, type ReactNode } from "react";
 import * as r from "../raven";
@@ -376,6 +377,22 @@ test("useFrame: several at once, beside Rset_frame_callback, and gone with their
 	expect(direct).toBe(after);
 });
 
+test("Rset_frame_callback gives a function of JavaScript its user data, as C would", async () => {
+	await mount(<VBox><Label Name="t">t</Label></VBox>);
+	const seen: (Pointer | null)[] = [];
+	const data = new Uint8Array(8);
+	raven.Rset_frame_callback((_delta, userData) => void seen.push(userData), data);
+	r.Rdraw_frame();
+	expect(seen.at(-1)).toBe(ptr(data));
+	raven.Rset_frame_callback((_delta, userData) => void seen.push(userData), ptr(data));
+	r.Rdraw_frame();
+	expect(seen.at(-1)).toBe(ptr(data));
+	raven.Rset_frame_callback((_delta, userData) => void seen.push(userData));
+	r.Rdraw_frame();
+	expect(seen.at(-1)).toBeNull();
+	raven.Rset_frame_callback(null);
+});
+
 test("an exception in a frame function does not stop the others", async () => {
 	const report = console.error;
 	const reported: string[] = [];
@@ -473,6 +490,39 @@ test("children the application adds stay in their place, through inserts and a r
 	await settle();
 	expect(find("box")).not.toBe(before);
 	expect(names(find("box"))).toEqual(["first", "second", "foreign"]);
+});
+
+test("a child put before another goes just before it, past a child the application added", async () => {
+	const names = (parent: r.Rid): string[] => Array.from({ length: r.Rwidget_get_child_count(parent) }, (_, index) => r.Rwidget_get_name(r.Rwidget_get_child(parent, index)) ?? "");
+	function Mixed({ order }: { order: readonly string[] }): ReactNode {
+		const box = useRef<WidgetInstance>(null);
+		useLayoutEffect(() => {
+			const id = box.current?.widget ?? r.R_INVALID_ID;
+			const foreign = r.Rwidget_create_from_xml('<Label Name="foreign"/>');
+			r.Rwidget_insert_child(id, foreign, 1);
+			return () => r.Rwidget_destroy(foreign);
+		}, []);
+		return (
+			<VBox>
+				<WrapBox ref={box} Name="box">
+					{order.map((name) => <Label key={name} Name={name}>{name}</Label>)}
+				</WrapBox>
+			</VBox>
+		);
+	}
+	await mount(<Mixed order={["a", "b"]} />);
+	expect(names(find("box"))).toEqual(["a", "foreign", "b"]);
+	// a new child
+	root?.render(<Mixed order={["a", "c", "b"]} />);
+	await settle();
+	expect(names(find("box"))).toEqual(["a", "foreign", "c", "b"]);
+	// a child that moves: it is out of Raven when its place is asked
+	root?.render(<Mixed order={["a", "b", "c"]} />);
+	await settle();
+	expect(names(find("box"))).toEqual(["a", "foreign", "b", "c"]);
+	root?.render(<Mixed order={["a", "c", "b"]} />);
+	await settle();
+	expect(names(find("box"))).toEqual(["a", "foreign", "c", "b"]);
 });
 
 test("a Viewport says its size from the first layout, which an effect is too late for", async () => {

@@ -100,9 +100,17 @@ const CONTROLLED: Readonly<Record<string, readonly ControlledValue[]>> = {
 /** The attributes held by the widgets of a tag, for the test of what is covered. */
 export const controlledAttributes = (tag: string): readonly string[] => (CONTROLLED[tag] ?? []).map(({ attribute }) => attribute);
 
-/** Fills a TreeView from its `Items`, as text. Its rows are made again: their handles change. Text that is not JSON leaves them. */
+/** Whether what `Items` holds, once parsed, are rows a TreeView can show. */
+function isRows(value: unknown): value is readonly TreeItem[] {
+	return Array.isArray(value) && value.every((row: TreeItem | null) => typeof row?.Text === "string" && isRows(row.Children ?? []));
+}
+
+/** Fills a TreeView from its `Items`, as text. Its rows are made again: their handles change. Text that is not rows leaves them. */
 function fillTree(tree: r.Rid, text: string): void {
-	const items = text ? (JSON.parse(text) as TreeItem[]) : [];
+	const items: unknown = text ? JSON.parse(text) : [];
+	if (!isRows(items)) {
+		RavenError.throw("raven-react: the Items of a TreeView should be a list of rows, each with a Text");
+	}
 	const add = (parent: r.Rid, items: readonly TreeItem[]): void => {
 		for (const item of items) {
 			const row = r.Rtree_view_add_item(tree, parent, item.Text);

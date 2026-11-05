@@ -492,12 +492,16 @@ test("a boundary takes away a widget that could not be made again", async () => 
 	expect(namesUnder("box")).toEqual(["fallback"]);
 });
 
-test("Items that are not JSON leave the rows of a TreeView as they were", async () => {
+test("Items that are not rows leave the rows of a TreeView as they were", async () => {
 	const tree = createRef<WidgetInstance>();
 	await mount(treeThatRemakes(tree, [{ Text: "row" }], "a tip"));
 	const instance = tree.current as WidgetInstance;
-	expect(() => instance.update({ Name: "tree", Height: 100, Tooltip: "a tip", Items: "not json", OnContext: treeContext })).toThrow();
-	expect(r.Rtree_view_get_item_count(instance.widget)).toBe(1);
+	const wrong = ["not json", "5", '{"Text":"new"}', '[{"Text":"new"},null]', '[{"Text":"new"},{"Text":5}]', '[{"Text":"new","Children":[null]}]'];
+	for (const Items of wrong) {
+		expect(() => instance.update({ Name: "tree", Height: 100, Tooltip: "a tip", Items, OnContext: treeContext })).toThrow();
+		expect(r.Rtree_view_get_item_count(instance.widget)).toBe(1);
+		expect(r.Rtree_item_get_text(r.Rtree_view_get_item(instance.widget, 0))).toBe("row");
+	}
 });
 
 test("a widget that cannot be made leaves nothing in Raven", async () => {

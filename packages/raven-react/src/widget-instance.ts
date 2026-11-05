@@ -188,6 +188,8 @@ export class WidgetInstance implements HostNode {
 	/** Told of a new handle when what holds it is not a parent: the island of a window. */
 	private holder: ((widget: r.Rid) => void) | null = null;
 	private resolved: ResolvedProps = { attributes: new Map(), handlers: new Map() };
+	/** How many children the widget had when it was made: those of its markup come first. */
+	private madeChildren = 0;
 
 	private constructor(
 		private id: r.Rid,
@@ -198,6 +200,7 @@ export class WidgetInstance implements HostNode {
 	static create(tag: string, props: RavenProps): WidgetInstance {
 		const resolved = resolveProps(props);
 		const instance = new WidgetInstance(WidgetInstance.make(tag, resolved.attributes.get(MARKUP)), tag);
+		instance.madeChildren = r.Rwidget_get_child_count(instance.id);
 		instance.applyAll(resolved);
 		return instance;
 	}
@@ -405,6 +408,7 @@ export class WidgetInstance implements HostNode {
 		const placed = parent?.holds(this) === true;
 		const index = placed ? parent.nativeIndexOf(this, true) : -1;
 		this.id = WidgetInstance.make(this.tag, next.attributes.get(MARKUP));
+		const madeChildren = r.Rwidget_get_child_count(this.id);
 		try {
 			this.applyAll(next);
 		} catch (error) {
@@ -415,7 +419,9 @@ export class WidgetInstance implements HostNode {
 			throw error;
 		}
 		forgetHandlers(this.tag, old, true);
-		const own = r.Rwidget_get_child_count(this.id);
+		// What Raven made in the old widget: as many as in the new one, but for a markup that changed.
+		const own = r.Rwidget_get_child_count(this.id) + this.madeChildren - madeChildren;
+		this.madeChildren = madeChildren;
 		const moving = Array.from({ length: Math.max(r.Rwidget_get_child_count(old) - own, 0) }, (_, position) => r.Rwidget_get_child(old, own + position));
 		for (const child of moving) {
 			r.Rwidget_remove_child(old, child);

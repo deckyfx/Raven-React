@@ -5,7 +5,7 @@ import { Component, createRef, useEffect, useState, type ReactNode, type RefObje
 import * as r from "../raven";
 import { eventStats } from "../events";
 import {
-	Border, Breadcrumb, Button, parseKeys, useAction, useShortcut, Checkbox, ComboBox, createWindow, Custom, DatePicker, Expander, HBox, Label, ListView, Overlay, Pagination, raven, RavenRoot, Rating, Slider, SpinBox, Table, TabView, TextInput, TileView, TimePicker, Toast, TreeView, VBox, Window,
+	Border, Breadcrumb, Button, parseKeys, useAction, useShortcut, Checkbox, ComboBox, createWindow, Custom, DatePicker, Expander, HBox, Label, ListView, NodeGraph, Overlay, Pagination, raven, RavenRoot, Rating, Slider, SpinBox, Table, TabView, TextInput, TileView, TimePicker, Toast, TreeView, VBox, Window,
 	type TreeItem, type WidgetInstance, type WindowInstance,
 } from "../index";
 
@@ -306,6 +306,39 @@ test("a removed prop remakes the widget, in its place, with its children working
 	click("toggle");
 	await settle();
 	expect(namesUnder("outer")).toEqual(["before", "panel", "after", "toggle"]);
+});
+
+test("a NodeGraph with less Markup does not keep what the old nodes held", async () => {
+	const node = (name: string, inner: string): string => `<Node Name="${name}" Title="${name}" X="0" Y="0">${inner}</Node>`;
+	const app = (markup: string): ReactNode => <VBox><NodeGraph Name="graph" Height={100} Markup={markup} /></VBox>;
+	await mount(app(node("a", '<Label Name="old-a"/>') + node("b", '<Label Name="old-b"/>')));
+	expect(namesUnder("graph")).toEqual(["old-a", "old-b"]);
+	root?.render(app(node("c", '<Label Name="new-c"/>')));
+	await settle();
+	expect(namesUnder("graph")).toEqual(["new-c"]);
+});
+
+test("a change of Markup keeps the children after it, also where the types do not offer Markup", async () => {
+	let clicks = 0;
+	const app = (markup: string): ReactNode => (
+		// @ts-expect-error A VBox has no Markup in its types: JavaScript can still give it one.
+		<VBox Name="box" Markup={markup}>
+			<Button Name="react" OnClicked={() => clicks++}>react</Button>
+		</VBox>
+	);
+	await mount(app('<Label Name="m1"/>'));
+	const button = find("react");
+	expect(namesUnder("box")).toEqual(["m1", "react"]);
+	root?.render(app('<Label Name="m1"/><Label Name="m2"/>'));
+	await settle();
+	expect(namesUnder("box")).toEqual(["m1", "m2", "react"]);
+	expect(find("react")).toBe(button);
+	root?.render(app('<Label Name="m3"/>'));
+	await settle();
+	expect(namesUnder("box")).toEqual(["m3", "react"]);
+	expect(find("react")).toBe(button);
+	click("react");
+	expect(clicks).toBe(1);
 });
 
 test("effects run, and their cleanups run on unmount", async () => {

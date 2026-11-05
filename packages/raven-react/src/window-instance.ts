@@ -39,7 +39,11 @@ const SET_ON_OPEN_WINDOW: Readonly<Record<string, (window: r.Rid, value: string)
 /** What the XML of a window does not take: it is set by calling Raven, once the window is there. */
 const NOT_IN_XML: ReadonlySet<string> = new Set(["Opacity", "ContinuousRedraw"]);
 
-/** Makes a window from attributes, with a place for widgets. */
+/**
+ * Makes a window from attributes, with a place for widgets. That place is an `Overlay`, as for the
+ * content of a window in C: a child fills the window and follows its `Slot`. A `VBox` would not let
+ * it, and children that should stack go in one.
+ */
 export function makeWindow(attributes: ReadonlyMap<string, string>): { window: r.Rid; content: r.Rid } {
 	const text = [...attributes].filter(([name]) => !NOT_IN_XML.has(name)).map(([name, value]) => `${name}="${escapeXml(value)}"`).join(" ");
 	const window = r.Rwindow_create_from_xml(`<Window ${text}><Overlay Name="${CONTENT_NAME}"/></Window>`);

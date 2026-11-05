@@ -341,6 +341,17 @@ test("a change of Markup keeps the children after it, also where the types do no
 	expect(clicks).toBe(1);
 });
 
+test("what a window holds fills it, follows its Slot, and lies on top of the rest", async () => {
+	await mount(
+		<>
+			<VBox Name="fills" />
+			<VBox Name="centered" Width={100} Height={40} Slot={{ HAlign: "Center", VAlign: "Center" }} />
+		</>,
+	);
+	expect([...r.Rwidget_get_rect(find("fills"))]).toEqual([0, 0, WINDOW.Width, WINDOW.Height]);
+	expect([...r.Rwidget_get_rect(find("centered"))]).toEqual([190, 220, 100, 40]);
+});
+
 test("effects run, and their cleanups run on unmount", async () => {
 	const log: string[] = [];
 	function Timer(): ReactNode {

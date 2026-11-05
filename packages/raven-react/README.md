@@ -128,6 +128,8 @@ await runApp(<App />);
 
 With `OnClose`, closing is a request: the window stays until the element is taken out. Without it, the user can close the window at any time. `Title`, `Theme`, `Width`, `Height`, `Backdrop`, `Opacity` and `ContinuousRedraw` can change on an open window. Other attributes only count when it is made.
 
+What a `<Window>` holds directly fills it and follows its `Slot`, as the content of a window in C. Several such children lie on top of each other: put them in a `<VBox>` to stack them.
+
 An `<Island>` directly in a `<Window>` floats above the content at the top, as in XML. A `<Menu>` that no `MenuBar` or `Menu` holds is not shown until it is asked: its ref has `open(x, y)`, in the coordinates `OnContext` gives. A `<Separator>` in a `<Menu>` is a line of the menu.
 
 ## Going beyond props

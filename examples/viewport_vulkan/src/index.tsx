@@ -16,7 +16,7 @@
  * (Rviewport_set_draw_callback) are not demonstrated.
  */
 
-import { useEffect, useRef, useState, type ReactNode } from "react";
+import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from "react";
 import { Button, Checkbox, Custom, HBox, Label, Overlay, raven, runApp, Splitter, VBox, Viewport, type WidgetInstance } from "@decky.fx/raven-react";
 import { placeCorners, SoftwareTarget } from "./triangle";
 
@@ -71,7 +71,9 @@ function App(): ReactNode {
 	// what the frame callback and the paint read: animation is no state of React
 	const angle = useRef(0);
 	const pausedNow = useRef(paused);
-	pausedNow.current = paused;
+	useLayoutEffect(() => {
+		pausedNow.current = paused;
+	}, [paused]);
 
 	useEffect(() => {
 		const target = new SoftwareTarget();

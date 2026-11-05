@@ -206,7 +206,8 @@ function goTo(navigation: Navigation, page: number): Navigation {
 	if (page === navigation.page) {
 		return navigation;
 	}
-	const history = navigation.history.length < MAX_HISTORY ? [...navigation.history, navigation.page] : navigation.history;
+	// (the oldest page goes when it is full: Back always goes to the page before)
+	const history = [...navigation.history, navigation.page].slice(-MAX_HISTORY);
 	return { page, history };
 }
 

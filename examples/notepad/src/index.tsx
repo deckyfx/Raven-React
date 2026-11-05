@@ -131,7 +131,15 @@ function App(): ReactNode {
 			setStatus(`Cannot read ${chosen}`);
 			return;
 		}
-		replaceText(new TextDecoder().decode(bytes), chosen, raven.Rlanguage_for_file(chosen));
+		let text: string;
+		try {
+			// (a byte that is not UTF-8 would become U+FFFD, and saving would write that over the file)
+			text = new TextDecoder("utf-8", { fatal: true }).decode(bytes);
+		} catch {
+			setStatus(`Not opened: ${chosen} is not UTF-8 text`);
+			return;
+		}
+		replaceText(text, chosen, raven.Rlanguage_for_file(chosen));
 		setStatus(`Opened ${chosen}`);
 		editor.current?.focus();
 	};
@@ -150,13 +158,16 @@ function App(): ReactNode {
 				return;
 			}
 			target = chosen;
-			setPath(target);
-			setLanguage(raven.Rlanguage_for_file(target));
 		}
 		const text = raven.Rtext_editor_get_text(editor.current.widget) ?? "";
 		if (!raven.Rfile_write(target, new TextEncoder().encode(text))) {
 			setStatus(`Cannot write ${target}`);
 			return;
+		}
+		// (only once it is written: a failed Save As leaves the text where it was)
+		if (target !== path) {
+			setPath(target);
+			setLanguage(raven.Rlanguage_for_file(target));
 		}
 		setModified(false);
 		setStatus(`Saved ${target}`);

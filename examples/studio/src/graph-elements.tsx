@@ -120,27 +120,30 @@ export function GraphLink({ graph, from, to }: { graph: GraphRef; from: string; 
 	return null;
 }
 
-/** Whether a path of links leads from a node to another. */
-export function reaches(graph: raven.Rid, node: number, target: number, depth = 0): boolean {
-	if (node === target) {
-		return true;
-	}
-	if (depth > 64) {
-		return false;
-	}
-	for (let index = 0; ; index++) {
-		const output = raven.Rnode_graph_get_output(graph, node, index);
-		if (!output) {
-			return false;
+/** Whether a path of links leads from a node to another. Each node is looked at once, however long the path. */
+export function reaches(graph: raven.Rid, node: number, target: number): boolean {
+	const seen = new Set<number>();
+	const pending = [node];
+	for (let current = pending.pop(); current !== undefined; current = pending.pop()) {
+		if (current === target) {
+			return true;
 		}
-		for (let k = 0; k < raven.Rnode_graph_get_link_count(graph); k++) {
-			const link = raven.Rnode_graph_get_link(graph, k);
-			if (
-				raven.Rnode_graph_get_link_output(graph, link) === output &&
-				reaches(graph, raven.Rnode_graph_get_pin_node(graph, raven.Rnode_graph_get_link_input(graph, link)), target, depth + 1)
-			) {
-				return true;
+		if (seen.has(current)) {
+			continue;
+		}
+		seen.add(current);
+		for (let index = 0; ; index++) {
+			const output = raven.Rnode_graph_get_output(graph, current, index);
+			if (!output) {
+				break;
+			}
+			for (let k = 0; k < raven.Rnode_graph_get_link_count(graph); k++) {
+				const link = raven.Rnode_graph_get_link(graph, k);
+				if (raven.Rnode_graph_get_link_output(graph, link) === output) {
+					pending.push(raven.Rnode_graph_get_pin_node(graph, raven.Rnode_graph_get_link_input(graph, link)));
+				}
 			}
 		}
 	}
+	return false;
 }

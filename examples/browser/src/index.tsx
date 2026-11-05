@@ -42,6 +42,8 @@ function App(): ReactNode {
 	const [address, setAddress] = useState("");
 	const [zoom, setZoom] = useState(1);
 	const [log, setLog] = useState("*Nothing yet: press a button of the page.*");
+	/** The address the bar was last given by the page: what is typed stays until the page goes elsewhere. */
+	const shownUrl = useRef("");
 
 	/** The handle of the view, read when needed since it can change. */
 	const view = (): raven.Rid => page.current?.widget ?? raven.R_INVALID_ID;
@@ -50,7 +52,10 @@ function App(): ReactNode {
 	const refresh = (): void => {
 		const next = web.readPage(view());
 		setState(next);
-		setAddress(next.url);
+		if (next.url !== shownUrl.current) {
+			shownUrl.current = next.url;
+			setAddress(next.url);
+		}
 	};
 
 	useEffect(() => {

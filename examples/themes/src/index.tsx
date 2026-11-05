@@ -75,6 +75,18 @@ function Sidebar(): ReactNode {
 	const accent = useRef<WidgetInstance>(null);
 	const [appearance, setAppearance] = useState(readAppearance);
 	const [status, setStatus] = useState("");
+	const [accentColor, setAccentColor] = useState("#22D3EE");
+
+	// a theme file Raven loaded again can have another name
+	useEffect(() => {
+		raven.Rxml_set_reload_callback((path, ok) => {
+			setStatus(ok ? `Loaded again: ${path}` : `Not loaded (see the error): ${path}`);
+			if (ok) {
+				setAppearance(readAppearance());
+			}
+		});
+		return () => raven.Rxml_set_reload_callback(null);
+	}, []);
 
 	useAction("themes.docs", () => setStatus('A link of the Markdown text fired the action "themes.docs".'));
 
@@ -94,8 +106,9 @@ function Sidebar(): ReactNode {
 		setAppearance(readAppearance());
 	};
 
-	// a ColorPicker gives nothing to `OnChanged`: its color is read from the widget
-	const chooseAccent = (): void => {
+	// (Color is held by React: without the new color in it, the picker would go back to the first one)
+	const chooseAccent = (hex: string): void => {
+		setAccentColor(hex);
 		if (accent.current) {
 			const [r, g, b] = raven.Rcolor_picker_get_color(accent.current.widget);
 			raven.Rtheme_set_accent(r, g, b);
@@ -116,7 +129,7 @@ function Sidebar(): ReactNode {
 			<ComboBox Items={appearance.themes} Selected={appearance.theme} OnChanged={chooseTheme} />
 			<FieldTitle>Accent</FieldTitle>
 			<HBox Spacing={8}>
-				<ColorPicker ref={accent} Popup Alpha={false} Color="#22D3EE" OnChanged={chooseAccent} />
+				<ColorPicker ref={accent} Popup Alpha={false} Color={accentColor} OnChanged={chooseAccent} />
 				<Label Font="monospace" TextSize={12} Opacity={0.7} Slot={{ VAlign: "Center" }}>Rtheme_set_accent</Label>
 			</HBox>
 			<Button

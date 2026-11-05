@@ -101,6 +101,7 @@ function App(): ReactNode {
 	const window = useRef<WindowInstance>(null);
 	const [backdrop, setBackdrop] = useState(FIRST_BACKDROP);
 	const [opacity, setOpacity] = useState(1);
+	const [opacityRefused, setOpacityRefused] = useState(false);
 	const [obtained, setObtained] = useState<Obtained>({ backdrop: "", what: "" });
 
 	// Only the window can say what it was given, once it exists.
@@ -120,12 +121,13 @@ function App(): ReactNode {
 		}
 	}
 
-	/** Fades the whole window. */
+	/** Fades the whole window. When the system refuses, the slider goes back to what the window has. */
 	function chooseOpacity(value: number): void {
-		setOpacity(value);
-		if (window.current) {
-			raven.Rwindow_set_opacity(window.current.window, value);
+		if (window.current && !raven.Rwindow_set_opacity(window.current.window, value)) {
+			setOpacityRefused(true);
+			return;
 		}
+		setOpacity(value);
 	}
 
 	return (
@@ -146,7 +148,7 @@ function App(): ReactNode {
 					<HBox Spacing={10}>
 						<RowLabel>Opacity</RowLabel>
 						<Slider Min={0.2} Max={1} Value={opacity} Width={160} OnChanged={chooseOpacity} Slot={{ VAlign: "Center" }} />
-						<Label Slot={{ VAlign: "Center" }} Color="#FFFFFF90">of the whole window</Label>
+						<Label Slot={{ VAlign: "Center" }} Color="#FFFFFF90">{opacityRefused ? "not supported by this window system" : "of the whole window"}</Label>
 					</HBox>
 
 					<Overlay Slot={{ Fill: 1 }}>

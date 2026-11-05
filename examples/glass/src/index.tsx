@@ -260,14 +260,14 @@ function formatTime(seconds: number): string {
 }
 
 /** The player bar, of clear glass. */
-function PlayerBar({ seconds, playing, onToggle }: { readonly seconds: number; readonly playing: boolean; readonly onToggle: () => void }): ReactNode {
+function PlayerBar({ seconds, playing, onToggle, onSeek }: { readonly seconds: number; readonly playing: boolean; readonly onToggle: () => void; readonly onSeek: (fraction: number) => void }): ReactNode {
 	return (
 		<Border Material="Glass" CornerRadius={100} Padding={[10, 8]} Shadow={30} Slot={{ HAlign: "Center", VAlign: "Bottom", Padding: [286, 0, 0, 22] }} Appear="FlyUp" AppearDelay={0.35}>
 			<HBox Spacing={12}>
 				<Button Style="Flat">Previous</Button>
 				<Button Style="Primary" MinWidth={76} OnClicked={onToggle}>{playing ? "Pause" : "Play"}</Button>
 				<Button Style="Flat">Next</Button>
-				<Slider Value={seconds / TRACK_SECONDS} Width={240} Slot={{ VAlign: "Center" }} />
+				<Slider Value={seconds / TRACK_SECONDS} Width={240} Slot={{ VAlign: "Center" }} OnChanged={onSeek} />
 				<Label Slot={{ VAlign: "Center" }} Opacity={0.7} MinWidth={40}>{formatTime(seconds)}</Label>
 			</HBox>
 		</Border>
@@ -279,7 +279,7 @@ function PlayerBar({ seconds, playing, onToggle }: { readonly seconds: number; r
  * producing frames. The state moves in tenths of a second, far less than a pixel of the slider,
  * so that the page is not rendered at each frame.
  */
-function usePlayer(window: RefObject<WindowInstance | null>): { readonly seconds: number; readonly playing: boolean; readonly toggle: () => void } {
+function usePlayer(window: RefObject<WindowInstance | null>): { readonly seconds: number; readonly playing: boolean; readonly toggle: () => void; readonly seek: (fraction: number) => void } {
 	const [playing, setPlaying] = useState(true);
 	const [tenths, setTenths] = useState(START_SECONDS * 10);
 	const clock = useRef({ playing: true, seconds: START_SECONDS });
@@ -300,13 +300,22 @@ function usePlayer(window: RefObject<WindowInstance | null>): { readonly seconds
 		return () => raven.Rset_frame_callback(null);
 	}, [window]);
 
-	/** Plays or pauses. */
+	/** Plays or pauses. Frames are only needed while the time moves. */
 	function toggle(): void {
 		clock.current.playing = !clock.current.playing;
 		setPlaying(clock.current.playing);
+		if (window.current) {
+			raven.Rwindow_set_continuous_redraw(window.current.window, clock.current.playing ? raven.R_TRUE : raven.R_FALSE);
+		}
 	}
 
-	return { seconds: tenths / 10, playing, toggle };
+	/** Moves the time to where the slider was dragged. */
+	function seek(fraction: number): void {
+		clock.current.seconds = fraction * TRACK_SECONDS;
+		setTenths(Math.trunc(clock.current.seconds * 10));
+	}
+
+	return { seconds: tenths / 10, playing, toggle, seek };
 }
 
 function App(): ReactNode {
@@ -318,7 +327,7 @@ function App(): ReactNode {
 				<Page progress={player.seconds / TRACK_SECONDS} />
 				<SideBar />
 				<ToolBar window={window} />
-				<PlayerBar seconds={player.seconds} playing={player.playing} onToggle={player.toggle} />
+				<PlayerBar seconds={player.seconds} playing={player.playing} onToggle={player.toggle} onSeek={player.seek} />
 			</Overlay>
 		</Window>
 	);

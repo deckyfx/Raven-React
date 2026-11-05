@@ -15,6 +15,7 @@ import {
 	Spacer,
 	Splitter,
 	Timeline,
+	useFrame,
 	VBox,
 	type WidgetInstance,
 } from "@decky.fx/raven-react";
@@ -296,6 +297,13 @@ function App(): ReactElement {
 	const [theme, setTheme] = useState(FIRST_THEME);
 
 	useTimelineContent(timeline);
+	// (Space in the timeline plays and pauses too, and tells nobody: the button reads the widget at each frame)
+	useFrame(() => {
+		const id = timeline.current?.widget;
+		if (id !== undefined) {
+			setPlaying(raven.Rtimeline_is_playing(id) === raven.R_TRUE);
+		}
+	});
 
 	/** Plays or pauses. The widget decides: Space in the timeline does the same, and it tells nobody. */
 	const togglePlaying = (): void => {

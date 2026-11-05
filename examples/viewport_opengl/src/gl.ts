@@ -84,8 +84,14 @@ export class GlContext {
 			return "This port only makes an OpenGL context on X11 (GLX). Start it with RAVEN_WINDOW_SYSTEM=x11.";
 		}
 		const drawable = native.window;
-		const gl = openGl();
-		const x11 = openX11();
+		let gl: ReturnType<typeof openGl>;
+		let x11: ReturnType<typeof openX11>;
+		try {
+			gl = openGl();
+			x11 = openX11();
+		} catch (error) {
+			return `Cannot load libGL or libX11: ${error instanceof Error ? error.message : String(error)}`;
+		}
 
 		const attributes = new Uint8Array(WINDOW_ATTRIBUTES_SIZE);
 		if (!x11.XGetWindowAttributes(display, drawable, attributes)) {

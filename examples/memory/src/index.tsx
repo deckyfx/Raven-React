@@ -20,9 +20,24 @@ const REFRESH_MS = 500;
 /** Whether this run was started with the allocator of the C runtime. */
 const SYSTEM_ALLOCATOR = process.argv.includes("--system");
 
-const WHICH_ALLOCATOR = SYSTEM_ALLOCATOR
-	? "The allocator of the C runtime is in use (Rallocator_get_system, started with --system): Raven counts its blocks but not their bytes, and Rmemory_check has no heap to walk."
-	: "The allocator of Raven is in use (start with --system for the one of the C runtime).";
+/**
+ * Whether the heap of Raven is in use: only it takes regions from the system. Not only `--system`
+ * leaves it: `RAVEN_ALLOCATOR=system` does too, and so does a build with a sanitizer.
+ */
+function ravenHeapInUse(): boolean {
+	const stats = new raven.RMemoryStats();
+	raven.Rmemory_get_stats(stats);
+	return stats.reserved_bytes > 0;
+}
+
+/** Which allocator is in use, and what that means for the statistics. */
+function whichAllocator(ravenHeap: boolean): string {
+	if (ravenHeap) {
+		return "The allocator of Raven is in use (start with --system for the one of the C runtime).";
+	}
+	const why = SYSTEM_ALLOCATOR ? "Rallocator_get_system, started with --system" : "RAVEN_ALLOCATOR=system, or a build with a sanitizer";
+	return `The allocator of the C runtime is in use (${why}): Raven counts its blocks but not their bytes, and Rmemory_check has no heap to walk.`;
+}
 const LEFT_OUT =
 	"Left out of this port: the counting allocator of the C example. Raven calls an allocator from its worker threads and before anything else starts, and a JavaScript function cannot be called off the JS thread.";
 
@@ -59,15 +74,21 @@ function Statistics({ buttons }: { readonly buttons: number }): ReactNode {
 function App(): ReactNode {
 	const [buttons, setButtons] = useState(BATCH);
 	const [check, setCheck] = useState("");
+	// (Raven started before the first render, and chose its allocator then)
+	const [ravenHeap] = useState(ravenHeapInUse);
 
 	/** Walks the heap of Raven and verifies every block. With another allocator there is nothing to walk. */
 	function checkHeap(): void {
+		if (!ravenHeap) {
+			setCheck("Rmemory_check: nothing to check, the heap of Raven is not in use.");
+			return;
+		}
 		setCheck(raven.Rmemory_check() ? "Rmemory_check: the heap is consistent." : "Rmemory_check: the heap is damaged!");
 	}
 
 	return (
 		<VBox Spacing={10} Slot={{ Padding: 16 }}>
-			<Label Wrap>{WHICH_ALLOCATOR}</Label>
+			<Label Wrap>{whichAllocator(ravenHeap)}</Label>
 			<Label Wrap Opacity={0.7}>{LEFT_OUT}</Label>
 			<Statistics buttons={buttons} />
 			<Label Text={check} Opacity={0.7} />

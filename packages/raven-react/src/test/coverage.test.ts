@@ -256,6 +256,14 @@ test("a library that cannot be the build of a checkout is not stamped as such", 
 	expect(provenanceProblem("/raven/build/libraven.so", "/raven", commitTime - 1, commitTime)).toContain("older");
 });
 
+test("a checkout git cannot read is not taken for a clean one", () => {
+	const script = `import { dirtyPaths } from ${JSON.stringify(`${import.meta.dir}/../tools/raven-pin`)}; dirtyPaths("/nonexistent/raven-checkout"); console.log("clean");`;
+	const run = Bun.spawnSync([process.execPath, "-e", script], { stdout: "pipe", stderr: "pipe" });
+	expect(run.stdout.toString()).not.toContain("clean");
+	expect(run.exitCode).toBe(1);
+	expect(run.stderr.toString()).toContain("git status failed");
+});
+
 test("what differs between two APIs is said by name", () => {
 	const before = parseApi([HEADER], SCHEMA);
 	const after = parseApi(

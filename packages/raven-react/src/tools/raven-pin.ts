@@ -78,7 +78,7 @@ export function nameOf(checkout: string, commit: string): string {
 }
 
 /** The uncommitted changes that would make a library of this checkout another library. */
-export const dirtyPaths = (checkout: string): string[] => (git(checkout, "status", "--porcelain", "--", ...BUILD_PATHS) ?? "").split("\n").filter(Boolean);
+export const dirtyPaths = (checkout: string): string[] => (git(checkout, "status", "--porcelain", "--", ...BUILD_PATHS) ?? fail(`git status failed in ${checkout}`)).split("\n").filter(Boolean);
 
 /** The API of Raven at a commit. */
 export function apiAt(checkout: string, commit: string): RavenApi {

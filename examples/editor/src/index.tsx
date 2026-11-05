@@ -304,7 +304,8 @@ function App(): ReactNode {
 	live.current = { objects, selected, playing, threaded, scale, tab };
 
 	const addLog = useCallback((line: string): void => {
-		setLog((lines) => (lines.length < LOG_CAPACITY ? [...lines, line] : lines));
+		// a full log drops its oldest line, so the new ones are still seen
+		setLog((lines) => [...(lines.length < LOG_CAPACITY ? lines : lines.slice(1)), line]);
 	}, []);
 
 	const onDrag = useCallback((id: number, x: number, y: number): void => {
@@ -318,13 +319,13 @@ function App(): ReactNode {
 
 	const itemObject = useOutliner(outliner, objects, selected);
 
-	const logScroll = log.length - 1;
+	// (on every line: a full log keeps its length)
 	useEffect(() => {
 		const list = logList.current?.widget;
 		if (list !== undefined) {
-			raven.Rlist_view_scroll_to_item(list, logScroll);
+			raven.Rlist_view_scroll_to_item(list, log.length - 1);
 		}
-	}, [logScroll]);
+	}, [log]);
 	const logRow = useCallback((index: number): string => log[index] ?? "", [log]);
 
 	const newScene = (): void => {

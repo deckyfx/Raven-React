@@ -29,6 +29,11 @@ function WebView(props: WebViewProps): ReactElement {
 	return createElement("WebView", props);
 }
 
+/** A path that starts at the root, "/..." or "C:\...": a file of the computer. */
+function isFilePath(text: string): boolean {
+	return text.startsWith("/") || /^[A-Za-z]:[\\/]/.test(text);
+}
+
 /** An address without a scheme is a web site. */
 function toUrl(text: string): string {
 	return text.includes("://") || text.startsWith("about:") ? text : `https://${text}`;
@@ -76,7 +81,11 @@ function App(): ReactNode {
 	/** Goes to what the address bar holds. */
 	const go = (text: string): void => {
 		if (text) {
-			web.loadUrl(view(), toUrl(text));
+			if (isFilePath(text)) {
+				web.loadFile(view(), text);
+			} else {
+				web.loadUrl(view(), toUrl(text));
+			}
 			page.current?.focus();
 		}
 	};

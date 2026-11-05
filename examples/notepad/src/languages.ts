@@ -70,3 +70,9 @@ export function markNotes(editor: raven.Rid): number {
 	}
 	return found;
 }
+
+/** Whether a text has line breaks and ends every one with CR LF. */
+export function usesCrlf(text: string): boolean {
+	const breaks = text.split("\n").length - 1;
+	return breaks > 0 && text.split("\r\n").length - 1 === breaks;
+}

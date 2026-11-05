@@ -43,6 +43,8 @@ function App(): ReactNode {
 	const page = useRef<WidgetInstance>(null);
 	const tint = useRef<WidgetInstance>(null);
 	const messages = useRef(0);
+	/** Whether a tint was chosen: a page loaded later gets it too. */
+	const tinted = useRef(false);
 	const [state, setState] = useState<web.PageState>({ url: "", title: "", loading: true, error: "", canGoBack: false, canGoForward: false });
 	const [address, setAddress] = useState("");
 	const [zoom, setZoom] = useState(1);
@@ -70,7 +72,14 @@ function App(): ReactNode {
 		if (tint.current) {
 			raven.Rcolor_picker_set_color(tint.current.widget, r, g, b, a);
 		}
-		const stop = web.listen(id, refresh, (message) => {
+		const onEvent = (event: number): void => {
+			refresh();
+			// (a new document has none of the CSS variables set on the one before)
+			if (event === web.WEB_EVENT_LOADED && tinted.current) {
+				applyTint();
+			}
+		};
+		const stop = web.listen(id, onEvent, (message) => {
 			messages.current += 1;
 			setLog(`Message **${messages.current}**:\n\n\`${message.slice(0, 600)}\``);
 		});
@@ -91,11 +100,16 @@ function App(): ReactNode {
 	};
 
 	/** A widget of Raven changes the page: the color picker sets a CSS variable. */
-	const applyTint = (): void => {
+	function applyTint(): void {
 		const hex = tint.current ? raven.Rcolor_picker_get_hex(tint.current.widget) : null;
 		if (hex) {
 			web.runJavaScript(view(), `document.documentElement.style.setProperty('--accent', '${hex}')`);
 		}
+	}
+
+	const chooseTint = (): void => {
+		tinted.current = true;
+		applyTint();
 	};
 
 	return (
@@ -130,7 +144,7 @@ function App(): ReactNode {
 					<Separator />
 					<Label Opacity={0.6}>From Raven to the page</Label>
 					<Label Markdown Wrap>This color picker is a widget of Raven. It sets a **CSS variable** of the page with `Rweb_view_run_javascript`.</Label>
-					<ColorPicker ref={tint} Previous="#7C5CFF" Alpha={false} Compact OnChanged={applyTint} />
+					<ColorPicker ref={tint} Previous="#7C5CFF" Alpha={false} Compact OnChanged={chooseTint} />
 					<Separator />
 					<Label Opacity={0.6}>From the page to Raven</Label>
 					<Label Wrap Markdown>{log}</Label>

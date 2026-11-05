@@ -111,12 +111,15 @@ export function readPage(view: ViewId): PageState {
 	};
 }
 
+/** `R_WEB_EVENT_LOADED` of `raven_web.h`: the page and what it needs are loaded. */
+export const WEB_EVENT_LOADED = 0x04a3;
+
 /**
- * Listens to a view: `onEvent` when something happens in the page, `onMessage` with what the
+ * Listens to a view: `onEvent` with the `R_WEB_EVENT_` of what happened in the page, `onMessage` with what the
  * page sends by `window.raven.postMessage`. The function returned stops it.
  */
-export function listen(view: ViewId, onEvent: () => void, onMessage: (message: string) => void): () => void {
-	const event = new JSCallback((): void => onEvent(), { args: ["u32", "i32", "ptr"], returns: "void" });
+export function listen(view: ViewId, onEvent: (event: number) => void, onMessage: (message: string) => void): () => void {
+	const event = new JSCallback((_view: number, kind: number): void => onEvent(kind), { args: ["u32", "i32", "ptr"], returns: "void" });
 	const message = new JSCallback(
 		(_view: number, text: Pointer | null): void => onMessage(text ? new CString(text).toString() : ""),
 		{ args: ["u32", "ptr", "ptr"], returns: "void" },

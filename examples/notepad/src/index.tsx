@@ -29,7 +29,7 @@ import {
 	type WidgetInstance,
 	type WindowInstance,
 } from "@decky.fx/raven-react";
-import { languageNames, markNotes, proposeWords, registerIni } from "./languages";
+import { languageNames, markNotes, proposeWords, registerIni, usesCrlf } from "./languages";
 import { NotepadMenus, type MenuActions } from "./NotepadMenus";
 
 const WELCOME = `/* Raven Notepad: this text is C, so the editor colors it. */
@@ -96,6 +96,11 @@ function App(): ReactNode {
 	const [lineNumbers, setLineNumbers] = useState(true);
 	const [wrap, setWrap] = useState(false);
 	const [edits, setEdits] = useState(0);
+	/**
+	 * Whether the file opened ended all its lines with CR LF: the editor keeps LF, saving puts CR LF
+	 * back. A file with both is saved with LF, as the editor no longer knows which line had which.
+	 */
+	const [crlf, setCrlf] = useState(false);
 
 	/** Underlines the notes of the text, and says how many there are. */
 	const scanNotes = (): void => {
@@ -117,6 +122,7 @@ function App(): ReactNode {
 	const replaceText = (text: string, nextPath: string, nextLanguage: string | null): void => {
 		if (editor.current) {
 			raven.Rtext_editor_set_text(editor.current.widget, text);
+			setCrlf(usesCrlf(text));
 			setLanguage(nextLanguage);
 			setPath(nextPath);
 			setModified(false);
@@ -139,6 +145,11 @@ function App(): ReactNode {
 			setStatus(`Not opened: ${chosen} is not UTF-8 text`);
 			return;
 		}
+		// (the editor takes text up to a NUL: the rest would be cut, and lost on saving)
+		if (text.includes("\0")) {
+			setStatus(`Not opened: ${chosen} holds a NUL byte, it is not text`);
+			return;
+		}
 		replaceText(text, chosen, raven.Rlanguage_for_file(chosen));
 		setStatus(`Opened ${chosen}`);
 		editor.current?.focus();
@@ -159,7 +170,8 @@ function App(): ReactNode {
 			}
 			target = chosen;
 		}
-		const text = raven.Rtext_editor_get_text(editor.current.widget) ?? "";
+		const lines = raven.Rtext_editor_get_text(editor.current.widget) ?? "";
+		const text = crlf ? lines.replaceAll("\n", "\r\n") : lines;
 		if (!raven.Rfile_write(target, new TextEncoder().encode(text))) {
 			setStatus(`Cannot write ${target}`);
 			return;

@@ -304,7 +304,10 @@ function App(): ReactNode {
 	const [measures, setMeasures] = useState<Measures>({ stats: "", renderInfo: "" });
 
 	const live = useRef<LiveState>({ objects, selected, playing, threaded, scale, tab });
-	live.current = { objects, selected, playing, threaded, scale, tab };
+	// (after the commit: the callbacks of the viewport read what is on screen, not a render React may throw away)
+	useLayoutEffect(() => {
+		live.current = { objects, selected, playing, threaded, scale, tab };
+	}, [objects, selected, playing, threaded, scale, tab]);
 
 	const addLog = useCallback((line: string): void => {
 		// a full log drops its oldest line, so the new ones are still seen

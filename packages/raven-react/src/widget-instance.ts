@@ -100,8 +100,9 @@ const CONTROLLED: Readonly<Record<string, readonly ControlledValue[]>> = {
 /** The attributes held by the widgets of a tag, for the test of what is covered. */
 export const controlledAttributes = (tag: string): readonly string[] => (CONTROLLED[tag] ?? []).map(({ attribute }) => attribute);
 
-/** Fills a TreeView from its `Items`, as text. Its rows are made again: their handles change. */
+/** Fills a TreeView from its `Items`, as text. Its rows are made again: their handles change. Text that is not JSON leaves them. */
 function fillTree(tree: r.Rid, text: string): void {
+	const items = text ? (JSON.parse(text) as TreeItem[]) : [];
 	const add = (parent: r.Rid, items: readonly TreeItem[]): void => {
 		for (const item of items) {
 			const row = r.Rtree_view_add_item(tree, parent, item.Text);
@@ -112,7 +113,7 @@ function fillTree(tree: r.Rid, text: string): void {
 		}
 	};
 	r.Rtree_view_clear_items(tree);
-	add(r.R_INVALID_ID, text ? (JSON.parse(text) as TreeItem[]) : []);
+	add(r.R_INVALID_ID, items);
 }
 
 /** The styles of `FontStyle`, of the font of the theme. */
@@ -201,7 +202,14 @@ export class WidgetInstance implements HostNode {
 		const resolved = resolveProps(props);
 		const instance = new WidgetInstance(WidgetInstance.make(tag, resolved.attributes.get(MARKUP)), tag);
 		instance.madeChildren = r.Rwidget_get_child_count(instance.id);
-		instance.applyAll(resolved);
+		try {
+			instance.applyAll(resolved);
+		} catch (error) {
+			// (React keeps no instance of it, and nothing else would destroy a widget without a parent)
+			forgetHandlers(tag, instance.id, true);
+			r.Rwidget_destroy(instance.id);
+			throw error;
+		}
 		return instance;
 	}
 

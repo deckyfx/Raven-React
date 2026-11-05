@@ -5,12 +5,13 @@
  */
 
 import { afterAll, beforeAll, expect, test } from "bun:test";
-import { existsSync } from "node:fs";
+import { existsSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
 import { resolve } from "node:path";
 import * as r from "../raven";
 import * as components from "../index";
 import { EVENT_VALUE_TYPES, EXTRA_PROPS, COMMON_PROPS, wiredCallbacks, wiredProps } from "../events";
-import { functionsOfBinding, missingFunctions } from "../library-check";
+import { checkLibrary, functionsOfBinding, missingFunctions, STAMP_FILE } from "../library-check";
 import { apiAt, commitOf, provenanceProblem, readPin } from "../tools/raven-pin";
 import { diffApi, parseApi, parseHeader, parseSchema, countOf, formatDiff, newCallbackSetters, type RavenApi } from "../tools/raven-api";
 import { controlledAttributes, overrideOf } from "../widget-instance";
@@ -194,6 +195,26 @@ test("the library has all the functions of the binding, and the check for it see
 	expect(missingFunctions([...functions, "Rnot_there_yet"], library)).toEqual(["Rnot_there_yet"]);
 	// (not a library: it says nothing rather than something false)
 	expect(missingFunctions(functions, Buffer.from("nothing"))).toEqual([]);
+});
+
+test("a stamp spares a library the search for missing functions only if it was checked", async () => {
+	const functions = functionsOfBinding(await Bun.file(`${import.meta.dir}/../vendor/raven.ts`).text());
+	const pin = await readPin();
+	const directory = mkdtempSync(`${tmpdir()}/raven-stamp-`);
+	const library = `${directory}/library`;
+	const stampIt = (verified: boolean): void => writeFileSync(`${directory}/${STAMP_FILE}`, JSON.stringify({ commit: "", pin, version: "", sha256: "", verified }));
+	const warn = console.warn;
+	try {
+		console.warn = (): void => {};
+		writeFileSync(library, functions.slice(1).join(" "));
+		stampIt(true);
+		expect(() => checkLibrary(library)).not.toThrow();
+		stampIt(false);
+		expect(() => checkLibrary(library)).toThrow(functions[0]);
+	} finally {
+		console.warn = warn;
+		rmSync(directory, { recursive: true });
+	}
 });
 
 test("the components are what generating them again gives", () => {

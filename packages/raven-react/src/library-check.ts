@@ -59,7 +59,8 @@ export function shortCommit(commit: string): string {
 /**
  * Says what is wrong with a library before the binding opens it, as all the system would say is
  * that one symbol was not found. Nothing happens in an executable, which holds what it was
- * built with, or when the stamp says the library was packaged for this pin.
+ * built with, or when the stamp says the library was packaged for this pin and checked:
+ * `--allow-mismatch` writes the pin too, without having checked anything.
  */
 export function checkLibrary(library: string): void {
 	const binding = `${import.meta.dir}/vendor/raven.ts`;
@@ -69,7 +70,7 @@ export function checkLibrary(library: string): void {
 	const pinFile = resolve(import.meta.dir, "../RAVEN_VERSION");
 	const pin = existsSync(pinFile) ? readFileSync(pinFile, "utf8").trim() : "";
 	const stamp = readStamp(dirname(library));
-	if (stamp && stamp.pin === pin) {
+	if (stamp?.verified && stamp.pin === pin) {
 		return;
 	}
 	const built = stamp?.commit ? `built from Raven ${shortCommit(stamp.commit)}` : "built from a commit it cannot say";

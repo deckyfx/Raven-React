@@ -85,7 +85,8 @@ export interface RunOptions {
 
 /**
  * Starts Raven, shows a tree and runs until the last window closes, the event loop of Bun
- * running beside it. Then the effects are cleaned up and Raven stops.
+ * running beside it. Then the effects are cleaned up and Raven stops. It also stops when the
+ * run ends with an error, so that it can start again.
  *
  * With options, the tree goes in one window made from them. Without, the tree says what
  * windows there are, with `<Window>` elements.
@@ -100,12 +101,15 @@ export async function runApp(element: ReactNode, options?: WindowOptions, start?
 	if (!r.Rinit_ex(desc)) {
 		RavenError.fromLibrary("Raven cannot start");
 	}
-	start?.setup?.();
-	const root = new RavenRoot();
-	root.render(options ? createElement(Window, options, element) : element);
-	// (the first commit makes the windows, and Rwait_frame ends at once when there are none)
-	reconciler.flushSyncWork();
-	await r.runLoop();
-	root.unmount();
-	r.Rshutdown();
+	try {
+		start?.setup?.();
+		const root = new RavenRoot();
+		root.render(options ? createElement(Window, options, element) : element);
+		// (the first commit makes the windows. Rwait_frame ends once the last one closed: until there was one, it goes on)
+		reconciler.flushSyncWork();
+		await r.runLoop();
+		root.unmount();
+	} finally {
+		r.Rshutdown();
+	}
 }

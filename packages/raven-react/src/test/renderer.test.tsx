@@ -1,6 +1,6 @@
 /** React on real Raven widgets, without a window system or a GPU, clicked and typed into for real. */
 
-import { afterAll, afterEach, beforeAll, expect, test } from "bun:test";
+import { afterAll, afterEach, beforeAll, expect, spyOn, test } from "bun:test";
 import { Component, createRef, useEffect, useState, type ReactNode, type RefObject } from "react";
 import * as r from "../raven";
 import { eventStats } from "../events";
@@ -490,6 +490,32 @@ test("a boundary takes away a widget that could not be made again", async () => 
 	await settle();
 	console.error = report;
 	expect(namesUnder("box")).toEqual(["fallback"]);
+});
+
+test("Items that are not JSON leave the rows of a TreeView as they were", async () => {
+	const tree = createRef<WidgetInstance>();
+	await mount(treeThatRemakes(tree, [{ Text: "row" }], "a tip"));
+	const instance = tree.current as WidgetInstance;
+	expect(() => instance.update({ Name: "tree", Height: 100, Tooltip: "a tip", Items: "not json", OnContext: treeContext })).toThrow();
+	expect(r.Rtree_view_get_item_count(instance.widget)).toBe(1);
+});
+
+test("a widget that cannot be made leaves nothing in Raven", async () => {
+	const report = console.error;
+	console.error = (): void => {};
+	const made = spyOn(r, "Rwidget_create_from_xml");
+	await mount(
+		<Boundary fallback={<Label Name="fallback">failed</Label>}>
+			{/* @ts-expect-error Text that is not JSON, as a value from outside the types can be. */}
+			<TreeView Items="not json" />
+		</Boundary>,
+	);
+	const trees = made.mock.calls.flatMap(([xml], call) => (xml?.startsWith("<TreeView") ? [made.mock.results[call]?.value as r.Rid] : []));
+	made.mockRestore();
+	console.error = report;
+	expect(text("fallback")).toBe("failed");
+	expect(trees.length).toBeGreaterThan(0);
+	expect(trees.filter((tree) => r.Rwidget_is_valid(tree))).toEqual([]);
 });
 
 /** Presses and releases a key. */

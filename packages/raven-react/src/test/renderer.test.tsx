@@ -901,3 +901,19 @@ test("useAction names a function, and an On prop takes a name", async () => {
 	r.Raction_fire("test.named", r.R_INVALID_ID);
 	expect(fired).toBe(2);
 });
+
+test("an On prop that goes from a function to a name keeps the name", async () => {
+	let named = 0;
+	let direct = 0;
+	function Switching({ byName }: { byName: boolean }): ReactNode {
+		useAction("test.switching", () => named++);
+		return <VBox><Button Name="go" OnClicked={byName ? "test.switching" : () => direct++}>go</Button></VBox>;
+	}
+	await mount(<Switching byName={false} />);
+	click("go");
+	expect([named, direct]).toEqual([0, 1]);
+	root?.render(<Switching byName />);
+	await settle();
+	click("go");
+	expect([named, direct]).toEqual([1, 1]);
+});

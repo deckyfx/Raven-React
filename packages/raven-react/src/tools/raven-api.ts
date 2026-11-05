@@ -50,6 +50,9 @@ export function parseHeader(text: string): Pick<RavenApi, "functions" | "callbac
 	return { functions, callbacks };
 }
 
+/** Tables no `TAG` names that still belong to one tag: the rest are shared by every widget. */
+const TABLES_OF_ONE_TAG: Readonly<Record<string, string>> = { g_window_touch: "Window" };
+
 /** The tags and attributes of the text of `src/xml/xml_schema.c`. */
 export function parseSchema(text: string): Pick<RavenApi, "tags" | "attributes"> {
 	const macros = new Map(Array.from(text.matchAll(/^#define (\w+) "([^"]*)"$/gm), ([, name = "", value = ""]) => [name, value]));
@@ -76,8 +79,9 @@ export function parseSchema(text: string): Pick<RavenApi, "tags" | "attributes">
 	}
 	for (const [name, table] of tables) {
 		if (!used.has(name)) {
+			const owner = TABLES_OF_ONE_TAG[name] ?? "*";
 			for (const [attribute, kind] of table) {
-				attributes.set(`*.${attribute}`, kind);
+				attributes.set(`${owner}.${attribute}`, kind);
 			}
 		}
 	}

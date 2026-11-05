@@ -44,8 +44,11 @@ const SYMBOLS = {
 	Rweb_view_set_event_callback: { args: ["u32", "ptr", "ptr"], returns: "void" },
 } as const;
 
-/** The props of every widget, and what `<WebView>` takes in XML. */
-export type WebViewProps = Omit<Parameters<typeof Custom>[0], "OnPaint" | "OnMeasure" | "children"> & {
+/**
+ * The props of every widget, and what `<WebView>` takes in XML. Not `OnEvent`: a widget has one
+ * event callback, and this one forwards the mouse and the keys to the page.
+ */
+export type WebViewProps = Omit<Parameters<typeof Custom>[0], "OnPaint" | "OnMeasure" | "OnEvent" | "children"> & {
 	readonly Url?: string;
 	/** A file: it can also be given by `Url` as `file://...`. */
 	readonly Source?: string;

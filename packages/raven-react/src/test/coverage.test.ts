@@ -11,7 +11,7 @@ import * as r from "../raven";
 import * as components from "../index";
 import { EVENT_VALUE_TYPES, EXTRA_PROPS, COMMON_PROPS, wiredCallbacks, wiredProps } from "../events";
 import { functionsOfBinding, missingFunctions } from "../library-check";
-import { apiAt, commitOf, readPin } from "../tools/raven-pin";
+import { apiAt, commitOf, provenanceProblem, readPin } from "../tools/raven-pin";
 import { diffApi, parseApi, parseHeader, parseSchema, countOf, formatDiff, newCallbackSetters, type RavenApi } from "../tools/raven-api";
 import { controlledAttributes, overrideOf } from "../widget-instance";
 
@@ -238,6 +238,22 @@ test("the API is read from headers and from the schema", () => {
 	const { tags, attributes } = parseSchema(SCHEMA);
 	expect([...tags]).toEqual(["Foo", "Bar"]);
 	expect(Object.fromEntries(attributes)).toEqual({ "Foo.Size": "N", "Foo.Way": "C[Horizontal|Vertical]", "Foo.Style": "C[A|B]", "Foo.OnChanged": "A", "*.Name": "T" });
+});
+
+test("a table of the window alone is not taken for one every widget shares", () => {
+	const { attributes } = parseSchema(`
+static const rvn_schema_attribute_t g_touch[] = { B("Touch.Gestures", "Shared."), };
+static const rvn_schema_attribute_t g_window_touch[] = { N("Touch.Gestures", "Of a window."), };
+`);
+	expect(Object.fromEntries(attributes)).toEqual({ "*.Touch.Gestures": "B", "Window.Touch.Gestures": "N" });
+});
+
+test("a library that cannot be the build of a checkout is not stamped as such", () => {
+	const commitTime = 1_000_000;
+	expect(provenanceProblem("/raven/build/libraven.so", "/raven", commitTime + 1, commitTime)).toBeNull();
+	expect(provenanceProblem("/elsewhere/libraven.so", "/raven", commitTime + 1, commitTime)).toContain("is not in");
+	expect(provenanceProblem("/raven-other/libraven.so", "/raven", commitTime + 1, commitTime)).toContain("is not in");
+	expect(provenanceProblem("/raven/build/libraven.so", "/raven", commitTime - 1, commitTime)).toContain("older");
 });
 
 test("what differs between two APIs is said by name", () => {

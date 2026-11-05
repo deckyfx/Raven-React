@@ -980,8 +980,26 @@ test("FontStyle takes a style of the font of the theme", async () => {
 test("the functions of raven_web come from the library, and WebView is a tag once they are asked", async () => {
 	expect(webFunctions().Rweb_is_available()).toBeOneOf([0, 1]);
 	registerWebView();
+	// None of this needs a page. A real browser would only make it slow: starting one and stopping
+	// it at once took over 5 seconds on the macOS runner, past the time limit of a test.
+	webFunctions().Rweb_set_browser_path(Buffer.from("/nonexistent/raven-test-browser\0"));
 	const page = createRef<WidgetInstance>();
 	await mount(<VBox><WebView ref={page} Name="w" Height={100} Zoom={1.5} /></VBox>);
+	webFunctions().Rweb_set_browser_path(null);
 	expect(webFunctions().Rweb_view_is_valid(page.current?.widget ?? r.R_INVALID_ID)).toBe(1);
 	expect(webFunctions().Rweb_view_get_zoom(page.current?.widget ?? r.R_INVALID_ID)).toBeCloseTo(1.5, 5);
 });
+
+/** Never called: what the compiler must refuse. */
+export const refusedByTheTypes = (): readonly ReactNode[] => [
+	// @ts-expect-error a WebView forwards its input through this callback, which a prop would replace
+	<WebView OnEvent={() => true} />,
+	// @ts-expect-error the action of a TextInput fires on Enter, so a name here would not fire at each change
+	<TextInput OnChanged="save" />,
+	// @ts-expect-error the action of a ListView fires when a row is activated, not when the selection changes
+	<ListView OnChanged="save" />,
+	// @ts-expect-error as for a ListView
+	<TreeView OnChanged="save" />,
+	// @ts-expect-error as for a ListView
+	<TileView OnChanged="save" />,
+];

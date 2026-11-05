@@ -12,11 +12,21 @@ import { COMMON_PROPS, EVENT_VALUE_TYPES, EXTRA_PROPS } from "../events";
 /** Choices the schema lists among others it does not: the name of a loaded theme, or `Language="Markdown"`. */
 const OPEN_CHOICES: ReadonlySet<string> = new Set(["Theme", "Language"]);
 
+/**
+ * Events whose function and action fire at different moments. These widgets have one action, which
+ * fires for their other event: Enter in a TextInput, activating a row in the lists. A name given
+ * here would fire then, and not at each change, so these take a function only.
+ */
+const FUNCTION_ONLY: Readonly<Record<string, string>> = { TextInput: "OnChanged", ListView: "OnChanged", TreeView: "OnChanged" };
+
 /** The TypeScript of an attribute, from what the schema says of it. */
 function typeOf(tag: string, info: r.RXmlAttributeInfo): string {
 	const name = info.name ?? "";
 	if (info.type === r.R_XML_ACTION) {
 		const value = EVENT_VALUE_TYPES[tag]?.[name];
+		if (value && FUNCTION_ONLY[tag] === name) {
+			return `((value: ${value}) => void)`;
+		}
 		// (a text is the name of an action: "app.quit", or one given to useAction)
 		return value ? `string | ((value: ${value}) => void)` : "string | (() => void)";
 	}

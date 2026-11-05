@@ -5,7 +5,7 @@
  */
 
 import { existsSync, readdirSync } from "node:fs";
-import { resolve } from "node:path";
+import { isAbsolute, relative, resolve, sep } from "node:path";
 import { functionsOfBinding, missingFunctions, readStamp, shortCommit, STAMP_FILE, type LibraryStamp } from "../library-check";
 import { parseApi, type RavenApi } from "./raven-api";
 import { TARGETS, targetOf, writePlatformPackage } from "./targets";
@@ -134,6 +134,19 @@ export function mismatchOf(checkout: string, pin: string): string | null {
 		return `the Raven checkout ${checkout} has changes that are not in ${shortCommit(pin)}:\n  ${dirty.slice(0, 5).join("\n  ")}\nCommit or put them aside, or say --allow-mismatch to package a library that is not the pin.`;
 	}
 	return null;
+}
+
+/**
+ * Why a library cannot be the build of a checkout, as text to show, or nothing: it must be inside
+ * the checkout, and not older than its commit. A library does not say its commit, so this rules
+ * out the mistakes and is not a proof. Times are in milliseconds.
+ */
+export function provenanceProblem(library: string, checkout: string, libraryTime: number, commitTime: number): string | null {
+	const inside = relative(resolve(checkout), resolve(library));
+	if (inside === "" || inside === ".." || inside.startsWith(`..${sep}`) || isAbsolute(inside)) {
+		return `${library} is not in ${checkout}, so nothing says it was built from it`;
+	}
+	return libraryTime < commitTime ? `${library} is older than the commit of ${checkout}, so it was built from something else` : null;
 }
 
 /** Makes sure a build folder is up to date with its sources: then the library is that commit, and not whatever was built last. */

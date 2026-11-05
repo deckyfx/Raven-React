@@ -1,4 +1,4 @@
-import { useEffect, useRef, type RefObject } from "react";
+import { useEffect, useLayoutEffect, useRef, type RefObject } from "react";
 import * as r from "./raven";
 import { actionEvents, eventScope } from "./events";
 import { RavenError } from "./errors";
@@ -16,6 +16,18 @@ const MODIFIERS: Readonly<Record<string, number>> = {
 
 /** Keys that are not spelled as in `R_KEY_...`. */
 const KEY_NAMES: Readonly<Record<string, string>> = { esc: "ESCAPE", del: "DELETE", return: "ENTER", pgup: "PAGE_UP", pgdn: "PAGE_DOWN" };
+
+/**
+ * The function of the last commit, for a native callback to call. Not of the last render: React
+ * can throw a render away, and then its function would see state that never was.
+ */
+function useLatest<T>(value: T): RefObject<T> {
+	const latest = useRef(value);
+	useLayoutEffect(() => {
+		latest.current = value;
+	});
+	return latest;
+}
 
 /** Reads `"Ctrl+Shift+S"` or `"F5"` into a key and its modifiers. */
 export function parseKeys(keys: string): { key: r.RKey; modifiers: number } {
@@ -42,8 +54,7 @@ export function parseKeys(keys: string): { key: r.RKey; modifiers: number } {
  * It receives the widget that fired the action.
  */
 export function useAction(name: string, handler: (sender: r.Rid) => void): void {
-	const latest = useRef(handler);
-	latest.current = handler;
+	const latest = useLatest(handler);
 	useEffect(() => {
 		actionEvents.bind(name, (sender) => latest.current(sender));
 		return () => actionEvents.unbind(name);
@@ -54,8 +65,7 @@ let nextShortcut = 0;
 
 /** A keyboard shortcut of a window: `useShortcut(window, "Ctrl+S", save)`, with `window` the ref of a `<Window>`. */
 export function useShortcut(window: RefObject<WindowInstance | null>, keys: string, handler: () => void): void {
-	const latest = useRef(handler);
-	latest.current = handler;
+	const latest = useLatest(handler);
 	useEffect(() => {
 		const owner = window.current;
 		if (!owner) {
@@ -82,7 +92,6 @@ export function useShortcut(window: RefObject<WindowInstance | null>, keys: stri
  * `Rset_frame_callback`. The function can change at each render.
  */
 export function useFrame(handler: FrameHandler): void {
-	const latest = useRef(handler);
-	latest.current = handler;
+	const latest = useLatest(handler);
 	useEffect(() => frameSlot.subscribe((delta) => eventScope.run(() => latest.current(delta))), []);
 }

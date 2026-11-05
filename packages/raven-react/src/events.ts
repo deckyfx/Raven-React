@@ -705,7 +705,8 @@ class ActionEvents {
 			this.handlers.delete(name);
 			this.nameOf.delete(widget);
 			r.Raction_unbind(name);
-			if (alive) {
+			// (a prop that went from a function to a name has set that name by now: it stays)
+			if (alive && r.Rwidget_get_action(widget) === name) {
 				r.Rwidget_set_action(widget, null);
 			}
 		}

@@ -62,8 +62,11 @@ class EventScope {
 	/** Runs a change made by the renderer: an event it causes is not from the user. */
 	ignoringEvents(change: () => void): void {
 		this.ignoring++;
-		change();
-		this.ignoring--;
+		try {
+			change();
+		} finally {
+			this.ignoring--;
+		}
 	}
 
 	/**

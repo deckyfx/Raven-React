@@ -6,7 +6,7 @@ import * as r from "../raven";
 import { eventStats } from "../events";
 import {
 	Border, Breadcrumb, Button, parseKeys, useAction, useShortcut, Checkbox, ComboBox, createWindow, Custom, DatePicker, Expander, HBox, Label, ListView, Overlay, Pagination, raven, RavenRoot, Rating, Slider, SpinBox, Table, TabView, TextInput, TileView, TimePicker, Toast, TreeView, VBox, Window,
-	type WidgetInstance, type WindowInstance,
+	type TreeItem, type WidgetInstance, type WindowInstance,
 } from "../index";
 
 const WINDOW = { Title: "Test", Width: 480, Height: 480 } as const;
@@ -372,24 +372,46 @@ test("an exception in a handler does not cross C", async () => {
 	expect(text("alive")).toBe("still here");
 });
 
+/** Shows its fallback once what it holds has thrown. */
+class Boundary extends Component<{ children: ReactNode; fallback: ReactNode }, { failed: boolean }> {
+	override state = { failed: false };
+	static getDerivedStateFromError(): { failed: boolean } {
+		return { failed: true };
+	}
+	override render(): ReactNode {
+		return this.state.failed ? this.props.fallback : this.props.children;
+	}
+}
+
 test("an error boundary works", async () => {
 	const report = console.error;
 	console.error = (): void => {};
-	class Boundary extends Component<{ children: ReactNode }, { failed: boolean }> {
-		override state = { failed: false };
-		static getDerivedStateFromError(): { failed: boolean } {
-			return { failed: true };
-		}
-		override render(): ReactNode {
-			return this.state.failed ? <Label Name="fallback">failed</Label> : this.props.children;
-		}
-	}
 	function Bad(): ReactNode {
 		throw new Error("in a render");
 	}
-	await mount(<VBox><Boundary><Bad /></Boundary></VBox>);
+	await mount(<VBox><Boundary fallback={<Label Name="fallback">failed</Label>}><Bad /></Boundary></VBox>);
 	console.error = report;
 	expect(text("fallback")).toBe("failed");
+});
+
+test("a prop whose setter throws leaves the other handlers listening", async () => {
+	const report = console.error;
+	console.error = (): void => {};
+	let clicks = 0;
+	const app = (items: readonly TreeItem[]): ReactNode => (
+		<VBox>
+			<Button Name="after" OnClicked={() => clicks++}>after</Button>
+			<Boundary fallback={<Label Name="fallback">failed</Label>}><TreeView Name="tree" Height={100} Items={items} /></Boundary>
+		</VBox>
+	);
+	await mount(app([{ Text: "row" }]));
+	// @ts-expect-error Text that is not JSON, as a value from outside the types can be.
+	root?.render(app("not json"));
+	await settle();
+	console.error = report;
+	expect(text("fallback")).toBe("failed");
+	click("after");
+	expect(clicks).toBe(1);
 });
 
 /** Presses and releases a key. */

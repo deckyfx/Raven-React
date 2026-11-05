@@ -191,8 +191,13 @@ function useTimelineContent(timeline: RefObject<WidgetInstance | null>): void {
 
 /** A time as minutes, seconds and frames. */
 function timeText(seconds: number, frameRate: number): string {
-	const whole = Math.trunc(seconds);
-	const frame = Math.trunc((seconds - whole) * frameRate + 0.5);
+	let whole = Math.trunc(seconds);
+	let frame = Math.round((seconds - whole) * frameRate);
+	// (a time just under a second rounds to the next one, not to a frame numbered as the frame rate)
+	if (frame >= frameRate) {
+		whole += 1;
+		frame = 0;
+	}
 	return `${Math.trunc(whole / 60)}:${String(whole % 60).padStart(2, "0")}:${String(frame).padStart(2, "0")}`;
 }
 

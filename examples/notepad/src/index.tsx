@@ -14,7 +14,7 @@
  * Run it with a file to open it: bun run src/index.tsx main.c
  */
 
-import { useEffect, useRef, useState, type ReactNode } from "react";
+import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from "react";
 import {
 	ComboBox,
 	HBox,
@@ -214,7 +214,10 @@ function App(): ReactNode {
 
 	/** What the callbacks given once to Raven reach, as of the last render. */
 	const latest = useRef({ canDiscard, openPath });
-	latest.current = { canDiscard, openPath };
+	// (after the commit: a render that React throws away must not reach the callbacks, as a drop could then lose unsaved text)
+	useLayoutEffect(() => {
+		latest.current = { canDiscard, openPath };
+	});
 
 	// The text of the start, and what is given to Raven once, as there are no props for it.
 	useEffect(() => {

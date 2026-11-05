@@ -52,16 +52,25 @@ interface Appearance {
 	readonly look: number;
 	readonly themes: readonly string[];
 	readonly theme: number;
+	/** The accent of the theme in use, as `#RRGGBB`. */
+	readonly accent: string;
 }
 
-/** Reads the look and the themes from Raven, which owns them. */
+/** A color of Raven, its parts from 0 to 1, as `#RRGGBB`. */
+function hexColor(r: number, g: number, b: number): string {
+	return `#${[r, g, b].map((part) => Math.round(Math.min(1, Math.max(0, part)) * 255).toString(16).padStart(2, "0")).join("")}`;
+}
+
+/** Reads the look, the themes and the accent from Raven, which owns them. */
 function readAppearance(): Appearance {
 	const current = raven.Rlook_get();
 	const themes = Array.from({ length: raven.Rtheme_get_count() }, (_, i) => raven.Rtheme_get_name_at(i) ?? "");
+	const [r, g, b] = raven.Rtheme_get_color(raven.R_COLOR_ACCENT);
 	return {
 		look: LOOKS.findIndex(({ look }) => look === current),
 		themes,
 		theme: themes.indexOf(raven.Rtheme_get_name() ?? ""),
+		accent: hexColor(r, g, b),
 	};
 }
 
@@ -75,7 +84,6 @@ function Sidebar(): ReactNode {
 	const accent = useRef<WidgetInstance>(null);
 	const [appearance, setAppearance] = useState(readAppearance);
 	const [status, setStatus] = useState("");
-	const [accentColor, setAccentColor] = useState("#22D3EE");
 
 	// a theme file Raven loaded again can have another name
 	useEffect(() => {
@@ -106,13 +114,13 @@ function Sidebar(): ReactNode {
 		setAppearance(readAppearance());
 	};
 
-	// (Color is held by React: without the new color in it, the picker would go back to the first one)
-	const chooseAccent = (hex: string): void => {
-		setAccentColor(hex);
+	// (Color follows the accent of the theme: read again, the picker shows the new one, and a new theme or look its own)
+	const chooseAccent = (): void => {
 		if (accent.current) {
 			const [r, g, b] = raven.Rcolor_picker_get_color(accent.current.widget);
 			raven.Rtheme_set_accent(r, g, b);
 		}
+		setAppearance(readAppearance());
 	};
 
 	const save = (): void => {
@@ -129,7 +137,7 @@ function Sidebar(): ReactNode {
 			<ComboBox Items={appearance.themes} Selected={appearance.theme} OnChanged={chooseTheme} />
 			<FieldTitle>Accent</FieldTitle>
 			<HBox Spacing={8}>
-				<ColorPicker ref={accent} Popup Alpha={false} Color={accentColor} OnChanged={chooseAccent} />
+				<ColorPicker ref={accent} Popup Alpha={false} Color={appearance.accent} OnChanged={chooseAccent} />
 				<Label Font="monospace" TextSize={12} Opacity={0.7} Slot={{ VAlign: "Center" }}>Rtheme_set_accent</Label>
 			</HBox>
 			<Button

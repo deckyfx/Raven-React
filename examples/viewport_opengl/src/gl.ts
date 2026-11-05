@@ -25,10 +25,13 @@ const WINDOW_ATTRIBUTES_VISUAL = 24;
 const VISUAL_INFO_SIZE = 64;
 const VISUAL_INFO_ID = 8;
 const VISUAL_ID_MASK = 1;
+/** The attribute of `glXGetConfig` that says whether a visual can render OpenGL at all. */
+const GLX_USE_GL = 1;
 
 /** Opens libGL, on the first context only: another system has no such library. */
 function openGl() {
 	return dlopen("libGL.so.1", {
+		glXGetConfig: { args: ["ptr", "ptr", "i32", "ptr"], returns: "i32" },
 		glXCreateContext: { args: ["ptr", "ptr", "ptr", "i32"], returns: "ptr" },
 		glXMakeCurrent: { args: ["ptr", "u64", "ptr"], returns: "i32" },
 		glXSwapBuffers: { args: ["ptr", "u64"], returns: "void" },
@@ -103,6 +106,12 @@ export class GlContext {
 		const visual = x11.XGetVisualInfo(display, VISUAL_ID_MASK, wanted, new Int32Array(1));
 		if (!visual) {
 			return "XGetVisualInfo found no visual for the window of the viewport.";
+		}
+		// (a visual without OpenGL would make glXCreateContext raise an X error, not return null)
+		const usesGl = new Int32Array(1);
+		if (gl.glXGetConfig(display, visual, GLX_USE_GL, usesGl) !== 0 || usesGl[0] === 0) {
+			x11.XFree(visual);
+			return "The window of the viewport has a visual that cannot render OpenGL.";
 		}
 		const context = gl.glXCreateContext(display, visual, null, 1);
 		x11.XFree(visual);

@@ -2,7 +2,7 @@
 
 import { raven } from "@decky.fx/raven-react";
 import type { SceneObject } from "./scene";
-import { makeFrameBuffers, SharedFrame, type FrameBuffers } from "./shared-frame";
+import { makeFrameBuffers, MAX_PIXEL_BYTES, SharedFrame, type FrameBuffers } from "./shared-frame";
 
 /** The divisor of each choice of the Resolution box. */
 const DIVISORS: readonly number[] = [1, 2, 4];
@@ -14,6 +14,17 @@ export interface RenderRequest {
 	readonly time: number;
 	readonly scale: number;
 	readonly threaded: boolean;
+}
+
+/**
+ * The size of a frame for a viewport, divided as the Resolution box says, and made smaller, in
+ * the same shape, when the pixels would not fit in the memory reserved for a frame (past 8K).
+ */
+export function frameSize(viewportWidth: number, viewportHeight: number, divisor: number): [width: number, height: number] {
+	const width = viewportWidth / divisor;
+	const height = viewportHeight / divisor;
+	const fit = Math.min(1, Math.sqrt(MAX_PIXEL_BYTES / 4 / (width * height)));
+	return [Math.floor(width * fit), Math.floor(height * fit)];
 }
 
 /**
@@ -49,9 +60,7 @@ export class SceneRenderer {
 
 	/** Renders a frame and gives it to a viewport. Returns whether the viewport has a size to render to. */
 	render(viewport: raven.Rid, request: RenderRequest): boolean {
-		const divisor = DIVISORS[request.scale % DIVISORS.length] ?? 1;
-		const width = Math.floor(this.viewportWidth / divisor);
-		const height = Math.floor(this.viewportHeight / divisor);
+		const [width, height] = frameSize(this.viewportWidth, this.viewportHeight, DIVISORS[request.scale % DIVISORS.length] ?? 1);
 		if (width < 2 || height < 2) {
 			return false;
 		}

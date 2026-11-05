@@ -10,7 +10,7 @@ import {
 	Separator, Slider, Spacer, SpinBox, Splitter, TabView, TextInput, TreeView, VBox, Viewport, useShortcut, Window,
 	type WidgetInstance, type WindowInstance,
 } from "@decky.fx/raven-react";
-import { COLOR_NAMES, makeObject, MAX_OBJECTS, objectAt, type SceneObject } from "./scene";
+import { bobAt, COLOR_NAMES, makeObject, MAX_OBJECTS, objectAt, type SceneObject } from "./scene";
 import { SceneRenderer } from "./scene-renderer";
 
 const LOG_CAPACITY = 2000;
@@ -135,13 +135,16 @@ function useSceneView({ window, viewport, graph, live, onMeasures, onSelect, onD
 			const u = event.local_x / width;
 			const v = event.local_y / height;
 			if (event.type === raven.R_EVENT_MOUSE_DOWN && event.button === raven.R_MOUSE_LEFT) {
-				const object = objectAt(live.current.objects, u, v, width / height);
+				const object = objectAt(live.current.objects, u, v, width / height, time);
 				onSelect(object);
 				dragged = object?.id ?? null;
 				return true;
 			}
 			if (event.type === raven.R_EVENT_MOUSE_MOVE && dragged !== null) {
-				onDrag(dragged, Math.max(0, Math.min(1, u)), Math.max(0, Math.min(1, v)));
+				// (the disc is drawn where it bobs to: its y is set so that it is drawn under the pointer)
+				const object = live.current.objects.find(({ id }) => id === dragged);
+				const bob = object ? bobAt(object.speed, object.phase, time) : 0;
+				onDrag(dragged, Math.max(0, Math.min(1, u)), Math.max(0, Math.min(1, v - bob)));
 				return true;
 			}
 			if (event.type === raven.R_EVENT_MOUSE_UP) {

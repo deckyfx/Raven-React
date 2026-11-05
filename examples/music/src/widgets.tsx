@@ -72,7 +72,7 @@ export function PlayButton({ Playing, OnClicked, Size = 48, IconSize = 22, White
 			OnClicked={OnClicked}
 			Tooltip="Play / pause (Space)"
 			Cursor="Hand"
-			AccessibleName="Play"
+			AccessibleName={Playing ? "Pause" : "Play"}
 		>
 			<Icon Glyph={Playing ? "pause" : "play"} Size={IconSize} Slot={{ HAlign: "Center", VAlign: "Center" }} />
 		</Button>
@@ -207,6 +207,7 @@ export function TrackRow({ Track, Number, ShowCover, ShowAlbum }: TrackRowProps)
 	const track = trackAt(Track);
 	const album = albumAt(track.album);
 	const liked = music.liked.has(Track);
+	const likeAction = liked ? "Remove from Liked songs" : "Save to Liked songs";
 	const row = useRef<WidgetInstance>(null);
 	useTextColor(row, music.player.track === Track ? music.accent : null);
 	return (
@@ -233,7 +234,8 @@ export function TrackRow({ Track, Number, ShowCover, ShowAlbum }: TrackRowProps)
 					Style="Flat"
 					Class="icon"
 					OnClicked={() => music.toggleLike(Track)}
-					Tooltip={liked ? "Remove from Liked songs" : "Save to Liked songs"}
+					Tooltip={likeAction}
+					AccessibleName={likeAction}
 					Slot={{ Column: 3, VAlign: "Center" }}
 				>
 					<Icon Glyph={liked ? "heart-filled" : "heart"} Size={16} Opacity={liked ? 1 : 0.55} Tint={liked ? hex(music.accent) : undefined} />

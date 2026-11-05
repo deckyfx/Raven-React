@@ -42,13 +42,21 @@ export function makeObject(created: number, name?: string): SceneObject {
 	};
 }
 
-/** The topmost visible object at a point of the viewport, or null. `aspect` is its width over its height. */
-export function objectAt(objects: readonly SceneObject[], u: number, v: number, aspect: number): SceneObject | null {
+/** How far a disc bobs from its `y` at a time of the scene: the renderer draws it there. */
+export function bobAt(speed: number, phase: number, time: number): number {
+	return 0.06 * Math.sin(time * speed + phase);
+}
+
+/**
+ * The topmost visible object at a point of the viewport, or null, where the discs are drawn at
+ * `time`. `aspect` is the width of the viewport over its height.
+ */
+export function objectAt(objects: readonly SceneObject[], u: number, v: number, aspect: number, time: number): SceneObject | null {
 	for (let i = objects.length - 1; i >= 0; i--) {
 		const object = objects[i];
 		if (object?.visible) {
 			const dx = (u - object.x) * aspect;
-			const dy = v - object.y;
+			const dy = v - (object.y + bobAt(object.speed, object.phase, time));
 			if (dx * dx + dy * dy < object.radius * object.radius * 1.5) {
 				return object;
 			}

@@ -90,7 +90,11 @@ export function Visualizer({ Bars = 5, Gap = 2, Width = 24, Height = 18, ...rest
 	const levels = useRef(new Float32Array(Bars));
 	const last = useRef(0);
 	const playing = useRef(false);
-	playing.current = usePlaying();
+	const isPlaying = usePlaying();
+	// (after the commit: a render that React throws away does not reach what paint reads)
+	useLayoutEffect(() => {
+		playing.current = isPlaying;
+	}, [isPlaying]);
 
 	const paint = useCallback((painter: Pointer | null, width: number, height: number): void => {
 		if (!widget.current) {

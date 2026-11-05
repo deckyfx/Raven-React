@@ -3,7 +3,7 @@
  * is in shared memory, so that the main thread and the workers run this same code on one frame.
  */
 
-import { MAX_OBJECTS, PALETTE, type SceneObject } from "./scene";
+import { bobAt, MAX_OBJECTS, PALETTE, type SceneObject } from "./scene";
 
 /** Rows in a band: the unit of work that threads share. */
 const BAND_ROWS = 8;
@@ -12,7 +12,7 @@ const NO_WORK = 0x7fff0000;
 /** Numbers per object in the shared scene: x, y, radius, speed, phase, color, visible. */
 const OBJECT_FIELDS = 7;
 /** Reserved, not used, memory for pixels: the frame grows into it as the viewport does (8K). */
-const MAX_PIXEL_BYTES = 7680 * 4320 * 4;
+export const MAX_PIXEL_BYTES = 7680 * 4320 * 4;
 
 /** Where each number is in the shared control block. */
 const enum Control {
@@ -103,8 +103,12 @@ export class SharedFrame {
 	/** Writes what a frame needs in shared memory. */
 	private prepare(objects: readonly SceneObject[], selected: number, time: number, width: number, height: number): void {
 		const bytes = width * height * 4;
+		// (Raven copies width x height pixels from the buffer: a frame larger than it would be read past its end)
+		if (bytes > MAX_PIXEL_BYTES) {
+			throw new RangeError(`A frame of ${width} x ${height} pixels is larger than the ${MAX_PIXEL_BYTES} bytes reserved for one`);
+		}
 		if (bytes > this.buffers.pixels.byteLength) {
-			this.buffers.pixels.grow(Math.min(bytes, MAX_PIXEL_BYTES));
+			this.buffers.pixels.grow(bytes);
 		}
 		this.control[Control.Width] = width;
 		this.control[Control.Height] = height;
@@ -149,7 +153,7 @@ export class SharedFrame {
 		const time = this.scene[0] ?? 0;
 		const aspect = width / height;
 		for (let i = 0; i < count; i++) {
-			centers[i] = this.field(i, 1) + 0.06 * Math.sin(time * this.field(i, 3) + this.field(i, 4));
+			centers[i] = this.field(i, 1) + bobAt(this.field(i, 3), this.field(i, 4), time);
 		}
 		for (let row = begin; row < end; row++) {
 			const v = (row + 0.5) / height;

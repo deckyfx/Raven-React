@@ -115,7 +115,8 @@ function EditorPanel({ panel, onMounted }: { readonly panel: EditorPanelState; r
 			onMounted(id, panel.key);
 		}
 	}, []);
-	return <TextEditor ref={editor} Text={panel.text} LineNumbers Slot={{ Title: panel.title, Dock: "Tab", DockTo: "welcome" }} />;
+	// (a saved layout finds a panel by its name: one per panel, so each goes back to where it was)
+	return <TextEditor ref={editor} Name={`panel-${panel.key}`} Text={panel.text} LineNumbers Slot={{ Title: panel.title, Dock: "Tab", DockTo: "welcome" }} />;
 }
 
 /** What the "Appearance" panel changes. */
@@ -232,6 +233,11 @@ function App(): ReactNode {
 				return;
 			}
 			const name = fileName(path);
+			// (the size first: a large file is not read whole only to be refused; files kept in memory by Raven are not on the disk)
+			if (!raven.Rfile_is_memory(path) && Bun.file(path).size > MOST_BYTES) {
+				say("Too large to show", name);
+				return;
+			}
 			const bytes = raven.Rfile_read(path);
 			if (!bytes) {
 				say("Cannot open", path);

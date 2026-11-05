@@ -52,11 +52,12 @@ const MOST_NOTES = 200;
 
 /** Underlines the lines that say TODO or FIXME, and returns how many there are. */
 export function markNotes(editor: raven.Rid): number {
-	const lines = raven.Rtext_editor_get_line_count(editor);
+	// (the text once, rather than a call into Raven for each line)
+	const lines = (raven.Rtext_editor_get_text(editor) ?? "").split("\n");
 	let found = 0;
 	raven.Rtext_editor_clear_markers(editor);
-	for (let line = 0; line < lines && found < MOST_NOTES; line++) {
-		const content = raven.Rtext_editor_get_line(editor, line) ?? "";
+	for (let line = 0; line < lines.length && found < MOST_NOTES; line++) {
+		const content = lines[line] ?? "";
 		const fixme = content.indexOf("FIXME");
 		const todo = content.indexOf("TODO");
 		if (fixme >= 0) {

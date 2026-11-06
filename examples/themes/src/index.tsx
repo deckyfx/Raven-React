@@ -1,30 +1,28 @@
 /**
- * Theme files, styles, classes, Markdown, and files loaded again when they change.
- * The port of `examples/themes` of Raven.
+ * Themes, styles, classes, and Markdown. The port of `examples/themes` of Raven.
  *
  *   `Rlook_set(look)`            the look: Raven's (flat, glass, high contrast), Windows 11, macOS, GNOME, the platform's
- *   `Rtheme_load(path)`          reads a theme file and keeps it under its name
+ *   `defineTheme`, `loadTheme`   a theme in TypeScript (`themes.ts`), kept by Raven under its name: the theme files of the original
  *   `Rtheme_use(name)`           makes a named theme the theme of the application
  *   `Rtheme_set_accent(r,g,b)`   one color, and the shades that follow from it
  *   `Rtheme_save(path, name)`    writes the theme in use as a theme file
- *   `Class="danger"`             in the props, for the styles of the theme files
+ *   `Class="danger"`             in the props, for the styles of the themes
  *   `Markdown`                   on a `Label` (rendered) and on a `TextEditor` (styled in place)
  *
- * A theme file that names no look (`tweaks.xml`) is laid over the look in use and follows it;
- * one that names a look (`ocean.xml`, `paper.xml`) imposes it. Theme files stay XML, in
- * `assets/`: Raven watches them while this runs. `notes.md` is not XML: this example reads it
- * again by itself.
+ * A theme that names no look (`tweaks`) is laid over the look in use and follows it; one that
+ * names a look (`ocean`, `paper`) imposes it. The original watches its theme files and loads them
+ * again when they change; these are code, so this example only reads `notes.md` again when it
+ * changes.
  */
 
-import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 import {
-	Border, Button, Checkbox, ColorPicker, ComboBox, HBox, Label, ListView, ProgressBar, raven, runApp, ScrollBox, Separator, Slider, Spacer, SpinBox, Splitter, TextEditor, TextInput, useAction, VBox,
+	Border, Button, Checkbox, ColorPicker, ComboBox, HBox, Label, ListView, loadTheme, ProgressBar, raven, runApp, ScrollBox, Separator, Slider, Spacer, SpinBox, Splitter, TextEditor, TextInput, useAction, VBox,
 	type WidgetInstance,
 } from "@decky.fx/raven-react";
+import { ocean, paper, tweaks } from "./themes";
 
 const ASSETS = `${import.meta.dir}/../assets`;
-/** The name `paper.xml` gives its theme, once it is loaded: the card that keeps that theme uses it. */
-let paperTheme: string | null = null;
 const NOTES = `${ASSETS}/notes.md`;
 
 const LOOKS: readonly { readonly name: string; readonly look: raven.RLook }[] = [
@@ -87,17 +85,6 @@ function Sidebar(): ReactNode {
 	const [appearance, setAppearance] = useState(readAppearance);
 	const [status, setStatus] = useState("");
 
-	// a theme file Raven loaded again can have another name
-	useEffect(() => {
-		raven.Rxml_set_reload_callback((path, ok) => {
-			setStatus(ok ? `Loaded again: ${path}` : `Not loaded (see the error): ${path}`);
-			if (ok) {
-				setAppearance(readAppearance());
-			}
-		});
-		return () => raven.Rxml_set_reload_callback(null);
-	}, []);
-
 	useAction("themes.docs", () => setStatus('A link of the Markdown text fired the action "themes.docs".'));
 
 	const chooseLook = (index: number): void => {
@@ -135,7 +122,7 @@ function Sidebar(): ReactNode {
 			<Label TextSize={24}>Themes</Label>
 			<FieldTitle>Look</FieldTitle>
 			<ComboBox Items={LOOK_NAMES} Selected={appearance.look} OnChanged={chooseLook} />
-			<FieldTitle>Theme file laid over it</FieldTitle>
+			<FieldTitle>Theme laid over it</FieldTitle>
 			<ComboBox Items={appearance.themes} Selected={appearance.theme} OnChanged={chooseTheme} />
 			<FieldTitle>Accent</FieldTitle>
 			<HBox Spacing={8}>
@@ -152,7 +139,7 @@ function Sidebar(): ReactNode {
 			</Button>
 			<Label Wrap Opacity={0.65} Text={status} />
 			<Spacer Slot={{ Fill: 1 }} />
-			<Label Wrap Opacity={0.6} Markdown>Edit **ocean.xml**, **paper.xml**, **tweaks.xml** or **notes.md** while this runs: the window follows.</Label>
+			<Label Wrap Opacity={0.6} Markdown>The themes are in **themes.ts**. Edit **notes.md** while this runs: the window follows.</Label>
 		</VBox>
 	);
 }
@@ -192,21 +179,12 @@ function Controls(): ReactNode {
 	);
 }
 
-/**
- * A part of the window with a theme of its own, whatever the theme of the application. The
- * `Theme` prop only lists the built-in themes, so a theme from a file goes through a ref.
- */
+/** A part of the window with a theme of its own, whatever the theme of the application: one of `themes.ts`, by its name. */
 function PaperCard(): ReactNode {
-	const card = useRef<WidgetInstance>(null);
-	useLayoutEffect(() => {
-		if (card.current && paperTheme) {
-			raven.Rwidget_set_theme(card.current.widget, paperTheme);
-		}
-	}, []);
 	return (
-		<Border ref={card} Class="card" Padding={18}>
+		<Border Class="card" Padding={18} Theme={paper.Name}>
 			<VBox Spacing={10}>
-				<Label Class="eyebrow">THEME="PAPER.XML"</Label>
+				<Label Class="eyebrow">{`THEME="${paper.Name.toUpperCase()}"`}</Label>
 				<Label TextSize={19}>A card that keeps its theme</Label>
 				<HBox Spacing={8}>
 					<Button Style="Primary">Primary</Button>
@@ -283,10 +261,10 @@ function App(): ReactNode {
 await runApp(<App />, { Title: "Raven - themes", Width: 1180, Height: 760, MinWidth: 820, MinHeight: 520 }, {
 	appName: "Raven themes",
 	setup: () => {
-		// the theme files: each becomes a theme with a name, next to the built-in ones
-		raven.Rtheme_load(`${ASSETS}/ocean.xml`);
-		paperTheme = raven.Rtheme_load(`${ASSETS}/paper.xml`);
-		raven.Rtheme_load(`${ASSETS}/tweaks.xml`);
-		raven.Rtheme_use(process.env.RAVEN_EXAMPLE_THEME ?? "Ocean");
+		// the themes: each is kept under its name, next to the built-in ones
+		for (const theme of [ocean, paper, tweaks]) {
+			loadTheme(theme);
+		}
+		raven.Rtheme_use(process.env.RAVEN_EXAMPLE_THEME ?? ocean.Name);
 	},
 });

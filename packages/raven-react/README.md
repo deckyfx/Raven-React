@@ -221,6 +221,17 @@ raven.Rnotification_show("Backup", "It is finished", raven.R_NOTIFICATION_NORMAL
 
 What belongs to the system and not to a window has no component: an icon in the tray (`Rtray_create`, `Rtray_set_menu`, `Rtray_set_clicked_callback`), the badge, progress and menu of the taskbar or the Dock (`Rtaskbar_set_badge`, `Rwindow_set_taskbar_progress`), picture in picture (`Rwindow_set_picture_in_picture`), and the inspector of a window, which lists its widgets and picks one with a click (`Rwindow_set_inspector`). Call them from an effect, and undo them in its cleanup.
 
+An application with a tray icon lives on when its last window closes, as a tray application should: `runApp` returns only after `raven.Rquit(0)`, or the action `app.quit`. Give the icon a way to end it, a "Quit" item of its menu for one; the cleanup that destroys the icon still runs then.
+
+```tsx
+useEffect(() => {
+	const tray = raven.Rtray_create();
+	raven.Rtray_set_tooltip(tray, "Backup");
+	raven.Rtray_set_clicked_callback(tray, () => raven.Rquit(0));
+	return () => raven.Rtray_destroy(tray);
+}, []);
+```
+
 An `Image` shows an SVG file like any other: `<Image Source="logo.svg" />`.
 
 ## What to expect

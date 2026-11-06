@@ -197,12 +197,14 @@ export function QuickCard({ Album, Title, OnClicked, IsPlayingAlbum, Column, Row
 export interface TrackRowProps {
 	readonly Track: number;
 	readonly Number: number;
+	/** Its row in the list of the page, when the list is the page's collection. */
+	readonly Position?: number;
 	readonly ShowCover: boolean;
 	readonly ShowAlbum: boolean;
 }
 
 /** One song in a list: number, cover, title and artist, album, heart, length. The song playing is written in the accent. */
-export function TrackRow({ Track, Number, ShowCover, ShowAlbum }: TrackRowProps): ReactNode {
+export function TrackRow({ Track, Number, Position, ShowCover, ShowAlbum }: TrackRowProps): ReactNode {
 	const music = useMusic();
 	const track = trackAt(Track);
 	const album = albumAt(track.album);
@@ -215,7 +217,7 @@ export function TrackRow({ Track, Number, ShowCover, ShowAlbum }: TrackRowProps)
 			ref={row}
 			Style="Flat"
 			Class="row"
-			OnClicked={() => music.playTrack(Track)}
+			OnClicked={() => music.playTrack(Track, Position)}
 			Height={56}
 			Clip
 			AccessibleName={`${track.title}, ${album.artist}`}

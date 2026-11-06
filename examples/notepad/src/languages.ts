@@ -76,3 +76,23 @@ export function usesCrlf(text: string): boolean {
 	const breaks = text.split("\n").length - 1;
 	return breaks > 0 && text.split("\r\n").length - 1 === breaks;
 }
+
+/** The byte order mark some editors write at the start of a UTF-8 file. */
+const UTF8_BOM: readonly number[] = [0xef, 0xbb, 0xbf];
+
+/** Whether bytes begin with the UTF-8 byte order mark. */
+export function startsWithBom(bytes: Uint8Array): boolean {
+	return UTF8_BOM.every((byte, i) => bytes[i] === byte);
+}
+
+/** A text as UTF-8 bytes, after the byte order mark when `bom`. */
+export function encodeText(text: string, bom: boolean): Uint8Array {
+	const encoded = new TextEncoder().encode(text);
+	if (!bom) {
+		return encoded;
+	}
+	const bytes = new Uint8Array(UTF8_BOM.length + encoded.length);
+	bytes.set(UTF8_BOM);
+	bytes.set(encoded, UTF8_BOM.length);
+	return bytes;
+}

@@ -115,7 +115,11 @@ export class GlContext {
 		}
 		const context = gl.glXCreateContext(display, visual, null, 1);
 		x11.XFree(visual);
-		if (!context || !gl.glXMakeCurrent(display, drawable, context)) {
+		if (!context) {
+			return "Cannot create an OpenGL context on the viewport.";
+		}
+		if (!gl.glXMakeCurrent(display, drawable, context)) {
+			gl.glXDestroyContext(display, context);
 			return "Cannot create an OpenGL context on the viewport.";
 		}
 		return new GlContext(gl, display, drawable, context);

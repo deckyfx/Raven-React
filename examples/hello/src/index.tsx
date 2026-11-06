@@ -9,7 +9,7 @@ function App(): ReactNode {
 		// a vertical box centered in the window
 		<VBox Spacing={12} Slot={{ HAlign: "Center", VAlign: "Center" }}>
 			<Label TextSize={24} Slot={{ HAlign: "Center" }}>Hello from Raven</Label>
-			<Label Slot={{ HAlign: "Center" }}>{clicks === 0 ? "Press the button" : `Clicked ${clicks} time(s)`}</Label>
+			<Label Slot={{ HAlign: "Center" }}>{clicks === 0 ? "Press the button" : `Clicked ${clicks} time${clicks > 1 ? "s" : ""}`}</Label>
 			<HBox Spacing={8} Slot={{ HAlign: "Center" }}>
 				<Button Style="Primary" Tooltip="Counts the clicks" OnClicked={() => setClicks(clicks + 1)}>Click me</Button>
 				<Button OnClicked="app.quit">Quit</Button>

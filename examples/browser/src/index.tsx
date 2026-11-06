@@ -48,7 +48,8 @@ function App(): ReactNode {
 	const [state, setState] = useState<web.PageState>({ url: "", title: "", loading: true, error: "", canGoBack: false, canGoForward: false });
 	const [address, setAddress] = useState("");
 	const [zoom, setZoom] = useState(1);
-	const [log, setLog] = useState("*Nothing yet: press a button of the page.*");
+	/** The last message of the page, and how many came. */
+	const [received, setReceived] = useState<{ readonly count: number; readonly text: string } | null>(null);
 	/** The address the bar was last given by the page: what is typed stays until the page goes elsewhere. */
 	const shownUrl = useRef("");
 
@@ -81,7 +82,7 @@ function App(): ReactNode {
 		};
 		const stop = web.listen(id, onEvent, (message) => {
 			messages.current += 1;
-			setLog(`Message **${messages.current}**:\n\n\`${message.slice(0, 600)}\``);
+			setReceived({ count: messages.current, text: message.slice(0, 600) });
 		});
 		refresh();
 		return stop;
@@ -147,7 +148,15 @@ function App(): ReactNode {
 					<ColorPicker ref={tint} Previous="#7C5CFF" Alpha={false} Compact OnChanged={chooseTint} />
 					<Separator />
 					<Label Opacity={0.6}>From the page to Raven</Label>
-					<Label Wrap Markdown>{log}</Label>
+					{/* (what the page sent is shown as it is: read as Markdown, a page could write a link that fires an action) */}
+					{received === null ? (
+						<Label Wrap Markdown>*Nothing yet: press a button of the page.*</Label>
+					) : (
+						<>
+							<Label Markdown>{`Message **${received.count}**:`}</Label>
+							<Label Wrap Font="monospace">{received.text}</Label>
+						</>
+					)}
 				</VBox>
 			</HBox>
 		</VBox>

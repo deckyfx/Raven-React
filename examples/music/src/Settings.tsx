@@ -2,6 +2,7 @@
 
 import { useRef, useState, type ReactNode } from "react";
 import { Border, Checkbox, ColorPicker, ComboBox, HBox, Label, raven, ScrollBox, Separator, Slider, VBox, type WidgetInstance } from "@decky.fx/raven-react";
+import { hex } from "./library";
 import { LOOK_NAMES, useMusic } from "./music";
 import { Heading } from "./tags";
 import { SettingRow } from "./widgets";
@@ -40,7 +41,8 @@ export function Settings(): ReactNode {
 					<Checkbox Style="Switch" Checked={music.followCover} OnChanged={music.setFollowCover} />
 				</SettingRow>
 				<SettingRow Title="Accent" Description="The color of the controls, when it does not follow the cover.">
-					<ColorPicker ref={picker} Popup Alpha={false} Color="#B79CFF" OnChanged={onAccent} />
+					{/* (Color is held by React: it shows the picked accent, or the picker would go back to the first color after each pick) */}
+					<ColorPicker ref={picker} Popup Alpha={false} Color={hex(music.picked)} OnChanged={onAccent} />
 				</SettingRow>
 				<SettingRow Title="Background" Description="What moves behind the panels, in the colors of the cover.">
 					<ComboBox Items={["Mesh", "Aurora", "Plasma", "Spotlight", "Shimmer", "None"]} Selected={music.effect} OnChanged={music.setEffect} Width={160} />

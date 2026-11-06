@@ -247,6 +247,8 @@ export interface Music {
 	readonly panel: boolean;
 	/** The accent in use. */
 	readonly accent: Rgb;
+	/** The accent picked in the settings, used when it does not follow the cover. */
+	readonly picked: Rgb;
 	/** The album of the song playing. */
 	readonly album: Album;
 	/** What the folded island says. */
@@ -274,7 +276,8 @@ export interface Music {
 	readonly toggleLike: (track: number) => void;
 	readonly setVolume: (value: number) => void;
 	readonly toggleMute: () => void;
-	readonly playTrack: (track: number) => void;
+	/** Plays a track from the list it is in. `position` is its row in the page's list, when it was clicked there. */
+	readonly playTrack: (track: number, position?: number) => void;
 	readonly jumpInQueue: (position: number) => void;
 	readonly playCollection: () => void;
 	readonly shuffleCollection: () => void;
@@ -458,6 +461,7 @@ export function MusicProvider({ start, children }: { readonly start: StartOption
 			effect,
 			panel,
 			accent,
+			picked,
 			album,
 			islandTitle: noticeText ?? (player.track >= 0 ? trackAt(player.track).title : "Raven Music"),
 			searchInput,
@@ -508,9 +512,10 @@ export function MusicProvider({ start, children }: { readonly start: StartOption
 			toggleLike,
 			setVolume: (value) => dispatch({ type: "volume", value }),
 			toggleMute: () => dispatch({ type: "mute" }),
-			playTrack: (track) => {
-				// the list it is in plays from it: the page, else its album
-				const inPage = navigation.page === PAGE_COLLECTION ? collectionTracks.lastIndexOf(track) : -1;
+			playTrack: (track, position) => {
+				// the list it is in plays from it: the page (from the row clicked, as a playlist can hold a song twice), else its album
+				const atRow = position !== undefined && collectionTracks[position] === track ? position : collectionTracks.lastIndexOf(track);
+				const inPage = navigation.page === PAGE_COLLECTION ? atRow : -1;
 				if (inPage >= 0) {
 					playList(collectionTracks, inPage, collectionName);
 				} else {
@@ -558,7 +563,7 @@ export function MusicProvider({ start, children }: { readonly start: StartOption
 			notice,
 			notInThisDemo: () => notice("Not in this demo"),
 		};
-	}, [player, liked, likedAlbums, navigation, collection, libraryFilter, query, theme, followCover, animate, effect, panel, accent, album, noticeText]);
+	}, [player, liked, likedAlbums, navigation, collection, libraryFilter, query, theme, followCover, animate, effect, panel, accent, picked, album, noticeText]);
 
 	return (
 		<MusicContext value={music}>

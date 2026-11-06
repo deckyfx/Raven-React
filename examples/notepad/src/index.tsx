@@ -29,7 +29,7 @@ import {
 	type WidgetInstance,
 	type WindowInstance,
 } from "@decky.fx/raven-react";
-import { languageNames, markNotes, proposeWords, registerIni, usesCrlf } from "./languages";
+import { encodeText, languageNames, markNotes, proposeWords, registerIni, startsWithBom, usesCrlf } from "./languages";
 import { NotepadMenus, type MenuActions } from "./NotepadMenus";
 
 const WELCOME = `/* Raven Notepad: this text is C, so the editor colors it. */
@@ -101,6 +101,8 @@ function App(): ReactNode {
 	 * back. A file with both is saved with LF, as the editor no longer knows which line had which.
 	 */
 	const [crlf, setCrlf] = useState(false);
+	/** Whether the file opened began with the UTF-8 byte order mark: the decoder takes it off, saving puts it back. */
+	const [bom, setBom] = useState(false);
 
 	/** Underlines the notes of the text, and says how many there are. */
 	const scanNotes = (): void => {
@@ -119,10 +121,11 @@ function App(): ReactNode {
 	};
 
 	/** Replaces the text without it counting as a change of the user. */
-	const replaceText = (text: string, nextPath: string, nextLanguage: string | null): void => {
+	const replaceText = (text: string, nextPath: string, nextLanguage: string | null, withBom = false): void => {
 		if (editor.current) {
 			raven.Rtext_editor_set_text(editor.current.widget, text);
 			setCrlf(usesCrlf(text));
+			setBom(withBom);
 			setLanguage(nextLanguage);
 			setPath(nextPath);
 			setModified(false);
@@ -150,7 +153,7 @@ function App(): ReactNode {
 			setStatus(`Not opened: ${chosen} holds a NUL byte, it is not text`);
 			return;
 		}
-		replaceText(text, chosen, raven.Rlanguage_for_file(chosen));
+		replaceText(text, chosen, raven.Rlanguage_for_file(chosen), startsWithBom(bytes));
 		setStatus(`Opened ${chosen}`);
 		editor.current?.focus();
 	};
@@ -172,7 +175,7 @@ function App(): ReactNode {
 		}
 		const lines = raven.Rtext_editor_get_text(editor.current.widget) ?? "";
 		const text = crlf ? lines.replaceAll("\n", "\r\n") : lines;
-		if (!raven.Rfile_write(target, new TextEncoder().encode(text))) {
+		if (!raven.Rfile_write(target, encodeText(text, bom))) {
 			setStatus(`Cannot write ${target}`);
 			return;
 		}

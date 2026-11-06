@@ -445,7 +445,7 @@ export function formatTime(seconds: number): string {
 
 /** A color as `#RRGGBB`, multiplied by a scale. */
 export function hex(color: Rgb, scale = 1): string {
-	const channel = (value: number): string => Math.trunc(clamp(value * scale, 0, 1) * 255).toString(16).toUpperCase().padStart(2, "0");
+	const channel = (value: number): string => Math.round(clamp(value * scale, 0, 1) * 255).toString(16).toUpperCase().padStart(2, "0");
 	return `#${channel(color[0])}${channel(color[1])}${channel(color[2])}`;
 }
 

@@ -129,7 +129,7 @@ export function Collection(): ReactNode {
 					<Separator Slot={{ Padding: [0, 4, 0, 6] }} />
 					<VBox Spacing={0}>
 						{collectionTracks.map((track, i) => (
-							<TrackRow key={`${collection.kind}-${collection.index}-${i}`} Track={track} Number={i + 1} ShowCover={!isAlbum} ShowAlbum={!isAlbum} />
+							<TrackRow key={`${collection.kind}-${collection.index}-${i}`} Track={track} Number={i + 1} Position={i} ShowCover={!isAlbum} ShowAlbum={!isAlbum} />
 						))}
 						{collectionTracks.length === 0 && (
 							<VBox key="empty" Spacing={8} Slot={{ Padding: [12, 24] }}>

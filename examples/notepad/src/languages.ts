@@ -50,6 +50,11 @@ export function proposeWords(editor: raven.Rid): void {
 /** The most notes marked in a text. */
 const MOST_NOTES = 200;
 
+/** The column Raven counts, in bytes of UTF-8, of a place in a line JavaScript counts in UTF-16 units. */
+export function byteColumn(line: string, index: number): number {
+	return new TextEncoder().encode(line.slice(0, index)).length;
+}
+
 /** Underlines the lines that say TODO or FIXME, and returns how many there are. */
 export function markNotes(editor: raven.Rid): number {
 	// (the text once, rather than a call into Raven for each line)
@@ -61,10 +66,10 @@ export function markNotes(editor: raven.Rid): number {
 		const fixme = content.indexOf("FIXME");
 		const todo = content.indexOf("TODO");
 		if (fixme >= 0) {
-			raven.Rtext_editor_add_marker(editor, line, fixme, -1, raven.R_MARKER_WARNING, "Something to fix");
+			raven.Rtext_editor_add_marker(editor, line, byteColumn(content, fixme), -1, raven.R_MARKER_WARNING, "Something to fix");
 			found++;
 		} else if (todo >= 0) {
-			raven.Rtext_editor_add_marker(editor, line, todo, -1, raven.R_MARKER_INFO, "Something left to do");
+			raven.Rtext_editor_add_marker(editor, line, byteColumn(content, todo), -1, raven.R_MARKER_INFO, "Something left to do");
 			found++;
 		}
 	}

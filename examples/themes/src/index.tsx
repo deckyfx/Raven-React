@@ -23,6 +23,8 @@ import {
 } from "@decky.fx/raven-react";
 
 const ASSETS = `${import.meta.dir}/../assets`;
+/** The name `paper.xml` gives its theme, once it is loaded: the card that keeps that theme uses it. */
+let paperTheme: string | null = null;
 const NOTES = `${ASSETS}/notes.md`;
 
 const LOOKS: readonly { readonly name: string; readonly look: raven.RLook }[] = [
@@ -197,8 +199,8 @@ function Controls(): ReactNode {
 function PaperCard(): ReactNode {
 	const card = useRef<WidgetInstance>(null);
 	useLayoutEffect(() => {
-		if (card.current) {
-			raven.Rwidget_set_theme(card.current.widget, "Paper");
+		if (card.current && paperTheme) {
+			raven.Rwidget_set_theme(card.current.widget, paperTheme);
 		}
 	}, []);
 	return (
@@ -283,7 +285,7 @@ await runApp(<App />, { Title: "Raven - themes", Width: 1180, Height: 760, MinWi
 	setup: () => {
 		// the theme files: each becomes a theme with a name, next to the built-in ones
 		raven.Rtheme_load(`${ASSETS}/ocean.xml`);
-		raven.Rtheme_load(`${ASSETS}/paper.xml`);
+		paperTheme = raven.Rtheme_load(`${ASSETS}/paper.xml`);
 		raven.Rtheme_load(`${ASSETS}/tweaks.xml`);
 		raven.Rtheme_use(process.env.RAVEN_EXAMPLE_THEME ?? "Ocean");
 	},

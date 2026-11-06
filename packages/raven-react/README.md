@@ -19,6 +19,10 @@ function App() {
 await runApp(<App />, { Title: "Hello", Width: 480, Height: 240 });
 ```
 
+![The studio example: a node graph and a timeline, in the Blueprint look](../../docs/screenshots/studio.png)
+
+Every C example of Raven has a TSX port in [examples](../../examples), with screenshots in the [README of the repository](../../README.md).
+
 ## Install
 
 Not on npm yet, and the name of the package is not final. Once it is published:
@@ -37,7 +41,7 @@ Raven's native library comes with it: there is a package per platform, and the p
 | macOS Apple Silicon, Intel | `@decky.fx/raven-react-darwin-arm64`, `-darwin-x64` |
 | Windows x64 | `@decky.fx/raven-react-win32-x64` |
 
-What the system must have: a Vulkan driver, and on Linux libX11. On macOS Vulkan comes from MoltenVK: `brew install molten-vk`.
+What the system must have: a Vulkan driver, and on Linux libX11. On macOS, version 14 or newer, Vulkan comes from MoltenVK: `brew install molten-vk`.
 
 `RAVEN_LIBRARY` set to the path of a library has priority, to try a build of your own.
 
@@ -126,11 +130,20 @@ function App() {
 await runApp(<App />);
 ```
 
+A tree that never opens a window never ends: Raven runs until a window has existed, so that one can open later. An application that renders nothing at all waits for ever, and wakes about 60 times a second.
+
+A splash screen is a window like the others, with `IsSplashScreen`: no frame, centered, above the other windows and out of the taskbar. Render the main window beside it and take the splash out when the main window is ready.
+
+```tsx
+{loading && <Window IsSplashScreen Width={480} Height={280}><Label>Starting...</Label></Window>}
+<Window Title="Main" Width={1024} Height={720}>...</Window>
+```
+
 With `OnClose`, closing is a request: the window stays until the element is taken out. Without it, the user can close the window at any time. `Title`, `Theme`, `Width`, `Height`, `Backdrop`, `Opacity` and `ContinuousRedraw` can change on an open window. Other attributes only count when it is made.
 
 What a `<Window>` holds directly fills it and follows its `Slot`, as the content of a window in C. Several such children lie on top of each other: put them in a `<VBox>` to stack them.
 
-An `<Island>` directly in a `<Window>` floats above the content at the top, as in XML. A `<Menu>` that no `MenuBar` or `Menu` holds is not shown until it is asked: its ref has `open(x, y)`, in the coordinates `OnContext` gives. A `<Separator>` in a `<Menu>` is a line of the menu.
+On macOS a `MenuBar` goes to the menu bar of the system; `Native={false}` keeps it in the window. An `<Island>` directly in a `<Window>` floats above the content at the top, as in XML. A `<Menu>` that no `MenuBar` or `Menu` holds is not shown until it is asked: its ref has `open(x, y)`, in the coordinates `OnContext` gives. A `<Separator>` in a `<Menu>` is a line of the menu.
 
 ## Going beyond props
 
@@ -153,6 +166,8 @@ Web pages need `registerWebView` once, as the `setup` of `runApp`. They are apar
 ```tsx
 await runApp(<WebView Url="https://example.com" Slot={{ Fill: 1 }} />, { Width: 800, Height: 600 }, { setup: registerWebView });
 ```
+
+A `WebView` drives a browser of the Chromium family installed on the machine (Chrome, Chromium, Edge...), hidden, and shows its picture: there is none in the package. Check `webFunctions().Rweb_is_available()` first, and show something else when it is 0.
 
 The data of a few widgets is given as props. Rows of a `TreeView` have new handles each time `Items` changes. `Markup` holds the elements XML takes inside a widget, and a change to it makes the widget again:
 
@@ -190,12 +205,21 @@ Long lists ask for their rows as they are shown, and a million rows cost nothing
 <Table Columns={["Name", "Age"]} RowCount={people.length} CellText={(row, column) => cell(people[row], column)} />
 ```
 
-Some things are done through a `ref`, as they are actions and not state:
+A `NodeGraph` and a `Timeline` take one of Raven's looks, `Preset` "Auto" (the theme), "Modern", "Blueprint", "Blender" or "Neon", and their parts can be changed one by one: `LinkShape`, `PinShape`, `HeaderStyle`, `ClipStyle`, `KeyShape`, `PlayheadColor`... One type of pin, one node or one track takes its own with `Rnode_graph_set_type_style`, `Rnode_graph_set_node_style` and `Rtimeline_set_track_style`.
+
+```tsx
+<NodeGraph Preset="Blueprint" LinkShape="Step" />
+<Timeline Preset={look} ClipStyle="Outline" />
+```
+
+Some things are done through a `ref`, as they are actions and not state. A `Toast` shows one message at a time; with `Queue="Sequence"` the next one waits its turn, with `Queue="Stack"` up to `MaxVisible` show at once.
 
 ```tsx
 raven.Rtoast_show(toast.current.widget, "Saved", 3);
 raven.Rnotification_show("Backup", "It is finished", raven.R_NOTIFICATION_NORMAL);
 ```
+
+What belongs to the system and not to a window has no component: an icon in the tray (`Rtray_create`, `Rtray_set_menu`, `Rtray_set_clicked_callback`), the badge, progress and menu of the taskbar or the Dock (`Rtaskbar_set_badge`, `Rwindow_set_taskbar_progress`), picture in picture (`Rwindow_set_picture_in_picture`), and the inspector of a window, which lists its widgets and picks one with a click (`Rwindow_set_inspector`). Call them from an effect, and undo them in its cleanup.
 
 An `Image` shows an SVG file like any other: `<Image Source="logo.svg" />`.
 
@@ -207,7 +231,7 @@ An `Image` shows an SVG file like any other: `<Image Source="logo.svg" />`.
 
 ## Working on this package
 
-The repository is a Bun workspace, with this package in `packages/raven-react` and an application to try it in `examples/helloworld`. It expects a Raven checkout two folders up, at `../../raven` from the root:
+The repository is a Bun workspace, with this package in `packages/raven-react` and the examples in `examples`: `helloworld` tries everything, the others are the examples of Raven in TSX. It expects a Raven checkout two folders up, at `../../raven` from the root:
 
     raven/                 github.com/oscar-soirey/Raven
     bun/raven-react/       this repository
@@ -221,7 +245,7 @@ Build Raven, then make the native package of your platform from it:
     bun install
     bun test
 
-Then, in `examples/helloworld`: `bun run dev`, or `bun run build`.
+Then, in `examples/helloworld`: `bun run dev`, or `bun run build`. Every other example runs with `bun run dev` in its folder.
 
 | Task | Command |
 |---|---|

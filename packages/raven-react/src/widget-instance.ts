@@ -577,10 +577,31 @@ export class WidgetInstance implements HostNode {
 		}
 	}
 
+	/**
+	 * Takes the adopted widgets of this tree out of the widgets that hold them, before those are
+	 * destroyed: they belong to the element of their registered tag, which may show them again.
+	 * Those the component already moved elsewhere are left where they are.
+	 */
+	private releaseAdopted(): void {
+		for (const child of this.children) {
+			if (child.tag === ADOPTED_TAG) {
+				const widget = child.nativeWidget;
+				if (widget !== null && r.Rwidget_is_valid(widget) && r.Rwidget_get_parent(widget) === this.id) {
+					r.Rwidget_remove_child(this.id, widget);
+				}
+			} else if (child instanceof WidgetInstance) {
+				child.releaseAdopted();
+			}
+		}
+	}
+
 	dispose(): void {
 		if (this.tag === ADOPTED_TAG) {
 			// (its parent let it go, unless it was already placed elsewhere: it belongs to the element of its registered tag)
 			return;
+		}
+		if (r.Rwidget_is_valid(this.id)) {
+			this.releaseAdopted();
 		}
 		this.disposeDetached();
 		if (r.Rwidget_is_valid(this.id)) {

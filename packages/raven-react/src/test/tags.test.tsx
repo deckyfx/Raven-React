@@ -226,6 +226,28 @@ test("the widgets of the children stay alive when the component moves them into 
 	expect(errors).toEqual([]);
 });
 
+test("the widgets of the children stay alive when the box the component put them in is removed, and come back", async () => {
+	unregister.push(registerTag("Folding", Folding, { attributes: { Open: "boolean", Boxed: "boolean" } }));
+	const card = await build('<Folding Name="f" Boxed="true"><Label Name="kept"/></Folding>');
+	const kept = r.Rwidget_find(card, "kept");
+	expect(namesUnder(r.Rwidget_find(card, "folding-box"))).toEqual(["kept"]);
+	expect(r.Rwidget_set_attribute(card, "Open", "false")).toBeTruthy();
+	await settle();
+	expect(r.Rwidget_is_valid(kept)).toBeTruthy();
+	expect(r.Rwidget_find(card, "folding-box")).toBe(r.R_INVALID_ID);
+	expect(r.Rwidget_set_attribute(card, "Open", "true")).toBeTruthy();
+	await settle();
+	expect(namesUnder(r.Rwidget_find(card, "folding-box"))).toEqual(["kept"]);
+	expect(r.Rwidget_find(card, "kept")).toBe(kept);
+	// and when the element goes, they go with it
+	r.Rwidget_set_attribute(card, "Open", "false");
+	await settle();
+	r.Rwidget_destroy(card);
+	await settle();
+	expect(r.Rwidget_is_valid(kept)).toBeFalsy();
+	expect(errors).toEqual([]);
+});
+
 test("widgets of the children that are hidden when the element is destroyed are destroyed with it", async () => {
 	unregister.push(registerTag("Folding", Folding, { attributes: { Open: "boolean" } }));
 	const card = await build('<Folding Name="f"><Label Name="kept"/></Folding>');

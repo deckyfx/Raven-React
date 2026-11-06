@@ -7,7 +7,7 @@
  * cannot overlap the scene and scroll boxes do not clip it.
  */
 
-import { useEffect, useRef, useState, type ReactNode } from "react";
+import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from "react";
 import { Checkbox, HBox, Label, raven, runApp, Separator, Slider, VBox, Viewport, type WidgetInstance } from "@decky.fx/raven-react";
 import {
 	GL_COLOR_BUFFER_BIT,
@@ -69,7 +69,10 @@ function App(): ReactNode {
 	const [info, setInfo] = useState("");
 	// what the frame callback reads, as it is made once
 	const controls = useRef({ speed, wireframe });
-	controls.current = { speed, wireframe };
+	// (after the commit: the frame callback reads what is on screen, not a render React may throw away)
+	useLayoutEffect(() => {
+		controls.current = { speed, wireframe };
+	}, [speed, wireframe]);
 
 	useEffect(() => {
 		const scene = viewport.current?.widget ?? raven.R_INVALID_ID;

@@ -285,8 +285,9 @@ function usePlayer(window: RefObject<WindowInstance | null>): { readonly seconds
 	const clock = useRef({ playing: true, seconds: START_SECONDS });
 
 	useEffect(() => {
-		if (window.current) {
-			raven.Rwindow_set_continuous_redraw(window.current.window, raven.R_TRUE);
+		const windowId = window.current?.window;
+		if (windowId !== undefined) {
+			raven.Rwindow_set_continuous_redraw(windowId, raven.R_TRUE);
 		}
 		raven.Rset_frame_callback((deltaSeconds) => {
 			if (clock.current.playing) {
@@ -297,7 +298,13 @@ function usePlayer(window: RefObject<WindowInstance | null>): { readonly seconds
 				setTenths(Math.trunc(clock.current.seconds * 10));
 			}
 		});
-		return () => raven.Rset_frame_callback(null);
+		return () => {
+			raven.Rset_frame_callback(null);
+			// (the window may be gone already, closed before this runs)
+			if (windowId !== undefined && raven.Rwindow_is_valid(windowId)) {
+				raven.Rwindow_set_continuous_redraw(windowId, raven.R_FALSE);
+			}
+		};
 	}, [window]);
 
 	/** Plays or pauses. Frames are only needed while the time moves. */

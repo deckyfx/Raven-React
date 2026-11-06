@@ -1,10 +1,12 @@
 /**
  * What `widgets.xml` declares in the original, with `<Widget Name="...">`. A tag of your own is
  * a component, its parameters are props, `{...}` is JavaScript, and `<Include>` is this import.
+ * `registerTags` makes them tags Raven knows too, for documents built by code: there is no XML
+ * declaration of them, these components are the only one.
  */
 
 import type { ReactNode } from "react";
-import { Border, HBox, Label, Separator, VBox } from "@decky.fx/raven-react";
+import { Border, HBox, Label, registerTag, Separator, VBox } from "@decky.fx/raven-react";
 
 /** A small colored label. */
 export function Badge({ Text = "new", Color = "#3B82F6" }: { readonly Text?: string; readonly Color?: string }): ReactNode {
@@ -62,4 +64,14 @@ export function Card({ Title = "Untitled", Badge: badge = "", Wide = false, Appe
 			</VBox>
 		</Border>
 	);
+}
+
+/** The tags `registerTags` gives Raven. */
+export const TAG_NAMES = ["Badge", "Stat", "Card"] as const;
+
+/** Makes the components of this file tags Raven knows, with the kinds of their attributes. */
+export function registerTags(): void {
+	registerTag("Badge", Badge, { attributes: { Text: "string", Color: "string" } });
+	registerTag("Stat", Stat, { attributes: { Label: "string", Value: "string", Trend: "number" } });
+	registerTag("Card", Card, { attributes: { Title: "string", Badge: "string", Wide: "boolean", Appear: "string", AppearDelay: "number" }, slots: ["footer"] });
 }

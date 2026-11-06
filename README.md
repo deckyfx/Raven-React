@@ -30,7 +30,7 @@ The C examples of Raven are ported to TSX in [examples](examples), with the same
 | ![Studio: a node graph and a timeline, in the Blueprint look](docs/screenshots/studio.png) | ![Music: a music player, Raven's largest showcase](docs/screenshots/music.png) |
 | **studio**: a node graph and a timeline, here in the Blueprint look | **music**: a music player with no sound, Raven's largest showcase |
 | ![Editor: a scene editor with a software-rendered viewport](docs/screenshots/editor.png) | ![Themes: looks, theme files, styles and Markdown](docs/screenshots/themes.png) |
-| **editor**: a scene editor, its viewport rendered on every core | **themes**: looks, theme files, styles and Markdown |
+| **editor**: a scene editor, its viewport rendered on every core | **themes**: looks, themes written in TypeScript, styles and Markdown |
 | ![Workspace: docking panels, a file browser and glass](docs/screenshots/workspace.png) | ![Browser: a web page inside the interface](docs/screenshots/browser.png) |
 | **workspace**: panels that dock, a file browser, the kinds of glass | **browser**: a web page inside the interface, talking to the application |
 | ![Effects: the shader effects of Raven](docs/screenshots/effects.png) | ![Notepad: a text editor with a custom header bar](docs/screenshots/notepad.png) |
@@ -41,7 +41,7 @@ The C examples of Raven are ported to TSX in [examples](examples), with the same
 | [hello](examples/hello) | A window, a label and two buttons |
 | [helloworld](examples/helloworld) | An application that tries everything, and compiles to one executable |
 | [animations](examples/animations) | Transitions, springs in a custom widget, cards that pop |
-| [components](examples/components) | XML tags as React components, and a card built from an XML document ([screenshot](docs/screenshots/components.png)) |
+| [components](examples/components) | Tags of your own as React components, which Raven also builds from a document made by code ([screenshot](docs/screenshots/components.png)) |
 | [memory](examples/memory) | Where the memory of the library comes from, and how to watch it |
 | [glass](examples/glass) | The glass themes and materials |
 | [overlay](examples/overlay) | A window that is seen through, and the ways to blur what is behind |

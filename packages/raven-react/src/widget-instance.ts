@@ -3,6 +3,9 @@ import { RavenError } from "./errors";
 import { applyHandlers, controlledSync, eventScope, forgetHandlers, setVirtualItems, virtualItemsOf } from "./events";
 import { CLEARED, resolveProps, type RavenProps, type ResolvedProps, type TreeItem } from "./props";
 
+/** The host type of a widget Raven made and React only places: `adopt`. */
+export const ADOPTED_TAG = "raven-react:adopted";
+
 /** What React's tree is made of: a widget, or a window, which is no widget of its parent. */
 export interface HostNode {
 	readonly tag: string;
@@ -226,6 +229,19 @@ export class WidgetInstance implements HostNode {
 		return new WidgetInstance(id, "");
 	}
 
+	/**
+	 * A widget Raven made, a child of a registered tag in XML: React places it where it is
+	 * rendered, and sets nothing on it. Taken out of the tree, it is only let go, alive: the
+	 * component may show it again, or move it into another box. Its element destroys it.
+	 */
+	static adopt(id: r.Rid): WidgetInstance {
+		const parent = r.Rwidget_get_parent(id);
+		if (parent !== r.R_INVALID_ID) {
+			r.Rwidget_remove_child(parent, id);
+		}
+		return new WidgetInstance(id, ADOPTED_TAG);
+	}
+
 	/** Makes the widget of a tag in Raven. */
 	private static make(tag: string, markup = ""): r.Rid {
 		const id = r.Rwidget_create_from_xml(`<${tag}>${markup}</${tag}>`);
@@ -383,8 +399,8 @@ export class WidgetInstance implements HostNode {
 
 	/** Goes from the last props to new ones, setting only what changed. */
 	update(props: RavenProps): void {
-		// (its window can be gone already: closed by the user, with no OnClose to ask first)
-		if (!r.Rwidget_is_valid(this.id)) {
+		// (its window can be gone already: closed by the user, with no OnClose to ask first. An adopted widget has no props of React)
+		if (!r.Rwidget_is_valid(this.id) || this.tag === ADOPTED_TAG) {
 			return;
 		}
 		const next = resolveProps(props);
@@ -529,9 +545,11 @@ export class WidgetInstance implements HostNode {
 	/** Removes a child and deletes it with everything under it. */
 	remove(child: HostNode): void {
 		child.forgetTree();
-		// (the window may be gone already, closed by the user, with its widgets)
-		if (this.holds(child) && r.Rwidget_is_valid(child.nativeWidget as r.Rid)) {
-			r.Rwidget_remove_child(this.id, child.nativeWidget as r.Rid);
+		// (the window may be gone already, closed by the user, with its widgets. An adopted widget
+		// may be in another place already, where the component moved it)
+		const widget = child.nativeWidget;
+		if (this.holds(child) && widget !== null && r.Rwidget_is_valid(widget) && r.Rwidget_get_parent(widget) === this.id) {
+			r.Rwidget_remove_child(this.id, widget);
 		}
 		const index = this.children.indexOf(child);
 		if (index >= 0) {
@@ -560,6 +578,10 @@ export class WidgetInstance implements HostNode {
 	}
 
 	dispose(): void {
+		if (this.tag === ADOPTED_TAG) {
+			// (its parent let it go, unless it was already placed elsewhere: it belongs to the element of its registered tag)
+			return;
+		}
 		this.disposeDetached();
 		if (r.Rwidget_is_valid(this.id)) {
 			r.Rwidget_destroy(this.id);

@@ -145,6 +145,52 @@ What a `<Window>` holds directly fills it and follows its `Slot`, as the content
 
 On macOS a `MenuBar` goes to the menu bar of the system; `Native={false}` keeps it in the window. An `<Island>` directly in a `<Window>` floats above the content at the top, as in XML. A `<Menu>` that no `MenuBar` or `Menu` holds is not shown until it is asked: its ref has `open(x, y)`, in the coordinates `OnContext` gives. A `<Separator>` in a `<Menu>` is a line of the menu.
 
+## Themes
+
+A theme is a typed object, not a theme file: `defineTheme` checks it, and `loadTheme` gives it to Raven, which keeps it under its name. The colors and metrics take the names of Raven's schema, so a typo does not compile.
+
+```tsx
+import { defineTheme, loadTheme, raven } from "@decky.fx/raven-react";
+
+export const ocean = defineTheme({
+	Name: "Ocean",
+	Base: "Dark",
+	Accent: "#22D3EE",
+	Colors: { Window: "#0B1220", Panel: "#111A2C", Text: "#DCE7F5" },
+	Metrics: { ControlHeight: 32, Spacing: 8 },
+	Syntax: { Keyword: "#7DD3FC", String: "#86EFAC" },
+	Styles: [
+		{ Widget: "Button", CornerRadius: 16 },
+		{ Class: "danger", Accent: "#FB7185" },
+		{ Widget: "Slider", Part: "Knob", State: "Hovered", Size: 16 },
+	],
+});
+
+await runApp(<App />, options, { setup: () => raven.Rtheme_use(loadTheme(ocean)) });
+```
+
+`Theme={ocean.Name}` gives it to a part of the window only. Everything a theme file has is there: `Look` or `Base`, `Motion`, `Material`, `Font`, `Wallpaper`, `Colors`, `Metrics`, `Glass`, `Syntax`, and `Styles` for a type, a class, a part and its states. A mistake Raven finds (a `Base` that names no theme) is reported by Raven, and the rest is used, as in a file. `themeXml(theme)` gives the text of the theme file, to save one.
+
+## Tags of your own
+
+A component can be a tag Raven knows, built by Raven from XML as `<Button>` is: in a document made by code, in `Markup`, in a file of someone else. There is no XML declaration of it: the component is the only one.
+
+```tsx
+registerTag("Card", Card, {
+	attributes: { Title: "string", Wide: "boolean", Count: "number" },
+	slots: ["footer"],
+});
+```
+
+```xml
+<Card Title="Sales" Wide="true">
+	<Stat Label="This week" Value="1 284"/>
+	<Into Name="footer"><Button Text="Details"/></Into>
+</Card>
+```
+
+`attributes` lists the attributes it takes, with the kind of their prop, checked against the component's props; the others stay with the widget (`Name`, `Width`, `Slot`...), and a value of the wrong kind is reported by Raven. The widgets of the children go where the component renders `children`, and those of `<Into Name="...">` where it renders the prop of that name, one of `slots`, with no box around them. `Rwidget_set_attribute` renders it again, and destroying the widget unmounts it. Each element is a root of its own, so context does not reach it from around it. `registerTag` returns what unregisters the tag.
+
 ## Going beyond props
 
 `useShortcut(window, "Ctrl+S", save)` adds a shortcut to a window, given the ref of its `<Window>`. `useAction("scene.play", play)` names a function, for whatever fires actions by name; it receives the widget that fired it. An `On...` prop also takes such a name, or a built-in action: `OnClicked="app.quit"`.
@@ -153,7 +199,7 @@ On macOS a `MenuBar` goes to the menu bar of the system; `Native={false}` keeps 
 
 `runApp(<App />, options, { appName, setup, allocator })`: `setup` runs after Raven starts and before the first render, for a look or a theme. `allocator` is what `Rset_allocator` takes, functions of C only.
 
-`Theme` takes a name given to `Rtheme_load`, and `Language` a language that was registered, beside those the types propose. A color or a metric goes back to the theme with `null`, without making the widget again: `Color={{ Text: null }}`. `FontStyle` on a `Label` takes a style of the font of the theme, and does not go with `Font`.
+`Theme` takes the name of a theme loaded with `loadTheme` (or `Rtheme_load`), and `Language` a language that was registered, beside those the types propose. A color or a metric goes back to the theme with `null`, without making the widget again: `Color={{ Text: null }}`. `FontStyle` on a `Label` takes a style of the font of the theme, and does not go with `Font`.
 
 A function given directly to the C API runs outside what props get. `inEventScope(fn)` makes it the same: an exception stays on this side, and what it changes in React is committed before the next event.
 
@@ -238,7 +284,7 @@ An `Image` shows an SVG file like any other: `<Image Source="logo.svg" />`.
 
 - Removing a prop makes the widget again, in its place, with the same children: Raven has no way to give an attribute its default back. What the widget held by itself (focus, typed text, scrolling) is lost. To avoid that, keep the prop and change its value.
 - The designer of Raven does not edit TSX.
-- Style parts and states (`Part=`, `State=`) only exist in theme files.
+- Style parts and states (`Part`, `State`) only exist in themes: `Styles` of `defineTheme`, not props.
 
 ## Working on this package
 

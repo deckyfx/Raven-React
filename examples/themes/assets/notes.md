@@ -19,9 +19,9 @@ A style gives values to a *type* of widget, to a *class*, or to both:
 
 ## Live
 
-- [x] `ocean.xml` and `paper.xml` are watched
-- [x] so is `notes.md`, this text
-- [ ] try it: change an accent, save
+- [x] the themes are TypeScript, in `themes.ts`
+- [x] `notes.md`, this text, is watched
+- [ ] try it: change a line, save
 
 > This text is a `Label` with `Markdown="true"`.
 > The editor under it has the same flag: it styles

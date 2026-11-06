@@ -8,14 +8,15 @@
  *
  * The "Add a card" button is the part that stays Raven's own: it builds a piece of interface as
  * a document (`Rxml_document_...`, `Rxml_node_...`), asks the library for the widgets and shows
- * the XML it wrote. A document can only name tags the library knows, so this example registers
- * `assets/widgets.xml` for it: React's `Card` and the library's `<Card>` are two declarations
- * of the same thing, and only the cards made by the button use the second.
+ * the XML it wrote. A document can only name tags the library knows, so the components of
+ * `widgets.tsx` are registered as tags (`registerTag`): Raven builds `<Card>` with React's
+ * `Card`, and there is no other declaration of it. Where the original writes `Into="footer"` on
+ * a child, a child of a component's tag goes in `<Into Name="footer">`.
  */
 
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { Button, Expander, HBox, Label, raven, runApp, ScrollBox, TextEditor, VBox, WrapBox, type WidgetInstance } from "@decky.fx/raven-react";
-import { Badge, Card, Stat } from "./widgets";
+import { Badge, Card, registerTags, Stat, TAG_NAMES } from "./widgets";
 
 const DOCUMENT_TITLES = ["Builds", "Tickets", "Reviews", "Deploys"];
 const REGIONS = ["paris", "tokyo", "oslo"];
@@ -32,18 +33,14 @@ function Row({ Name, Role, Online = false }: { readonly Name: string; readonly R
 	);
 }
 
-/** The tags the library knows, as the original shows them. */
+/** The tags the library knows, as the original shows them: here, the components registered by `registerTags`. */
 function declaredTags(): string {
-	let text = "Declared tags:";
-	for (let i = 0; i < raven.Rxml_get_registered_widget_count(); i++) {
-		text += ` <${raven.Rxml_get_registered_widget_name(i)}>`;
-	}
-	return text;
+	return `Tags of components: ${TAG_NAMES.filter((name) => raven.Rxml_is_tag_registered(name)).map((name) => `<${name}>`).join(" ")}`;
 }
 
 /**
  * Builds, as a document:
- * `<Card Title="..." Badge="new" Appear="Drop"> <Stat .../> <Stat .../> <Button Into="footer"/> </Card>`
+ * `<Card Title="..." Badge="new" Appear="Drop"> <Stat .../> <Stat .../> <Into Name="footer"> <Button/> </Into> </Card>`
  */
 function buildCardDocument(added: number): raven.Rid {
 	const document = raven.Rxml_document_create("Card");
@@ -57,10 +54,12 @@ function buildCardDocument(added: number): raven.Rid {
 		raven.Rxml_node_set_attribute(stat, "Value", String(3 + (added * 7 + i * 11) % 40));
 		raven.Rxml_node_set_attribute(stat, "Trend", i === 0 ? "-1" : "1");
 	});
-	const button = raven.Rxml_node_add_child(card, "Button", -1);
+	// (a tag of a component sends what <Into> holds to its prop of that name: the footer of Card)
+	const footer = raven.Rxml_node_add_child(card, "Into", -1);
+	raven.Rxml_node_set_attribute(footer, "Name", "footer");
+	const button = raven.Rxml_node_add_child(footer, "Button", -1);
 	raven.Rxml_node_set_attribute(button, "Text", "Remove");
 	raven.Rxml_node_set_attribute(button, "Style", "Flat");
-	raven.Rxml_node_set_attribute(button, "Into", "footer");
 	raven.Rxml_node_set_attribute(button, "OnClicked", "card.remove");
 	return document;
 }
@@ -162,7 +161,5 @@ function App(): ReactNode {
 
 await runApp(<App />, { Title: "Raven - components", Width: 760, Height: 560, MinWidth: 520, MinHeight: 400 }, {
 	appName: "components",
-	setup: () => {
-		raven.Rxml_register_widgets_from_file(`${import.meta.dir}/../assets/widgets.xml`);
-	},
+	setup: registerTags,
 });

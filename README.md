@@ -45,7 +45,7 @@ The C examples of Raven are ported to TSX in [examples](examples), with the same
 | [memory](examples/memory) | Where the memory of the library comes from, and how to watch it |
 | [glass](examples/glass) | The glass themes and materials |
 | [overlay](examples/overlay) | A window that is seen through, and the ways to blur what is behind |
-| [viewport_opengl](examples/viewport_opengl) | An OpenGL scene in the native child window of a viewport |
+| [viewport_opengl](examples/viewport_opengl) | An OpenGL scene in the native child window of a viewport. X11 only (GLX): on a Wayland session, start it with `RAVEN_WINDOW_SYSTEM=x11`; on Windows and macOS it says it cannot make a context |
 | [viewport_vulkan](examples/viewport_vulkan) | The scene of the original, rendered in software in TypeScript |
 | [browser](examples/browser), [editor](examples/editor), [effects](examples/effects), [music](examples/music), [notepad](examples/notepad), [studio](examples/studio), [themes](examples/themes), [workspace](examples/workspace) | Shown above |
 

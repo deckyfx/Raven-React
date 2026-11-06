@@ -19,13 +19,35 @@ import {
 	VBox,
 	type WidgetInstance,
 } from "@decky.fx/raven-react";
-import { GraphLink, GraphNode, hexColor, PinType, reaches, type NodeSpec, type PinSpec } from "./graph-elements";
+import { GraphLink, GraphNode, hexColor, PinType, reaches, type NodeSpec, type PinShape, type PinSpec } from "./graph-elements";
 
-const THEMES = [raven.R_THEME_DARK, raven.R_THEME_LIGHT, raven.R_THEME_GLASS_DARK, raven.R_THEME_GLASS_LIGHT];
-const THEME_NAMES = ["Dark", "Light", "Glass dark", "Glass light"];
+/** The themes of the list: Raven's, then the looks of the platforms, which the graph and the timeline follow with the look Auto. */
+const THEMES: readonly { readonly name: string; readonly apply: () => void }[] = [
+	{ name: "Dark", apply: () => raven.Rtheme_apply(raven.R_THEME_DARK) },
+	{ name: "Light", apply: () => raven.Rtheme_apply(raven.R_THEME_LIGHT) },
+	{ name: "Glass dark", apply: () => raven.Rtheme_apply(raven.R_THEME_GLASS_DARK) },
+	{ name: "Glass light", apply: () => raven.Rtheme_apply(raven.R_THEME_GLASS_LIGHT) },
+	{ name: "Windows", apply: () => raven.Rtheme_use("WindowsDark") },
+	{ name: "macOS", apply: () => raven.Rtheme_use("MacOSDark") },
+	{ name: "GNOME", apply: () => raven.Rtheme_use("GnomeDark") },
+];
+const THEME_NAMES = THEMES.map(({ name }) => name);
 
-/** The theme to start with: `RAVEN_EXAMPLE_THEME=2` is the third, as for the original. */
-const FIRST_THEME = Math.min(Math.max(Number(Bun.env.RAVEN_EXAMPLE_THEME ?? 0) || 0, 0), THEMES.length - 1);
+/** The looks of the graph and of the timeline. Auto follows the theme of the window. */
+const LOOKS = ["Auto", "Modern", "Blueprint", "Blender", "Neon"] as const;
+type Look = (typeof LOOKS)[number];
+
+/** A number of the environment, as an index of a list: 0 when it is missing or not one. */
+function startIndex(value: string | undefined, length: number): number {
+	return Math.min(Math.max(Number(value ?? 0) || 0, 0), length - 1);
+}
+
+/** The theme and the look to start with: `RAVEN_EXAMPLE_THEME=2` is the third theme, `RAVEN_EXAMPLE_LOOK=3` the fourth look, as for the original. */
+const FIRST_THEME = startIndex(Bun.env.RAVEN_EXAMPLE_THEME, THEMES.length);
+const FIRST_LOOK = startIndex(Bun.env.RAVEN_EXAMPLE_LOOK, LOOKS.length);
+
+/** The image of the node "Time". */
+const CLOCK_ICON = `${import.meta.dir}/../assets/clock.svg`;
 
 const SWATCHES = "#FF375F,#FF9F0A,#FFD60A,#30D158,#64D2FF,#0A84FF,#BF5AF2,#8E8E93";
 
@@ -36,10 +58,11 @@ const HELP = [
 	"- `Delete` removes what is selected.",
 ].join("\n");
 
-const PIN_TYPES = [
-	{ name: "vector", color: "#BF5AF2" },
+// (a shape for each type of data: it reads at a glance, in every look)
+const PIN_TYPES: readonly { readonly name: string; readonly color: string; readonly shape?: PinShape }[] = [
+	{ name: "vector", color: "#BF5AF2", shape: "Square" },
 	{ name: "number", color: "#64D2FF" },
-	{ name: "color", color: "#FFD60A" },
+	{ name: "color", color: "#FFD60A", shape: "Diamond" },
 ];
 
 /** A pin with a type, in short. */
@@ -73,7 +96,7 @@ function RemapKnob(): ReactElement {
 
 const FIRST_NODES: readonly NodeSpec[] = [
 	{ name: "uv", title: "Texture coordinates", x: 40, y: 60, color: "#FF375F", outputs: [pin("uv", "UV", "vector")] },
-	{ name: "time", title: "Time", x: 60, y: 260, color: "#30D158", outputs: [pin("seconds", "Seconds", "number")] },
+	{ name: "time", title: "Time", x: 60, y: 260, color: "#30D158", icon: CLOCK_ICON, outputs: [pin("seconds", "Seconds", "number")] },
 	{
 		name: "noise",
 		title: "Noise",
@@ -226,9 +249,10 @@ function selectionText(graph: raven.Rid): string {
 function GraphPane(props: {
 	graph: RefObject<WidgetInstance | null>;
 	nodes: readonly NodeSpec[];
+	look: Look;
 	onDeleted: (name: string) => void;
 }): ReactElement {
-	const { graph, nodes, onDeleted } = props;
+	const { graph, nodes, look, onDeleted } = props;
 	const tint = useRef<WidgetInstance>(null);
 	const [selected, setSelected] = useState("No node selected");
 
@@ -267,9 +291,9 @@ function GraphPane(props: {
 
 	return (
 		<HBox Slot={{ Fill: 5 }}>
-			<NodeGraph ref={graph} Slot={{ Fill: 1, Padding: [10, 10, 0, 6] }}>
+			<NodeGraph ref={graph} Preset={look} Slot={{ Fill: 1, Padding: [10, 10, 0, 6] }}>
 				{PIN_TYPES.map((type) => (
-					<PinType key={type.name} graph={graph} name={type.name} color={type.color} />
+					<PinType key={type.name} graph={graph} name={type.name} color={type.color} shape={type.shape} />
 				))}
 				{nodes.map((spec) => (
 					<GraphNode key={spec.name} graph={graph} spec={spec} onSelected={readSelection} />
@@ -300,6 +324,7 @@ function App(): ReactElement {
 	const [nodes, setNodes] = useState(FIRST_NODES);
 	const [playing, setPlaying] = useState(false);
 	const [theme, setTheme] = useState(FIRST_THEME);
+	const [look, setLook] = useState(FIRST_LOOK);
 
 	useTimelineContent(timeline);
 	// (Space in the timeline plays and pauses too, and tells nobody: the button reads the widget at each frame)
@@ -357,7 +382,7 @@ function App(): ReactElement {
 	const chooseTheme = (index: number): void => {
 		const chosen = THEMES[index];
 		if (chosen !== undefined) {
-			raven.Rtheme_apply(chosen);
+			chosen.apply();
 			setTheme(index);
 		}
 	};
@@ -377,18 +402,22 @@ function App(): ReactElement {
 				<Button Text="Add a node" OnClicked={addNode} />
 				<Button Text="Show all" Style="Flat" OnClicked={showAll} Tooltip="Every node in view (F, or a double click on the canvas)" />
 				<Spacer Slot={{ Fill: 1 }} />
+				<Label Text="Look" Slot={{ VAlign: "Center" }} Opacity={0.7} />
+				<ComboBox Items={LOOKS} Selected={look} Width={130} OnChanged={setLook} Tooltip="The look of the graph and of the timeline; Auto follows the theme" />
+				<Spacer Width={8} />
 				<Label Text="Theme" Slot={{ VAlign: "Center" }} Opacity={0.7} />
 				<ComboBox Items={THEME_NAMES} Selected={theme} Width={140} OnChanged={chooseTheme} />
 			</HBox>
 			<Separator />
 			<Splitter Orientation="Vertical" Slot={{ Fill: 1 }}>
-				<GraphPane graph={graph} nodes={nodes} onDeleted={dropNode} />
+				<GraphPane graph={graph} nodes={nodes} look={LOOKS[look] ?? "Auto"} onDeleted={dropNode} />
 				<Timeline
 					ref={timeline}
 					Duration={12}
 					FrameRate={FRAME_RATE}
 					Time={FIRST_TIME}
 					Loop
+					Preset={LOOKS[look] ?? "Auto"}
 					Slot={{ Fill: 3, Padding: [10, 6, 10, 10] }}
 				/>
 			</Splitter>
@@ -399,5 +428,5 @@ function App(): ReactElement {
 await runApp(
 	<App />,
 	{ Title: "Raven - studio", Width: 1280, Height: 800, MinWidth: 900, MinHeight: 560 },
-	{ appName: "Raven studio", setup: () => raven.Rtheme_apply(THEMES[FIRST_THEME] ?? raven.R_THEME_DARK) },
+	{ appName: "Raven studio", setup: () => (THEMES[FIRST_THEME] ?? THEMES[0])?.apply() },
 );

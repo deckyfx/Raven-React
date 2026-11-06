@@ -293,8 +293,9 @@ The repository is a Bun workspace, with this package in `packages/raven-react` a
     raven/                 github.com/oscar-soirey/Raven
     bun/raven-react/       this repository
 
-Build Raven, then make the native package of your platform from it:
+Check out the commit of Raven this package is pinned to, build it, then make the native package of your platform from it (`native:local` refuses a library built from any other commit):
 
+    git -C raven checkout "$(cat bun/raven-react/packages/raven-react/RAVEN_VERSION)"
     cmake -S raven -B raven/build-shared -DCMAKE_BUILD_TYPE=Release -DRAVEN_BUILD_SHARED=ON
     cmake --build raven/build-shared --parallel
     cd bun/raven-react/packages/raven-react

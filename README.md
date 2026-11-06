@@ -49,7 +49,7 @@ The C examples of Raven are ported to TSX in [examples](examples), with the same
 | [viewport_vulkan](examples/viewport_vulkan) | The scene of the original, rendered in software in TypeScript |
 | [browser](examples/browser), [editor](examples/editor), [effects](examples/effects), [music](examples/music), [notepad](examples/notepad), [studio](examples/studio), [themes](examples/themes), [workspace](examples/workspace) | Shown above |
 
-To run one, build Raven and make the native package first (see [Working on this package](packages/raven-react#working-on-this-package)), then, from the root of this repository:
+To run one, check out and build Raven at the pinned commit, and make the native package first (see [Working on this package](packages/raven-react#working-on-this-package)), then, from the root of this repository:
 
     cd examples/studio
     bun run dev

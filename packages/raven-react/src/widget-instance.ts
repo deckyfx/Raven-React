@@ -231,7 +231,8 @@ export class WidgetInstance implements HostNode {
 
 	/**
 	 * A widget Raven made, a child of a registered tag in XML: React places it where it is
-	 * rendered, and deletes it with what holds it, but sets nothing on it.
+	 * rendered, and sets nothing on it. Taken out of the tree, it is only let go, alive: the
+	 * component may show it again, or move it into another box. Its element destroys it.
 	 */
 	static adopt(id: r.Rid): WidgetInstance {
 		const parent = r.Rwidget_get_parent(id);
@@ -544,9 +545,11 @@ export class WidgetInstance implements HostNode {
 	/** Removes a child and deletes it with everything under it. */
 	remove(child: HostNode): void {
 		child.forgetTree();
-		// (the window may be gone already, closed by the user, with its widgets)
-		if (this.holds(child) && r.Rwidget_is_valid(child.nativeWidget as r.Rid)) {
-			r.Rwidget_remove_child(this.id, child.nativeWidget as r.Rid);
+		// (the window may be gone already, closed by the user, with its widgets. An adopted widget
+		// may be in another place already, where the component moved it)
+		const widget = child.nativeWidget;
+		if (this.holds(child) && widget !== null && r.Rwidget_is_valid(widget) && r.Rwidget_get_parent(widget) === this.id) {
+			r.Rwidget_remove_child(this.id, widget);
 		}
 		const index = this.children.indexOf(child);
 		if (index >= 0) {
@@ -575,6 +578,10 @@ export class WidgetInstance implements HostNode {
 	}
 
 	dispose(): void {
+		if (this.tag === ADOPTED_TAG) {
+			// (its parent let it go, unless it was already placed elsewhere: it belongs to the element of its registered tag)
+			return;
+		}
 		this.disposeDetached();
 		if (r.Rwidget_is_valid(this.id)) {
 			r.Rwidget_destroy(this.id);

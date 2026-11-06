@@ -151,6 +151,11 @@ function commonNames(prefix: string): string[] {
 			}
 		}
 	}
+	if (names.length === 0) {
+		// (a union of nothing is no TypeScript: better to stop than to write a broken file)
+		console.error(`the schema of Raven gives no ${prefix} names: the types of themes cannot be written`);
+		process.exit(1);
+	}
 	return names;
 }
 

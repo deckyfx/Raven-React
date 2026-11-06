@@ -53,6 +53,8 @@ interface Element {
 	slots: Record<string, ReactNode>;
 	/** Rendered once its children are known: until then, attributes are only kept. */
 	ready: boolean;
+	/** The widgets of its children, which React only places: those it does not show are destroyed with the element. */
+	adopted: readonly r.Rid[];
 }
 
 /** The tag that sends its children to a named place of the component around it. */
@@ -109,6 +111,7 @@ function place(widget: r.Rid, element: Element): void {
 		intos.delete(child);
 		r.Rwidget_destroy(child);
 	}
+	element.adopted = [...children, ...Object.values(slots).flat()];
 	element.children = adopted(children);
 	element.slots = Object.fromEntries(Object.entries(slots).map(([name, widgets]) => [name, adopted(widgets)]));
 	element.ready = true;
@@ -123,7 +126,7 @@ function create(tag: string): r.Rid {
 		r.Rwidget_set_destroy_callback(widget, nativeCallbacks().destroy);
 		return widget;
 	}
-	const element: Element = { tag, root: new RavenRoot(widget), props: {}, children: undefined, slots: {}, ready: false };
+	const element: Element = { tag, root: new RavenRoot(widget), props: {}, children: undefined, slots: {}, ready: false, adopted: [] };
 	elements.set(widget, element);
 	r.Rwidget_set_destroy_callback(widget, nativeCallbacks().destroy);
 	queueMicrotask(() => {
@@ -168,6 +171,12 @@ function destroyed(widget: r.Rid): void {
 	elements.delete(widget);
 	intos.delete(widget);
 	element?.root.unmount();
+	// (those in its tree went with it; those the component did not show are held by nothing)
+	for (const child of element?.adopted ?? []) {
+		if (r.Rwidget_is_valid(child) && r.Rwidget_get_parent(child) === r.R_INVALID_ID) {
+			r.Rwidget_destroy(child);
+		}
+	}
 }
 
 /** The pointers of the functions Raven calls for every registered tag and element. */

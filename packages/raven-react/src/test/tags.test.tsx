@@ -187,6 +187,57 @@ test("destroying the widget unmounts the component, and runs the cleanups of its
 	expect(errors).toEqual([]);
 });
 
+/** A card that hides what it holds, or puts it in a box of its own, as its attributes say. */
+function Folding({ Open = true, Boxed = false, children }: { readonly Open?: boolean; readonly Boxed?: boolean; readonly children?: ReactNode }): ReactNode {
+	return (
+		<VBox Name="folding-body">
+			<Label Name="folding-title">Folding</Label>
+			{Open && (Boxed ? <HBox Name="folding-box">{children}</HBox> : children)}
+		</VBox>
+	);
+}
+
+test("the widgets of the children stay alive while the component hides them, and come back", async () => {
+	unregister.push(registerTag("Folding", Folding, { attributes: { Open: "boolean", Boxed: "boolean" } }));
+	const card = await build('<Folding Name="f"><Label Name="kept"/></Folding>');
+	const kept = r.Rwidget_find(card, "kept");
+	expect(r.Rwidget_set_attribute(card, "Open", "false")).toBeTruthy();
+	await settle();
+	expect(r.Rwidget_is_valid(kept)).toBeTruthy();
+	expect(namesUnder(r.Rwidget_find(card, "folding-body"))).toEqual(["folding-title"]);
+	expect(r.Rwidget_set_attribute(card, "Open", "true")).toBeTruthy();
+	await settle();
+	expect(namesUnder(r.Rwidget_find(card, "folding-body"))).toEqual(["folding-title", "kept"]);
+	expect(r.Rwidget_find(card, "kept")).toBe(kept);
+	expect(errors).toEqual([]);
+});
+
+test("the widgets of the children stay alive when the component moves them into a box of its own", async () => {
+	unregister.push(registerTag("Folding", Folding, { attributes: { Open: "boolean", Boxed: "boolean" } }));
+	const card = await build('<Folding Name="f"><Label Name="kept"/></Folding>');
+	const kept = r.Rwidget_find(card, "kept");
+	expect(r.Rwidget_set_attribute(card, "Boxed", "true")).toBeTruthy();
+	await settle();
+	expect(namesUnder(r.Rwidget_find(card, "folding-box"))).toEqual(["kept"]);
+	expect(r.Rwidget_find(card, "kept")).toBe(kept);
+	expect(r.Rwidget_set_attribute(card, "Boxed", "false")).toBeTruthy();
+	await settle();
+	expect(namesUnder(r.Rwidget_find(card, "folding-body"))).toEqual(["folding-title", "kept"]);
+	expect(errors).toEqual([]);
+});
+
+test("widgets of the children that are hidden when the element is destroyed are destroyed with it", async () => {
+	unregister.push(registerTag("Folding", Folding, { attributes: { Open: "boolean" } }));
+	const card = await build('<Folding Name="f"><Label Name="kept"/></Folding>');
+	const kept = r.Rwidget_find(card, "kept");
+	r.Rwidget_set_attribute(card, "Open", "false");
+	await settle();
+	r.Rwidget_destroy(card);
+	await settle();
+	expect(r.Rwidget_is_valid(kept)).toBeFalsy();
+	expect(errors).toEqual([]);
+});
+
 test("a tag that is unregistered is known no more, and a tag of Raven cannot be taken", () => {
 	const done = registerTag("Badge", Badge, {});
 	expect(r.Rxml_is_tag_registered("Badge")).toBeTruthy();

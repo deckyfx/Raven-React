@@ -3,6 +3,9 @@ import { RavenError } from "./errors";
 import { applyHandlers, controlledSync, eventScope, forgetHandlers, setVirtualItems, virtualItemsOf } from "./events";
 import { CLEARED, resolveProps, type RavenProps, type ResolvedProps, type TreeItem } from "./props";
 
+/** The host type of a widget Raven made and React only places: `adopt`. */
+export const ADOPTED_TAG = "raven-react:adopted";
+
 /** What React's tree is made of: a widget, or a window, which is no widget of its parent. */
 export interface HostNode {
 	readonly tag: string;
@@ -226,6 +229,18 @@ export class WidgetInstance implements HostNode {
 		return new WidgetInstance(id, "");
 	}
 
+	/**
+	 * A widget Raven made, a child of a registered tag in XML: React places it where it is
+	 * rendered, and deletes it with what holds it, but sets nothing on it.
+	 */
+	static adopt(id: r.Rid): WidgetInstance {
+		const parent = r.Rwidget_get_parent(id);
+		if (parent !== r.R_INVALID_ID) {
+			r.Rwidget_remove_child(parent, id);
+		}
+		return new WidgetInstance(id, ADOPTED_TAG);
+	}
+
 	/** Makes the widget of a tag in Raven. */
 	private static make(tag: string, markup = ""): r.Rid {
 		const id = r.Rwidget_create_from_xml(`<${tag}>${markup}</${tag}>`);
@@ -383,8 +398,8 @@ export class WidgetInstance implements HostNode {
 
 	/** Goes from the last props to new ones, setting only what changed. */
 	update(props: RavenProps): void {
-		// (its window can be gone already: closed by the user, with no OnClose to ask first)
-		if (!r.Rwidget_is_valid(this.id)) {
+		// (its window can be gone already: closed by the user, with no OnClose to ask first. An adopted widget has no props of React)
+		if (!r.Rwidget_is_valid(this.id) || this.tag === ADOPTED_TAG) {
 			return;
 		}
 		const next = resolveProps(props);

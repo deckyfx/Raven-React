@@ -111,7 +111,8 @@ export interface ThemeSpec extends ThemeColors, ThemeMetrics {
 	readonly Motion?: "Springy" | "Smooth";
 	/** The accent color, and the shades that follow from it. */
 	readonly Accent?: ThemeColor;
-	readonly Material?: MaterialName;
+	/** The material of its surfaces. (`Default` is for widgets and styles: it puts them back to the theme's) */
+	readonly Material?: Exclude<MaterialName, "Default">;
 	/** Whether it is dark, when its base does not say it right. */
 	readonly Dark?: boolean;
 	/** A font file: an absolute path, or one from the current folder. */

@@ -149,5 +149,9 @@ test("a misspelled key does not compile", () => {
 	const wrong = defineTheme({ Name: "Typo", Colors: { Pannel: "#000000" } });
 	// @ts-expect-error: a color is written #RRGGBB
 	const bare = defineTheme({ Name: "Bare", Accent: "22D3EE" });
-	expect([wrong.Name, bare.Name]).toEqual(["Typo", "Bare"]);
+	// @ts-expect-error: Default puts a widget back to the material of its theme; a theme has no such thing
+	const reset = defineTheme({ Name: "Reset", Material: "Default" });
+	// (a style can, as a widget can)
+	const style = defineTheme({ Name: "Styled", Styles: [{ Class: "plain", Material: "Default" }] });
+	expect([wrong.Name, bare.Name, reset.Name, style.Name]).toEqual(["Typo", "Bare", "Reset", "Styled"]);
 });

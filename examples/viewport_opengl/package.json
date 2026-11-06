@@ -1,0 +1,19 @@
+{
+  "name": "example-viewport_opengl",
+  "description": "An OpenGL scene in the native child window of a viewport, through bun:ffi: Raven's viewport_opengl in TSX, X11 only",
+  "module": "src/index.tsx",
+  "type": "module",
+  "private": true,
+  "scripts": {
+    "dev": "bun run src/index.tsx",
+    "typecheck": "bun check"
+  },
+  "dependencies": {
+    "@decky.fx/raven-react": "workspace:*",
+    "react": "^19.2.0"
+  },
+  "devDependencies": {
+    "@types/bun": "latest",
+    "@types/react": "^19"
+  }
+}

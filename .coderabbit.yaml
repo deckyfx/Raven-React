@@ -1,0 +1,28 @@
+# yaml-language-server: $schema=https://coderabbit.ai/integrations/schema.v2.json
+# What CodeRabbit should know when it reviews this repository.
+reviews:
+  profile: chill
+  path_instructions:
+    - path: "examples/**"
+      instructions: |
+        Each folder is a port to TSX of the example of the same name in Raven
+        (https://github.com/oscar-soirey/Raven, folder `examples/<name>`, at the
+        commit pinned by `RAVEN_VERSION`). A port does what its original does.
+
+        - Report real bugs: crashes, lost data, wrong results, leaks, stale state,
+          React rules broken. Report them even when the original has them too.
+        - Do not report behaviour, text or looks only because they could be
+          different, when they are what the original does. Do not ask a port to
+          add features the original does not have.
+
+        Checked already, and not to be raised again:
+        - effects: a `Border` whose `Effect` is a shader file animates without
+          `EffectAnimate`. Raven creates that shader with `R_SHADER_ANIMATED`.
+        - viewport_vulkan: the right pane draws with `-angle`, and its background
+          is black. Both are what the original does (`main.c`, `on_draw`).
+        - glass: the "Dark glass" switch uses the built-in action `theme.toggle`,
+          as the original does. Whether to change that is the maintainer's open
+          decision.
+        - themes: the link "Open the documentation" in `assets/notes.md` fires
+          the action `themes.docs`, which only sets a status. That is the
+          original's text: the link shows that Markdown can fire an action.

@@ -120,12 +120,25 @@ export const WEB_EVENT_LOADED = 0x04a3;
  */
 export function listen(view: ViewId, onEvent: (event: number) => void, onMessage: (message: string) => void): () => void {
 	const event = new JSCallback((_view: number, kind: number): void => onEvent(kind), { args: ["u32", "i32", "ptr"], returns: "void" });
-	const message = new JSCallback(
-		(_view: number, text: Pointer | null): void => onMessage(text ? new CString(text).toString() : ""),
-		{ args: ["u32", "ptr", "ptr"], returns: "void" },
-	);
-	web.Rweb_view_set_event_callback(view, event.ptr, null);
-	web.Rweb_view_set_message_callback(view, message.ptr, null);
+	let message: JSCallback | null = null;
+	try {
+		message = new JSCallback(
+			(_view: number, text: Pointer | null): void => onMessage(text ? new CString(text).toString() : ""),
+			{ args: ["u32", "ptr", "ptr"], returns: "void" },
+		);
+		web.Rweb_view_set_event_callback(view, event.ptr, null);
+		web.Rweb_view_set_message_callback(view, message.ptr, null);
+	} catch (error) {
+		// (nothing is listening then: the callbacks made so far are freed, and Raven is given none of them)
+		if (web.Rweb_view_is_valid(view)) {
+			web.Rweb_view_set_event_callback(view, null, null);
+			web.Rweb_view_set_message_callback(view, null, null);
+		}
+		event.close();
+		message?.close();
+		throw error;
+	}
+	const registered = message;
 	return () => {
 		// (the view may be gone already, with its window)
 		if (web.Rweb_view_is_valid(view)) {
@@ -133,6 +146,6 @@ export function listen(view: ViewId, onEvent: (event: number) => void, onMessage
 			web.Rweb_view_set_message_callback(view, null, null);
 		}
 		event.close();
-		message.close();
+		registered.close();
 	};
 }

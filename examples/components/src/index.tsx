@@ -68,7 +68,8 @@ function buildCardDocument(added: number): raven.Rid {
 /** The whole window. */
 function App(): ReactNode {
 	const cards = useRef<WidgetInstance>(null);
-	const [added, setAdded] = useState(0);
+	/** How many cards were added from C: their titles and numbers follow from it. */
+	const addedCount = useRef(0);
 	const [status, setStatus] = useState(declaredTags);
 	const [source, setSource] = useState('<!-- press "Add a card" -->');
 
@@ -91,14 +92,16 @@ function App(): ReactNode {
 
 	/** The document becomes widgets, beside the ones React made: `<Card>` is expanded as from a file. */
 	const addCard = (): void => {
-		const document = buildCardDocument(added);
+		// (a ref, not state: two clicks before React renders again would read the same count, and make the same card)
+		const number = addedCount.current;
+		const document = buildCardDocument(number);
 		const widget = raven.Rxml_document_create_widget(document);
 		if (widget !== raven.R_INVALID_ID && cards.current) {
 			raven.Rwidget_add_child(cards.current.widget, widget);
-			setAdded(added + 1);
+			addedCount.current = number + 1;
 			// and it can be written back as text
 			setSource(raven.Rxml_document_to_string(document) ?? "");
-			setStatus(added === 0 ? "1 card added from C." : 'Several cards added from C; "Remove" takes one away.');
+			setStatus(number === 0 ? "1 card added from C." : 'Several cards added from C; "Remove" takes one away.');
 		}
 		raven.Rxml_document_destroy(document);
 	};

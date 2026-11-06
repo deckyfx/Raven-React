@@ -106,6 +106,8 @@ type PanelMounted = (widget: raven.Rid, key: number) => void;
  */
 function EditorPanel({ panel, onMounted }: { readonly panel: EditorPanelState; readonly onMounted: PanelMounted }): ReactNode {
 	const editor = useRef<WidgetInstance>(null);
+	// Once, when the panel is made: a panel never changes its language after it is added, and
+	// `onMounted` is a stable callback, so there is nothing for this to run again for.
 	useEffect(() => {
 		const id = editor.current?.widget;
 		if (id !== undefined) {

@@ -26,9 +26,11 @@ jobs:
           # the oldest Ubuntu available: a library built here runs on newer glibc, not older
           - { target: linux-x64, os: ubuntu-22.04, library: build/libraven.so, test: true }
           - { target: linux-arm64, os: ubuntu-22.04-arm, library: build/libraven.so, test: true }
-          - { target: darwin-arm64, os: macos-14, library: build/libraven.dylib, cmake: "-DCMAKE_OSX_ARCHITECTURES=arm64", test: true }
+          # macos-14 was retired by GitHub (2026-11-02). The target stays 14.0, what the libraries built
+          # there asked for: without it, a library built on macos-15 would not load on older systems
+          - { target: darwin-arm64, os: macos-15, library: build/libraven.dylib, cmake: "-DCMAKE_OSX_ARCHITECTURES=arm64 -DCMAKE_OSX_DEPLOYMENT_TARGET=14.0", test: true }
           # built on Apple Silicon for Intel, so it cannot run here
-          - { target: darwin-x64, os: macos-14, library: build/libraven.dylib, cmake: "-DCMAKE_OSX_ARCHITECTURES=x86_64", test: false }
+          - { target: darwin-x64, os: macos-15, library: build/libraven.dylib, cmake: "-DCMAKE_OSX_ARCHITECTURES=x86_64 -DCMAKE_OSX_DEPLOYMENT_TARGET=14.0", test: false }
           # the C runtime inside the DLL, so that nothing needs installing with it
           - { target: win32-x64, os: windows-latest, library: build/bin/Release/raven.dll, cmake: "-A x64 -DRAVEN_MSVC_STATIC_RUNTIME=ON", test: true }
     defaults:

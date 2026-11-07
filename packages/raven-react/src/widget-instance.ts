@@ -16,6 +16,12 @@ export interface HostNode {
 	update(props: RavenProps): void;
 	applyParentAttributes(): void;
 	append(child: HostNode): void;
+	/** Adds a child while React renders this new node: what is shown elsewhere goes in when it commits. */
+	appendInitial(child: HostNode): void;
+	/** Whether children wait for the commit to go in. */
+	readonly hasWaiting: boolean;
+	/** Puts in the children that waited, once React commits this node. */
+	attachWaiting(): void;
 	insertBefore(child: HostNode, before: HostNode): void;
 	remove(child: HostNode): void;
 	/** Forgets the handlers of this node and of everything under it. */
@@ -202,6 +208,8 @@ export class WidgetInstance implements HostNode {
 	private resolved: ResolvedProps = { attributes: new Map(), handlers: new Map() };
 	/** How many children the widget had when it was made: those of its markup come first. */
 	private madeChildren = 0;
+	/** Adopted children given while React rendered this widget, whose widgets go in when it commits. */
+	private readonly waiting: HostNode[] = [];
 
 	private constructor(
 		private id: r.Rid,
@@ -235,10 +243,8 @@ export class WidgetInstance implements HostNode {
 	 * component may show it again, or move it into another box. Its element destroys it.
 	 */
 	static adopt(id: r.Rid): WidgetInstance {
-		const parent = r.Rwidget_get_parent(id);
-		if (parent !== r.R_INVALID_ID) {
-			r.Rwidget_remove_child(parent, id);
-		}
+		// (it stays where it is shown: React may drop the render that made this, and Raven moves a
+		// widget it adds from the parent it had)
 		return new WidgetInstance(id, ADOPTED_TAG);
 	}
 
@@ -503,6 +509,56 @@ export class WidgetInstance implements HostNode {
 		if (this.holds(child) && this.id === r.R_INVALID_ID) {
 			RavenError.throw(`raven-react: <${child.tag}> must be inside a <Window>`);
 		}
+	}
+
+	/**
+	 * Adds a child while React renders this new widget. The widget of an adopted child is shown
+	 * elsewhere until React commits, which it may never do: it goes in with `attachWaiting`.
+	 */
+	appendInitial(child: HostNode): void {
+		if (child.tag !== ADOPTED_TAG) {
+			this.append(child);
+			return;
+		}
+		this.checkHolds(child);
+		this.children.push(child);
+		child.setParent(this);
+		this.waiting.push(child);
+	}
+
+	/** Whether adopted children wait for the commit to go in. */
+	get hasWaiting(): boolean {
+		return this.waiting.length > 0;
+	}
+
+	/** Puts in the widgets of the adopted children, in their places, once React commits this widget. */
+	attachWaiting(): void {
+		const waiting = new Set(this.waiting.splice(0));
+		// (a new widget: those Raven made from its markup come first, then those of React)
+		let position = this.madeChildren;
+		for (const child of this.children) {
+			const widget = child.nativeWidget;
+			if (!this.holds(child) || widget === null || !r.Rwidget_is_valid(widget)) {
+				continue;
+			}
+			if (waiting.has(child)) {
+				r.Rwidget_insert_child(this.id, widget, position);
+				position++;
+			} else if (r.Rwidget_get_parent(widget) === this.id) {
+				position = this.positionOf(widget) + 1;
+			}
+		}
+	}
+
+	/** Where a widget is among those of this one, or -1. */
+	private positionOf(widget: r.Rid): number {
+		const count = r.Rwidget_get_child_count(this.id);
+		for (let position = 0; position < count; position++) {
+			if (r.Rwidget_get_child(this.id, position) === widget) {
+				return position;
+			}
+		}
+		return -1;
 	}
 
 	/** Adds a child at the end. A child already here moves to the end. */

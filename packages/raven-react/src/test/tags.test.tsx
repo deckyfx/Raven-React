@@ -1,7 +1,7 @@
 /** React components as tags of Raven: built by Raven from XML, as `<Button>` is, with no declaration in XML. */
 
 import { afterAll, afterEach, beforeAll, expect, spyOn, test } from "bun:test";
-import { useEffect, type ReactNode } from "react";
+import { startTransition, Suspense, use, useEffect, useState, type ReactNode } from "react";
 import * as r from "../raven";
 import { Border, createWindow, HBox, Island, Label, RavenRoot, registerTag, VBox, Window, type WindowInstance } from "../index";
 import { RavenError } from "../errors";
@@ -310,6 +310,106 @@ test("the widgets of the children stay alive when the island the component put t
 	expect(r.Rwidget_set_attribute(islanded, "On", "true")).toBeTruthy();
 	await settle();
 	expect(r.Rwidget_get_parent(kept)).toBe(r.Rwindow_get_island(window));
+	expect(errors).toEqual([]);
+});
+
+test("the widgets of the children are not shown when the component does not show them from the start", async () => {
+	unregister.push(registerTag("Folding", Folding, { attributes: { Open: "boolean" } }));
+	const card = await build('<Folding Name="f" Open="false"><Label Name="kept"/></Folding>');
+	const kept = r.Rwidget_find(card, "kept");
+	expect(kept).toBe(r.R_INVALID_ID);
+	expect(namesUnder(card)).toEqual(["folding-body"]);
+	expect(r.Rwidget_set_attribute(card, "Open", "true")).toBeTruthy();
+	await settle();
+	expect(namesUnder(r.Rwidget_find(card, "folding-body"))).toEqual(["folding-title", "kept"]);
+	// and those it never showed go with the element
+	const shown = r.Rwidget_find(card, "kept");
+	r.Rwidget_set_attribute(card, "Open", "false");
+	await settle();
+	r.Rwidget_destroy(card);
+	await settle();
+	expect(r.Rwidget_is_valid(shown)).toBeFalsy();
+	expect(errors).toEqual([]);
+});
+
+/** Never settles: what waits for it suspends for good. */
+const never = new Promise<never>(() => {});
+
+/** Holds a render back for good. */
+function Waiting(): ReactNode {
+	return use(never);
+}
+
+/** Moves its children into a box beside something that is not ready, in a transition. */
+let moveLater: (() => void) | null = null;
+
+function Moving({ Note = "", children }: { readonly Note?: string; readonly children?: ReactNode }): ReactNode {
+	const [moved, setMoved] = useState(false);
+	moveLater = () => startTransition(() => setMoved(true));
+	return (
+		<Suspense fallback={null}>
+			<VBox Name="moving-body">
+				<Label>{Note}</Label>
+				{moved ? (
+					<>
+						<HBox Name="moving-box">{children}</HBox>
+						<Waiting />
+					</>
+				) : (
+					children
+				)}
+			</VBox>
+		</Suspense>
+	);
+}
+
+test("a render React does not commit leaves the widgets of the children where they are shown", async () => {
+	unregister.push(registerTag("Moving", Moving, { attributes: { Note: "string" } }));
+	const card = await build('<Moving Name="m"><Label Name="kept"/></Moving>');
+	const kept = r.Rwidget_find(card, "kept");
+	const body = r.Rwidget_find(card, "moving-body");
+	expect(r.Rwidget_get_parent(kept)).toBe(body);
+	moveLater?.();
+	await settle(80);
+	// (the transition waits: what is shown stays, and the widget with it)
+	expect(r.Rwidget_find(card, "moving-box")).toBe(r.R_INVALID_ID);
+	expect(r.Rwidget_get_parent(kept)).toBe(body);
+	// (and so does it after a render that commits, with the box of the other one made but not shown)
+	expect(r.Rwidget_set_attribute(card, "Note", "again")).toBeTruthy();
+	await settle(80);
+	expect(r.Rwidget_get_parent(kept)).toBe(body);
+	expect(errors).toEqual([]);
+});
+
+/** Moves its children into a window of its own beside something that is not ready, in a transition. */
+function MovingOut({ children }: { readonly children?: ReactNode }): ReactNode {
+	const [moved, setMoved] = useState(false);
+	moveLater = () => startTransition(() => setMoved(true));
+	return (
+		<Suspense fallback={null}>
+			<VBox Name="moving-body">
+				{moved ? (
+					<>
+						<Window Title="Out" Width={200} Height={120}>{children}</Window>
+						<Waiting />
+					</>
+				) : (
+					children
+				)}
+			</VBox>
+		</Suspense>
+	);
+}
+
+test("a render React does not commit leaves the widgets of the children where they are shown, out of a window too", async () => {
+	unregister.push(registerTag("MovingOut", MovingOut, {}));
+	const card = await build('<MovingOut Name="m"><Label Name="kept"/></MovingOut>');
+	const kept = r.Rwidget_find(card, "kept");
+	const body = r.Rwidget_find(card, "moving-body");
+	expect(r.Rwidget_get_parent(kept)).toBe(body);
+	moveLater?.();
+	await settle(80);
+	expect(r.Rwidget_get_parent(kept)).toBe(body);
 	expect(errors).toEqual([]);
 });
 

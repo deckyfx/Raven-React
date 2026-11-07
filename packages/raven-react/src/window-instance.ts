@@ -157,6 +157,20 @@ export class WindowInstance implements HostNode {
 		}
 	}
 
+	appendInitial(child: HostNode): void {
+		if (child !== this.island && !this.takeIsland(child)) {
+			this.content.appendInitial(child);
+		}
+	}
+
+	get hasWaiting(): boolean {
+		return this.content.hasWaiting;
+	}
+
+	attachWaiting(): void {
+		this.content.attachWaiting();
+	}
+
 	insertBefore(child: HostNode, before: HostNode): void {
 		if (child === this.island || this.takeIsland(child)) {
 			return;

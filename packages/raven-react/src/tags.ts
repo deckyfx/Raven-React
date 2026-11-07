@@ -93,6 +93,8 @@ function place(widget: r.Rid, element: Element): void {
 	const slots: Record<string, r.Rid[]> = {};
 	for (const child of childrenOf(widget)) {
 		if (!intos.has(child)) {
+			// (taken out, as those of <Into>: only what the component renders is shown)
+			r.Rwidget_remove_child(widget, child);
 			children.push(child);
 			continue;
 		}

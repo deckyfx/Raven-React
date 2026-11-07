@@ -176,9 +176,15 @@ await runApp(<App />, options, { setup: () => raven.Rtheme_use(loadTheme(ocean))
 A component can be a tag Raven knows, built by Raven from XML as `<Button>` is: in a document made by code, in `Markup`, in a file of someone else. There is no XML declaration of it: the component is the only one.
 
 ```tsx
-registerTag("Card", Card, {
-	attributes: { Title: "string", Wide: "boolean", Count: "number" },
-	slots: ["footer"],
+await runApp(<App />, options, {
+	// (once Raven started: Raven refuses a tag before)
+	setup: () => {
+		registerTag("Card", Card, {
+			attributes: { Title: "string", Wide: "boolean", Count: "number" },
+			slots: ["footer"],
+		});
+		registerTag("Stat", Stat, { attributes: { Label: "string", Value: "string" } });
+	},
 });
 ```
 
@@ -189,7 +195,7 @@ registerTag("Card", Card, {
 </Card>
 ```
 
-`attributes` lists the attributes it takes, with the kind of their prop, checked against the component's props; the others stay with the widget (`Name`, `Width`, `Slot`...), and a value of the wrong kind is reported by Raven. The widgets of the children go where the component renders `children`, and those of `<Into Name="...">` where it renders the prop of that name, one of `slots`, with no box around them. `Rwidget_set_attribute` renders it again, and destroying the widget unmounts it. Each element is a root of its own, so context does not reach it from around it. `registerTag` returns what unregisters the tag.
+`attributes` lists the attributes it takes, with the kind of their prop, checked against the component's props; the others stay with the widget (`Name`, `Width`, `Slot`...), and a value of the wrong kind is reported by Raven. The widgets of the children go where the component renders `children`, and those of `<Into Name="...">` where it renders the prop of that name, one of `slots`, with no box around them. Those it does not render are not shown, and stay alive until the element is destroyed. `Rwidget_set_attribute` renders it again, and destroying the widget unmounts it. Each element is a root of its own, so context does not reach it from around it. `registerTag` returns what unregisters the tag.
 
 ## Going beyond props
 

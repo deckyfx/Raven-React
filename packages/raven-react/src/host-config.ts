@@ -53,11 +53,13 @@ const hostConfig: RavenHostConfig = {
 	},
 	createTextInstance: (text) => RavenError.throw(`raven-react: text must be alone in a widget: "${text}"`),
 	shouldSetTextContent: (_tag, props) => childrenText(props.children) !== null,
-	appendInitialChild: (parent, child) => parent.append(child),
+	appendInitialChild: (parent, child) => parent.appendInitial(child),
 	finalizeInitialChildren: (instance) => {
 		placedInThisCommit.push(instance);
-		return false;
+		// (`commitMount` runs only for what React commits)
+		return instance.hasWaiting;
 	},
+	commitMount: (instance) => instance.attachWaiting(),
 	getPublicInstance: (instance) => instance,
 	getRootHostContext: () => HOST_CONTEXT,
 	getChildHostContext: (parent, tag) => {

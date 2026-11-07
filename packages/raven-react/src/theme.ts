@@ -76,7 +76,10 @@ export interface PartProperties {
 	readonly ShadowColor?: ThemeColor;
 	readonly ShadowSize?: number;
 	readonly Shape?: PartShape;
-	/** Light of its color around it, from 0 to 1: a `Label`, a `Border`, and the pins, links, nodes, clips and keys of node graphs and timelines. */
+	/**
+	 * Light of its color around it, from 0 to 1: a `Label` (not one with `Markdown`, which Raven
+	 * draws without it), a `Border`, and the pins, links, nodes, clips and keys of node graphs and timelines.
+	 */
 	readonly Glow?: number;
 	/** The color it fades to: a header of a node, a clip of the `Gradient` form. */
 	readonly Gradient?: ThemeColor;

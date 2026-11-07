@@ -72,13 +72,17 @@ export interface PartProperties {
 	readonly Size?: number;
 	/** From 0 to 1. */
 	readonly Opacity?: number;
-	/** The shadow it drops: popups, and a `Border`, whose own `Shadow` comes before `ShadowSize`. */
+	/**
+	 * The shadow it drops: popups, and a `Border`, whose own `Shadow` comes before `ShadowSize`.
+	 * A `Border` of glass without an `Effect` takes only `ShadowSize`.
+	 */
 	readonly ShadowColor?: ThemeColor;
 	readonly ShadowSize?: number;
 	readonly Shape?: PartShape;
 	/**
 	 * Light of its color around it, from 0 to 1: a `Label` (not one with `Markdown`, which Raven
-	 * draws without it), a `Border`, and the pins, links, nodes, clips and keys of node graphs and timelines.
+	 * draws without it), a `Border` (not one of glass without an `Effect`), and the pins, links,
+	 * nodes, clips, keys, markers and playhead of node graphs and timelines.
 	 */
 	readonly Glow?: number;
 	/** The color it fades to: a header of a node, a clip of the `Gradient` form. */

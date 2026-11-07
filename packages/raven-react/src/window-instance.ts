@@ -157,6 +157,20 @@ export class WindowInstance implements HostNode {
 		}
 	}
 
+	appendInitial(child: HostNode): void {
+		if (child !== this.island && !this.takeIsland(child)) {
+			this.content.appendInitial(child);
+		}
+	}
+
+	get hasWaiting(): boolean {
+		return this.content.hasWaiting;
+	}
+
+	attachWaiting(): void {
+		this.content.attachWaiting();
+	}
+
 	insertBefore(child: HostNode, before: HostNode): void {
 		if (child === this.island || this.takeIsland(child)) {
 			return;
@@ -178,7 +192,8 @@ export class WindowInstance implements HostNode {
 		this.island = null;
 		(child as WidgetInstance).setHolder(null);
 		if (this.isOpen) {
-			// (this deletes it: the window owns it)
+			// (this deletes it: the window owns it. What it holds of registered tags is theirs)
+			(child as WidgetInstance).releaseAdopted();
 			r.Rwindow_set_island(this.window, r.R_INVALID_ID);
 		}
 		child.dispose();
@@ -194,6 +209,11 @@ export class WindowInstance implements HostNode {
 	}
 
 	dispose(): void {
+		if (this.isOpen) {
+			// (the window destroys what it holds: those of registered tags are theirs)
+			this.content.releaseAdopted();
+			this.island?.releaseAdopted();
+		}
 		this.content.disposeDetached();
 		this.island?.disposeDetached();
 		if (this.isOpen) {

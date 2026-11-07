@@ -3,6 +3,9 @@ import { RavenError } from "./errors";
 import { applyHandlers, controlledSync, eventScope, forgetHandlers, setVirtualItems, virtualItemsOf } from "./events";
 import { CLEARED, resolveProps, type RavenProps, type ResolvedProps, type TreeItem } from "./props";
 
+/** The host type of a widget Raven made and React only places: `adopt`. */
+export const ADOPTED_TAG = "raven-react:adopted";
+
 /** What React's tree is made of: a widget, or a window, which is no widget of its parent. */
 export interface HostNode {
 	readonly tag: string;
@@ -13,6 +16,12 @@ export interface HostNode {
 	update(props: RavenProps): void;
 	applyParentAttributes(): void;
 	append(child: HostNode): void;
+	/** Adds a child while React renders this new node: what is shown elsewhere goes in when it commits. */
+	appendInitial(child: HostNode): void;
+	/** Whether children wait for the commit to go in. */
+	readonly hasWaiting: boolean;
+	/** Puts in the children that waited, once React commits this node. */
+	attachWaiting(): void;
 	insertBefore(child: HostNode, before: HostNode): void;
 	remove(child: HostNode): void;
 	/** Forgets the handlers of this node and of everything under it. */
@@ -199,6 +208,8 @@ export class WidgetInstance implements HostNode {
 	private resolved: ResolvedProps = { attributes: new Map(), handlers: new Map() };
 	/** How many children the widget had when it was made: those of its markup come first. */
 	private madeChildren = 0;
+	/** Adopted children given while React rendered this widget, whose widgets go in when it commits. */
+	private readonly waiting: HostNode[] = [];
 
 	private constructor(
 		private id: r.Rid,
@@ -224,6 +235,17 @@ export class WidgetInstance implements HostNode {
 	/** An instance for a widget React does not own: the top of a root. */
 	static forContainer(id: r.Rid): WidgetInstance {
 		return new WidgetInstance(id, "");
+	}
+
+	/**
+	 * A widget Raven made, a child of a registered tag in XML: React places it where it is
+	 * rendered, and sets nothing on it. Taken out of the tree, it is only let go, alive: the
+	 * component may show it again, or move it into another box. Its element destroys it.
+	 */
+	static adopt(id: r.Rid): WidgetInstance {
+		// (it stays where it is shown: React may drop the render that made this, and Raven moves a
+		// widget it adds from the parent it had)
+		return new WidgetInstance(id, ADOPTED_TAG);
 	}
 
 	/** Makes the widget of a tag in Raven. */
@@ -383,8 +405,8 @@ export class WidgetInstance implements HostNode {
 
 	/** Goes from the last props to new ones, setting only what changed. */
 	update(props: RavenProps): void {
-		// (its window can be gone already: closed by the user, with no OnClose to ask first)
-		if (!r.Rwidget_is_valid(this.id)) {
+		// (its window can be gone already: closed by the user, with no OnClose to ask first. An adopted widget has no props of React)
+		if (!r.Rwidget_is_valid(this.id) || this.tag === ADOPTED_TAG) {
 			return;
 		}
 		const next = resolveProps(props);
@@ -489,6 +511,56 @@ export class WidgetInstance implements HostNode {
 		}
 	}
 
+	/**
+	 * Adds a child while React renders this new widget. The widget of an adopted child is shown
+	 * elsewhere until React commits, which it may never do: it goes in with `attachWaiting`.
+	 */
+	appendInitial(child: HostNode): void {
+		if (child.tag !== ADOPTED_TAG) {
+			this.append(child);
+			return;
+		}
+		this.checkHolds(child);
+		this.children.push(child);
+		child.setParent(this);
+		this.waiting.push(child);
+	}
+
+	/** Whether adopted children wait for the commit to go in. */
+	get hasWaiting(): boolean {
+		return this.waiting.length > 0;
+	}
+
+	/** Puts in the widgets of the adopted children, in their places, once React commits this widget. */
+	attachWaiting(): void {
+		const waiting = new Set(this.waiting.splice(0));
+		// (a new widget: those Raven made from its markup come first, then those of React)
+		let position = this.madeChildren;
+		for (const child of this.children) {
+			const widget = child.nativeWidget;
+			if (!this.holds(child) || widget === null || !r.Rwidget_is_valid(widget)) {
+				continue;
+			}
+			if (waiting.has(child)) {
+				r.Rwidget_insert_child(this.id, widget, position);
+				position++;
+			} else if (r.Rwidget_get_parent(widget) === this.id) {
+				position = this.positionOf(widget) + 1;
+			}
+		}
+	}
+
+	/** Where a widget is among those of this one, or -1. */
+	private positionOf(widget: r.Rid): number {
+		const count = r.Rwidget_get_child_count(this.id);
+		for (let position = 0; position < count; position++) {
+			if (r.Rwidget_get_child(this.id, position) === widget) {
+				return position;
+			}
+		}
+		return -1;
+	}
+
 	/** Adds a child at the end. A child already here moves to the end. */
 	append(child: HostNode): void {
 		this.checkHolds(child);
@@ -529,9 +601,11 @@ export class WidgetInstance implements HostNode {
 	/** Removes a child and deletes it with everything under it. */
 	remove(child: HostNode): void {
 		child.forgetTree();
-		// (the window may be gone already, closed by the user, with its widgets)
-		if (this.holds(child) && r.Rwidget_is_valid(child.nativeWidget as r.Rid)) {
-			r.Rwidget_remove_child(this.id, child.nativeWidget as r.Rid);
+		// (the window may be gone already, closed by the user, with its widgets. An adopted widget
+		// may be in another place already, where the component moved it)
+		const widget = child.nativeWidget;
+		if (this.holds(child) && widget !== null && r.Rwidget_is_valid(widget) && r.Rwidget_get_parent(widget) === this.id) {
+			r.Rwidget_remove_child(this.id, widget);
 		}
 		const index = this.children.indexOf(child);
 		if (index >= 0) {
@@ -559,7 +633,32 @@ export class WidgetInstance implements HostNode {
 		}
 	}
 
+	/**
+	 * Takes the adopted widgets of this tree out of the widgets that hold them, before those are
+	 * destroyed: they belong to the element of their registered tag, which may show them again.
+	 * Those the component already moved elsewhere are left where they are.
+	 */
+	releaseAdopted(): void {
+		for (const child of this.children) {
+			if (child.tag === ADOPTED_TAG) {
+				const widget = child.nativeWidget;
+				if (widget !== null && r.Rwidget_is_valid(widget) && r.Rwidget_get_parent(widget) === this.id) {
+					r.Rwidget_remove_child(this.id, widget);
+				}
+			} else if (child instanceof WidgetInstance) {
+				child.releaseAdopted();
+			}
+		}
+	}
+
 	dispose(): void {
+		if (this.tag === ADOPTED_TAG) {
+			// (its parent let it go, unless it was already placed elsewhere: it belongs to the element of its registered tag)
+			return;
+		}
+		if (r.Rwidget_is_valid(this.id)) {
+			this.releaseAdopted();
+		}
 		this.disposeDetached();
 		if (r.Rwidget_is_valid(this.id)) {
 			r.Rwidget_destroy(this.id);

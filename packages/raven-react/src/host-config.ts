@@ -2,9 +2,10 @@ import { createContext } from "react";
 import ReactReconciler from "react-reconciler";
 import { DefaultEventPriority, DiscreteEventPriority } from "react-reconciler/constants";
 import { RavenError } from "./errors";
+import * as r from "./raven";
 import { eventScope, updatePriority } from "./events";
 import { childrenText, type RavenProps } from "./props";
-import { WidgetInstance, type HostNode } from "./widget-instance";
+import { ADOPTED_TAG, WidgetInstance, type HostNode } from "./widget-instance";
 import { WindowInstance } from "./window-instance";
 
 /** React asks for a context per level of the tree. Raven has no use for one, but it must exist. */
@@ -45,15 +46,20 @@ const hostConfig: RavenHostConfig = {
 		if (tag === "Window") {
 			return WindowInstance.create(props);
 		}
+		if (tag === ADOPTED_TAG) {
+			return WidgetInstance.adopt(typeof props.widget === "number" ? props.widget : r.R_INVALID_ID);
+		}
 		return tag === "Separator" && context.inMenu ? WidgetInstance.create("MenuItem", menuSeparator(props)) : WidgetInstance.create(tag, props);
 	},
 	createTextInstance: (text) => RavenError.throw(`raven-react: text must be alone in a widget: "${text}"`),
 	shouldSetTextContent: (_tag, props) => childrenText(props.children) !== null,
-	appendInitialChild: (parent, child) => parent.append(child),
+	appendInitialChild: (parent, child) => parent.appendInitial(child),
 	finalizeInitialChildren: (instance) => {
 		placedInThisCommit.push(instance);
-		return false;
+		// (`commitMount` runs only for what React commits)
+		return instance.hasWaiting;
 	},
+	commitMount: (instance) => instance.attachWaiting(),
 	getPublicInstance: (instance) => instance,
 	getRootHostContext: () => HOST_CONTEXT,
 	getChildHostContext: (parent, tag) => {

@@ -137,6 +137,41 @@ for (let index = 0; index < r.Rxml_get_tag_count(); index++) {
 	out.push(`export const ${name} = tag<{ ${propsOf(name)} }>(${JSON.stringify(name)});`);
 	components++;
 }
+/** The names of a group every widget has (`Color.Window`, `Metric.FontSize`), or the choices of one of its attributes. */
+function commonNames(prefix: string): string[] {
+	const names: string[] = [];
+	const info = new r.RXmlAttributeInfo();
+	// (Spacer has nothing of its own: what it has, every widget has)
+	for (let index = 0; index < r.Rxml_get_attribute_count("Spacer"); index++) {
+		if (r.Rxml_get_attribute_info("Spacer", index, info) && info.name) {
+			if (info.name.startsWith(`${prefix}.`)) {
+				names.push(info.name.slice(prefix.length + 1));
+			} else if (info.name === prefix && info.choices) {
+				names.push(...info.choices.split("|"));
+			}
+		}
+	}
+	if (names.length === 0) {
+		// (a union of nothing is no TypeScript: better to stop than to write a broken file)
+		console.error(`the schema of Raven gives no ${prefix} names: the types of themes cannot be written`);
+		process.exit(1);
+	}
+	return names;
+}
+
+// what themes take, by name: theme.ts types its colors, metrics and materials with these
+out.push(
+	"",
+	"/** A role of the colors of a theme: `Color={{ Window: ... }}`, and the colors of `defineTheme`. */",
+	`export type ColorRole = ${commonNames("Color").map((name) => JSON.stringify(name)).join(" | ")};`,
+	"",
+	"/** A metric of a theme: `Metric={{ FontSize: ... }}`, and the metrics of `defineTheme`. */",
+	`export type MetricName = ${commonNames("Metric").map((name) => JSON.stringify(name)).join(" | ")};`,
+	"",
+	"/** What a widget, or a theme, is made of. */",
+	`export type MaterialName = ${commonNames("Material").map((name) => JSON.stringify(name)).join(" | ")};`,
+);
+
 const path = process.argv[2] ?? "src/components.generated.ts";
 const text = `${out.join("\n")}\n`;
 r.Rshutdown();

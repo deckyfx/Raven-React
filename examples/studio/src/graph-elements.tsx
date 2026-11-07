@@ -18,6 +18,8 @@ export interface NodeSpec {
 	readonly x: number;
 	readonly y: number;
 	readonly color?: string;
+	/** An image file shown before its title. */
+	readonly icon?: string;
 	readonly inputs?: readonly PinSpec[];
 	readonly outputs?: readonly PinSpec[];
 	/** Widgets inside the node, as React elements. */
@@ -39,14 +41,22 @@ function addPins(graph: raven.Rid, node: number, pins: readonly PinSpec[], add: 
 	}
 }
 
-/** The color of the links and pins of a type. Goes before the nodes, in the children of `<NodeGraph>`. */
-export function PinType({ graph, name, color }: { graph: GraphRef; name: string; color: string }): null {
+/** The shapes a pin can have. */
+export type PinShape = "Circle" | "Ring" | "Square" | "Diamond" | "Triangle" | "Arrow";
+
+/**
+ * The color of the links and pins of a type, and the shape of its pins (a circle without one).
+ * Goes before the nodes, in the children of `<NodeGraph>`.
+ */
+export function PinType({ graph, name, color, shape }: { graph: GraphRef; name: string; color: string; shape?: PinShape }): null {
 	useEffect(() => {
 		const owner = graph.current;
 		if (owner) {
 			raven.Rnode_graph_set_type_color(owner.widget, name, ...hexColor(color));
+			// ("Default" gives back the shape of the graph)
+			raven.Rnode_graph_set_type_style(owner.widget, name, "Shape", shape ?? "Default");
 		}
-	}, [graph, name, color]);
+	}, [graph, name, color, shape]);
 	return null;
 }
 
@@ -73,6 +83,9 @@ export function GraphNode({ graph, spec, onSelected }: { graph: GraphRef; spec: 
 		addPins(id, node, spec.outputs ?? [], raven.Rnode_graph_add_output);
 		if (spec.color) {
 			raven.Rnode_graph_set_node_color(id, node, ...hexColor(spec.color));
+		}
+		if (spec.icon) {
+			raven.Rnode_graph_set_node_style(id, node, "Icon", spec.icon);
 		}
 		if (spec.content) {
 			const box = raven.Rwidget_create_from_xml(`<VBox Spacing="6"/>`);

@@ -207,22 +207,28 @@ A function given directly to the C API runs outside what props get. `inEventScop
 
 Children added with `Rwidget_add_child` to a parent React also fills stay in their place, through inserts and when the parent is made again. They are yours to delete.
 
-Web pages need `registerWebView` once, as the `setup` of `runApp`. They are apart from the binding, as a library can be built without them, and `webFunctions()` gives the functions of `raven_web.h`:
+Web pages need `registerWebView` once, as the `setup` of `runApp`, which runs before the first render. They are apart from the binding, as a library can be built without them, and `webFunctions()` gives the functions of `raven_web.h`.
+
+A `WebView` drives a browser of the Chromium family installed on the machine (Chrome, Chromium, Edge...), hidden, and shows its picture: there is none in the package. So show something else when there is no browser (`Rweb_is_available()` is 0), and when the library has no web pages: built with `-DRAVEN_BUILD_WEB=OFF`, `registerWebView` and `webFunctions()` throw a `RavenError`.
 
 ```tsx
-await runApp(<WebView Url="https://example.com" Slot={{ Fill: 1 }} />, { Width: 800, Height: 600 }, { setup: registerWebView });
-```
+/** Whether web pages can be shown, known once `setup` ran. */
+let pages = false;
 
-A `WebView` drives a browser of the Chromium family installed on the machine (Chrome, Chromium, Edge...), hidden, and shows its picture: there is none in the package. Check `webFunctions().Rweb_is_available()` first, and show something else when it is 0. On a library built with `-DRAVEN_BUILD_WEB=OFF`, `webFunctions()` throws a `RavenError` instead, so catch it and show the same thing:
-
-```tsx
-function canShowPages(): boolean {
-	try {
-		return webFunctions().Rweb_is_available() !== 0;
-	} catch {
-		return false;
-	}
+function App(): ReactNode {
+	return pages ? <WebView Url="https://example.com" Slot={{ Fill: 1 }} /> : <Label>No browser to show the page in</Label>;
 }
+
+await runApp(<App />, { Width: 800, Height: 600 }, {
+	setup: () => {
+		try {
+			registerWebView();
+			pages = webFunctions().Rweb_is_available() !== 0;
+		} catch {
+			// (a library without web pages)
+		}
+	},
+});
 ```
 
 The data of a few widgets is given as props. Rows of a `TreeView` have new handles each time `Items` changes. `Markup` holds the elements XML takes inside a widget, and a change to it makes the widget again:
@@ -282,6 +288,16 @@ An application with a tray icon lives on when its last window closes, as a tray 
 ```tsx
 useEffect(() => {
 	const tray = raven.Rtray_create();
+	if (tray === raven.R_INVALID_ID) {
+		return; // (a system with no tray)
+	}
+	// Its picture, as RGBA pixels: without one, some panels show nothing to click.
+	// An orange square here; in practice, the icon of the application.
+	const pixels = new Uint8Array(32 * 32 * 4);
+	for (let index = 0; index < pixels.length; index += 4) {
+		pixels.set([0xe8, 0x59, 0x0c, 0xff], index);
+	}
+	raven.Rtray_set_icon(tray, pixels, 32, 32);
 	raven.Rtray_set_tooltip(tray, "Backup");
 	raven.Rtray_set_clicked_callback(tray, () => raven.Rquit(0));
 	return () => raven.Rtray_destroy(tray);

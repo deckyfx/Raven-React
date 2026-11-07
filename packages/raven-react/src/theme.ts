@@ -60,7 +60,10 @@ export type ThemeMetrics = { readonly [Metric in MetricName]?: number };
 export interface PartProperties {
 	/** What it is filled with; `None`, nothing. */
 	readonly Background?: ThemeColor | "None";
-	/** Its text, marks and glyphs. */
+	/**
+	 * Its text, marks and glyphs. On a `Label` it wins over the label's own `Color`, as Raven
+	 * draws it since commit 5451306 (after the tag v0.2.2); a style's `Text` color gives way to it instead.
+	 */
 	readonly Foreground?: ThemeColor;
 	readonly BorderColor?: ThemeColor;
 	readonly BorderWidth?: number;

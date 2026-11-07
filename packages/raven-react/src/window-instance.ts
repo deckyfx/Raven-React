@@ -194,6 +194,11 @@ export class WindowInstance implements HostNode {
 	}
 
 	dispose(): void {
+		if (this.isOpen) {
+			// (the window destroys what it holds: those of registered tags are theirs)
+			this.content.releaseAdopted();
+			this.island?.releaseAdopted();
+		}
 		this.content.disposeDetached();
 		this.island?.disposeDetached();
 		if (this.isOpen) {

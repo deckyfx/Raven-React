@@ -3,7 +3,7 @@
 import { afterAll, afterEach, beforeAll, expect, spyOn, test } from "bun:test";
 import { useEffect, type ReactNode } from "react";
 import * as r from "../raven";
-import { Border, createWindow, HBox, Label, RavenRoot, registerTag, VBox } from "../index";
+import { Border, createWindow, HBox, Label, RavenRoot, registerTag, VBox, Window, type WindowInstance } from "../index";
 import { RavenError } from "../errors";
 
 let window: r.Rid = r.R_INVALID_ID;
@@ -245,6 +245,39 @@ test("the widgets of the children stay alive when the box the component put them
 	r.Rwidget_destroy(card);
 	await settle();
 	expect(r.Rwidget_is_valid(kept)).toBeFalsy();
+	expect(errors).toEqual([]);
+});
+
+/** The windows Popup opened, in order. */
+const popups: r.Rid[] = [];
+
+/** What it holds, in a window of its own while it is open. */
+function Popup({ Open = true, children }: { readonly Open?: boolean; readonly children?: ReactNode }): ReactNode {
+	return Open ? (
+		<Window Title="Popup" Width={200} Height={120} ref={(made: WindowInstance | null) => void (made && popups.push(made.window))}>
+			{children}
+		</Window>
+	) : null;
+}
+
+test("the widgets of the children stay alive when the window the component put them in is closed, and come back", async () => {
+	unregister.push(registerTag("Popup", Popup, { attributes: { Open: "boolean" } }));
+	popups.length = 0;
+	const popup = await build('<Popup Name="p"><Label Name="kept"/></Popup>');
+	const kept = r.Rwidget_find(popups[0] ?? r.R_INVALID_ID, "kept");
+	expect(kept).not.toBe(r.R_INVALID_ID);
+	expect(r.Rwidget_set_attribute(popup, "Open", "false")).toBeTruthy();
+	await settle();
+	expect(r.Rwindow_is_valid(popups[0] ?? r.R_INVALID_ID)).toBeFalsy();
+	expect(r.Rwidget_is_valid(kept)).toBeTruthy();
+	expect(r.Rwidget_set_attribute(popup, "Open", "true")).toBeTruthy();
+	await settle();
+	expect(r.Rwidget_find(popups[1] ?? r.R_INVALID_ID, "kept")).toBe(kept);
+	// and they go with the element, its window with them
+	r.Rwidget_destroy(popup);
+	await settle();
+	expect(r.Rwidget_is_valid(kept)).toBeFalsy();
+	expect(r.Rwindow_is_valid(popups[1] ?? r.R_INVALID_ID)).toBeFalsy();
 	expect(errors).toEqual([]);
 });
 

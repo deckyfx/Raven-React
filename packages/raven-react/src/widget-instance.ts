@@ -582,7 +582,7 @@ export class WidgetInstance implements HostNode {
 	 * destroyed: they belong to the element of their registered tag, which may show them again.
 	 * Those the component already moved elsewhere are left where they are.
 	 */
-	private releaseAdopted(): void {
+	releaseAdopted(): void {
 		for (const child of this.children) {
 			if (child.tag === ADOPTED_TAG) {
 				const widget = child.nativeWidget;

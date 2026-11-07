@@ -213,7 +213,17 @@ Web pages need `registerWebView` once, as the `setup` of `runApp`. They are apar
 await runApp(<WebView Url="https://example.com" Slot={{ Fill: 1 }} />, { Width: 800, Height: 600 }, { setup: registerWebView });
 ```
 
-A `WebView` drives a browser of the Chromium family installed on the machine (Chrome, Chromium, Edge...), hidden, and shows its picture: there is none in the package. Check `webFunctions().Rweb_is_available()` first, and show something else when it is 0.
+A `WebView` drives a browser of the Chromium family installed on the machine (Chrome, Chromium, Edge...), hidden, and shows its picture: there is none in the package. Check `webFunctions().Rweb_is_available()` first, and show something else when it is 0. On a library built with `-DRAVEN_BUILD_WEB=OFF`, `webFunctions()` throws a `RavenError` instead, so catch it and show the same thing:
+
+```tsx
+function canShowPages(): boolean {
+	try {
+		return webFunctions().Rweb_is_available() !== 0;
+	} catch {
+		return false;
+	}
+}
+```
 
 The data of a few widgets is given as props. Rows of a `TreeView` have new handles each time `Items` changes. `Markup` holds the elements XML takes inside a widget, and a change to it makes the widget again:
 

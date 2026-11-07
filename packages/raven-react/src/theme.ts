@@ -63,6 +63,7 @@ export interface PartProperties {
 	/**
 	 * Its text, marks and glyphs. On a `Label` it wins over the label's own `Color`, as Raven
 	 * draws it since commit 5451306 (after the tag v0.2.2); a style's `Text` color gives way to it instead.
+	 * (oscar-soirey/Raven#54 makes `Foreground` give way too)
 	 */
 	readonly Foreground?: ThemeColor;
 	readonly BorderColor?: ThemeColor;

@@ -25,6 +25,7 @@ const NOT_WIRED: Readonly<Record<string, string>> = {
 	Rset_frame_callback: "not of a widget: shared with useFrame by src/frame.ts",
 	Rxml_set_reload_callback: "not of a widget: XML hot reload, which React has no use for",
 	Rtray_set_clicked_callback: "not of a widget: an icon of the system tray, made with Rtray_create",
+	Rnotification_set_clicked_callback: "not of a widget: the notifications of Rnotification_show, for the whole application",
 	Rviewport_set_draw_callback: "records Vulkan commands while a frame is drawn, on the render thread if there is one: through a ref",
 	Rtile_view_set_drag_data_callback: "rare, and the indices C gives by default are enough: through a ref",
 	Rwidget_set_destroy_callback: "React already says when an element goes: a cleanup of an effect",

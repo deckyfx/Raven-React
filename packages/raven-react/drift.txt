@@ -82,7 +82,7 @@ b843903a05198a0b52a61129206eb579000cf746 ede33eb src/widget/widget.h
 51d429e7006db6d55801a3f88f82631f2970cfc1 ede33eb src/widget/window.c
 6c521f32f01969f23096858c6d823105d3e0f9f3 1092a82 src/widgets/background_blur.c
 2ff2d3f5ade2315cd1293c0dd06e44b9dda16f80 1092a82 src/widgets/block_editor.c
-7008f833edf577f0594e16022c7587f54c519e75 1092a82 src/widgets/border.c
+04be0253a84ef3535f78486ff5594956893b0c4d a472444 src/widgets/border.c
 e83ab151a381b70e683c8d28e979bba4488796cd 1092a82 src/widgets/box_panel.c
 a7b7c3ad63334e323ada7a9b2af682a62221c272 1092a82 src/widgets/breadcrumb.c
 d985dea4ae5e6192ecba534e8049df137bb875d1 1092a82 src/widgets/button.c
@@ -102,7 +102,7 @@ ca94c12a7f5a67f5adf2df9dca38a62dbb1b5d08 1092a82 src/widgets/grid.c
 d152de046588f200d15edf5ab14605b91527987f 1092a82 src/widgets/header_bar.c
 52a62c358f38f1224969dd96a56ff17c44de07dd ede33eb src/widgets/image.c
 07cdfd7e625dac71f8aade95374df5cfbe892f91 1092a82 src/widgets/island.c
-3b8a4f5cd9baf8efce278b6214bc83cdb48e40f3 1092a82 src/widgets/label.c
+bbf52737e37899188b75b6747a27e00508777576 a472444 src/widgets/label.c
 1d4f6202c7662caf0e95905f967d0dfd90145ec6 1092a82 src/widgets/list_view.c
 ae51f9e41c2a48e538f450a1013923a57fe08aa8 1092a82 src/widgets/markdown.c
 e96cc0d1e2bf72712aeb2399db2002ace504ae9e ede33eb src/widgets/menu.c

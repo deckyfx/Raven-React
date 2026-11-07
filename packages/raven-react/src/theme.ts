@@ -72,11 +72,11 @@ export interface PartProperties {
 	readonly Size?: number;
 	/** From 0 to 1. */
 	readonly Opacity?: number;
-	/** The shadow it drops (popups). */
+	/** The shadow it drops: popups, and a `Border`, whose own `Shadow` comes before `ShadowSize`. */
 	readonly ShadowColor?: ThemeColor;
 	readonly ShadowSize?: number;
 	readonly Shape?: PartShape;
-	/** Light of its color around it, from 0 to 1. */
+	/** Light of its color around it, from 0 to 1: a `Label`, a `Border`, and the pins, links, nodes, clips and keys of node graphs and timelines. */
 	readonly Glow?: number;
 	/** The color it fades to: a header of a node, a clip of the `Gradient` form. */
 	readonly Gradient?: ThemeColor;

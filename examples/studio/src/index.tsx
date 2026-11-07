@@ -37,9 +37,9 @@ const THEME_NAMES = THEMES.map(({ name }) => name);
 const LOOKS = ["Auto", "Modern", "Blueprint", "Blender", "Neon"] as const;
 type Look = (typeof LOOKS)[number];
 
-/** A number of the environment, as an index of a list: 0 when it is missing or not one. */
+/** A number of the environment, as an index of a list, read as `atoi` reads it (`1.5` is 1): 0 when it is missing or not one. */
 function startIndex(value: string | undefined, length: number): number {
-	return Math.min(Math.max(Number(value ?? 0) || 0, 0), length - 1);
+	return Math.min(Math.max(Number.parseInt(value ?? "0", 10) || 0, 0), length - 1);
 }
 
 /** The theme and the look to start with: `RAVEN_EXAMPLE_THEME=2` is the third theme, `RAVEN_EXAMPLE_LOOK=3` the fourth look, as for the original. */

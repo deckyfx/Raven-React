@@ -289,13 +289,14 @@ raven.Rnotification_show("Backup", "It is finished", raven.R_NOTIFICATION_NORMAL
 
 What belongs to the system and not to a window has no component: an icon in the tray (`Rtray_create`, `Rtray_set_menu`, `Rtray_set_clicked_callback`), the badge, progress and menu of the taskbar or the Dock (`Rtaskbar_set_badge`, `Rwindow_set_taskbar_progress`), picture in picture (`Rwindow_set_picture_in_picture`), and the inspector of a window, which lists its widgets and picks one with a click (`Rwindow_set_inspector`). Call them from an effect, and undo them in its cleanup.
 
-An application with a tray icon lives on when its last window closes, as a tray application should: `runApp` returns only after `raven.Rquit(0)`, or the action `app.quit`. Give the icon a way to end it, a "Quit" item of its menu for one; the cleanup that destroys the icon still runs then.
+An application with a tray icon lives on when its last window closes, as a tray application should: `runApp` returns only after `raven.Rquit(0)`, or the action `app.quit`. Give the icon a way to end it, a "Quit" item of its menu for one; the cleanup that destroys the icon still runs then. Make it only where the system shows it, `Rtray_is_supported()`: on Linux an icon is made even when no panel runs to show it, and the application would live on with nothing to click. Without one, closing the last window ends it, as usual.
 
 ```tsx
 useEffect(() => {
-	const tray = raven.Rtray_create();
+	// (on Linux, a panel that shows tray icons must be running)
+	const tray = raven.Rtray_is_supported() ? raven.Rtray_create() : raven.R_INVALID_ID;
 	if (tray === raven.R_INVALID_ID) {
-		return; // (a system with no tray)
+		return; // (no tray: the application ends with its last window)
 	}
 	// Its picture, as RGBA pixels: without one, some panels show nothing to click.
 	// An orange square here; in practice, the icon of the application.

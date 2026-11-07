@@ -130,11 +130,22 @@ export interface ThemeSpec extends ThemeColors, ThemeMetrics {
 /** The keys of a spec that are its sections, not attributes of `<Theme>`. */
 const SECTIONS: ReadonlySet<string> = new Set(["Colors", "Metrics", "Glass", "Syntax", "Styles"]);
 
+/** `T`, with `never` for each key `Shape` does not have, at every depth: what makes a misspelled key an error. */
+type OnlyKnown<T, Shape> = T extends readonly (infer Item)[]
+	? readonly OnlyKnown<Item, NonNullable<Shape> extends readonly (infer Allowed)[] ? Allowed : never>[]
+	: T extends object
+		? string extends keyof T
+			? T // (an object made by code, `Object.fromEntries`: its keys are not known before it runs)
+			: { readonly [K in keyof T]: K extends keyof NonNullable<Shape> ? OnlyKnown<T[K], NonNullable<Shape>[K]> : never }
+		: T;
+
 /**
- * A theme, checked by its type, key by key: a misspelled one does not compile, wherever it is.
- * (Not generic: a type inferred from the object would let a wrong key through beside right ones)
+ * A theme, checked by its type: a misspelled key does not compile, at any depth, in the object
+ * written here or in one made apart (the error is at the key: `Type 'string' is not assignable to
+ * type 'never'`). An object made at runtime, `Object.fromEntries`, has no keys to check before it
+ * runs. Returns the theme as it was given, with its own type: `ocean.Colors.Panel` is a string.
  */
-export function defineTheme(theme: ThemeSpec): ThemeSpec {
+export function defineTheme<const T extends ThemeSpec>(theme: T & OnlyKnown<T, ThemeSpec>): T {
 	return theme;
 }
 

@@ -2,7 +2,7 @@
 
 import { afterAll, afterEach, beforeAll, expect, spyOn, test } from "bun:test";
 import * as r from "../raven";
-import { defineTheme, GLASS_PROPERTIES, LOOKS, loadTheme, PART_SHAPES, SYNTAX_TOKENS, THEME_PARTS, THEME_STATES, themeXml, type ThemeStyle } from "../theme";
+import { defineTheme, GLASS_PROPERTIES, LOOKS, loadTheme, PART_SHAPES, SYNTAX_TOKENS, THEME_PARTS, THEME_STATES, themeXml, type ThemeColor, type ThemeStyle } from "../theme";
 import { RavenError } from "../errors";
 
 const errors: string[] = [];
@@ -163,7 +163,18 @@ test("a misspelled key does not compile", () => {
 	const beside = defineTheme({ Name: "Beside", Colors: { Panel: "#000000", Pannel: "#000000" } });
 	// @ts-expect-error: at the top of the theme
 	const top = defineTheme({ Name: "Top", Accnt: "#000000" });
+	const apart = { Panel: "#000000", Pannel: "#000000" } as const;
+	// @ts-expect-error: in an object made apart
+	const made = defineTheme({ Name: "Apart", Colors: apart });
 	// @ts-expect-error: in a style
 	const styled = defineTheme({ Name: "InStyle", Styles: [{ Widget: "Button", Backgrund: "#000000" }] });
-	expect([wrong.Name, bare.Name, reset.Name, style.Name, beside.Name, top.Name, styled.Name]).toEqual(["Typo", "Bare", "Reset", "Styled", "Beside", "Top", "InStyle"]);
+	expect([wrong.Name, bare.Name, reset.Name, style.Name, beside.Name, top.Name, made.Name, styled.Name]).toEqual(["Typo", "Bare", "Reset", "Styled", "Beside", "Top", "Apart", "InStyle"]);
+});
+
+test("a theme keeps the type it was given: what it says can be read back, and spread into another", () => {
+	const given = defineTheme({ Name: "Given", Colors: { Panel: "#101010" }, Styles: [{ Class: "card", CornerRadius: 12 }] });
+	const panel: ThemeColor = given.Colors.Panel;
+	const name: "Given" = given.Name;
+	const derived = defineTheme({ ...given, Name: "Derived", Accent: "#E8590C" });
+	expect([panel, name, derived.Name, derived.Colors.Panel, given.Styles[0].CornerRadius]).toEqual(["#101010", "Given", "Derived", "#101010", 12]);
 });

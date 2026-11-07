@@ -413,6 +413,30 @@ test("a render React does not commit leaves the widgets of the children where th
 	expect(errors).toEqual([]);
 });
 
+test("the widgets of the children are destroyed with the element when placing them fails half way", async () => {
+	unregister.push(registerTag("Card", Card, { attributes: { Title: "string" }, slots: ["footer"] }));
+	const made = createWindow({ Title: "Tags", Width: 480, Height: 480 });
+	window = made.window;
+	root = made.root;
+	const reported = spyOn(console, "error").mockImplementation(() => {});
+	const broken = spyOn(r, "Rwidget_get_name").mockImplementation(() => {
+		throw new Error("broken");
+	});
+	try {
+		const card = r.Rwidget_create_from_xml('<Card><Label Name="taken"/><Into Name="footer"><Button/></Into></Card>');
+		const taken = r.Rwidget_get_child(card, 0);
+		await settle();
+		broken.mockRestore();
+		expect(reported).toHaveBeenCalled();
+		r.Rwidget_destroy(card);
+		await settle();
+		expect(r.Rwidget_is_valid(taken)).toBeFalsy();
+	} finally {
+		broken.mockRestore();
+		reported.mockRestore();
+	}
+});
+
 test("widgets of the children that are hidden when the element is destroyed are destroyed with it", async () => {
 	unregister.push(registerTag("Folding", Folding, { attributes: { Open: "boolean" } }));
 	const card = await build('<Folding Name="f"><Label Name="kept"/></Folding>');

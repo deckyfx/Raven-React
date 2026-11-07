@@ -91,10 +91,14 @@ function place(widget: r.Rid, element: Element): void {
 	const registration = registrations.get(element.tag);
 	const children: r.Rid[] = [];
 	const slots: Record<string, r.Rid[]> = {};
+	// (each one taken out is the element's at once: destroyed with it, even if this stops half way)
+	const taken: r.Rid[] = [];
+	element.adopted = taken;
 	for (const child of childrenOf(widget)) {
 		if (!intos.has(child)) {
 			// (taken out, as those of <Into>: only what the component renders is shown)
 			r.Rwidget_remove_child(widget, child);
+			taken.push(child);
 			children.push(child);
 			continue;
 		}
@@ -109,6 +113,7 @@ function place(widget: r.Rid, element: Element): void {
 		// (the widgets it held are taken out of it first: React places them)
 		for (const held of inside) {
 			r.Rwidget_remove_child(child, held);
+			taken.push(held);
 		}
 		intos.delete(child);
 		r.Rwidget_destroy(child);
@@ -132,8 +137,12 @@ function create(tag: string): r.Rid {
 	elements.set(widget, element);
 	r.Rwidget_set_destroy_callback(widget, nativeCallbacks().destroy);
 	queueMicrotask(() => {
-		if (elements.get(widget) === element) {
-			place(widget, element);
+		try {
+			if (elements.get(widget) === element) {
+				place(widget, element);
+			}
+		} catch (error) {
+			console.error(`raven-react: error placing the children of <${tag}>:`, error);
 		}
 	});
 	return widget;

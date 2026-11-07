@@ -159,5 +159,11 @@ test("a misspelled key does not compile", () => {
 	const reset = defineTheme({ Name: "Reset", Material: "Default" });
 	// (a style can, as a widget can)
 	const style = defineTheme({ Name: "Styled", Styles: [{ Class: "plain", Material: "Default" }] });
-	expect([wrong.Name, bare.Name, reset.Name, style.Name]).toEqual(["Typo", "Bare", "Reset", "Styled"]);
+	// @ts-expect-error: beside a key that is right, too
+	const beside = defineTheme({ Name: "Beside", Colors: { Panel: "#000000", Pannel: "#000000" } });
+	// @ts-expect-error: at the top of the theme
+	const top = defineTheme({ Name: "Top", Accnt: "#000000" });
+	// @ts-expect-error: in a style
+	const styled = defineTheme({ Name: "InStyle", Styles: [{ Widget: "Button", Backgrund: "#000000" }] });
+	expect([wrong.Name, bare.Name, reset.Name, style.Name, beside.Name, top.Name, styled.Name]).toEqual(["Typo", "Bare", "Reset", "Styled", "Beside", "Top", "InStyle"]);
 });

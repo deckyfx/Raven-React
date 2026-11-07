@@ -130,8 +130,11 @@ export interface ThemeSpec extends ThemeColors, ThemeMetrics {
 /** The keys of a spec that are its sections, not attributes of `<Theme>`. */
 const SECTIONS: ReadonlySet<string> = new Set(["Colors", "Metrics", "Glass", "Syntax", "Styles"]);
 
-/** A theme, checked by its type: the spec as it was given, so that one theme can be spread into another. */
-export function defineTheme<const T extends ThemeSpec>(theme: T): T {
+/**
+ * A theme, checked by its type, key by key: a misspelled one does not compile, wherever it is.
+ * (Not generic: a type inferred from the object would let a wrong key through beside right ones)
+ */
+export function defineTheme(theme: ThemeSpec): ThemeSpec {
 	return theme;
 }
 

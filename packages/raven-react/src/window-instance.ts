@@ -178,7 +178,8 @@ export class WindowInstance implements HostNode {
 		this.island = null;
 		(child as WidgetInstance).setHolder(null);
 		if (this.isOpen) {
-			// (this deletes it: the window owns it)
+			// (this deletes it: the window owns it. What it holds of registered tags is theirs)
+			(child as WidgetInstance).releaseAdopted();
 			r.Rwindow_set_island(this.window, r.R_INVALID_ID);
 		}
 		child.dispose();

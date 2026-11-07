@@ -3,7 +3,7 @@
 import { afterAll, afterEach, beforeAll, expect, spyOn, test } from "bun:test";
 import { useEffect, type ReactNode } from "react";
 import * as r from "../raven";
-import { Border, createWindow, HBox, Label, RavenRoot, registerTag, VBox, Window, type WindowInstance } from "../index";
+import { Border, createWindow, HBox, Island, Label, RavenRoot, registerTag, VBox, Window, type WindowInstance } from "../index";
 import { RavenError } from "../errors";
 
 let window: r.Rid = r.R_INVALID_ID;
@@ -278,6 +278,38 @@ test("the widgets of the children stay alive when the window the component put t
 	await settle();
 	expect(r.Rwidget_is_valid(kept)).toBeFalsy();
 	expect(r.Rwindow_is_valid(popups[1] ?? r.R_INVALID_ID)).toBeFalsy();
+	expect(errors).toEqual([]);
+});
+
+/** What it holds, in the island of a window of its own while it is on. */
+function Islanded({ On = true, children }: { readonly On?: boolean; readonly children?: ReactNode }): ReactNode {
+	return (
+		<Window Title="Islanded" Width={200} Height={120} ref={(made: WindowInstance | null) => void (made && popups.push(made.window))}>
+			{On && (
+				<Island Name="island">
+					<Label>folded</Label>
+					{children}
+				</Island>
+			)}
+			<VBox Name="content" />
+		</Window>
+	);
+}
+
+test("the widgets of the children stay alive when the island the component put them in is removed, and come back", async () => {
+	unregister.push(registerTag("Islanded", Islanded, { attributes: { On: "boolean" } }));
+	popups.length = 0;
+	const islanded = await build('<Islanded Name="p"><Label Name="kept"/></Islanded>');
+	const window = popups[0] ?? r.R_INVALID_ID;
+	const kept = r.Rwidget_find(window, "kept");
+	expect(r.Rwidget_get_parent(kept)).toBe(r.Rwindow_get_island(window));
+	expect(r.Rwidget_set_attribute(islanded, "On", "false")).toBeTruthy();
+	await settle();
+	expect(r.Rwindow_get_island(window)).toBe(r.R_INVALID_ID);
+	expect(r.Rwidget_is_valid(kept)).toBeTruthy();
+	expect(r.Rwidget_set_attribute(islanded, "On", "true")).toBeTruthy();
+	await settle();
+	expect(r.Rwidget_get_parent(kept)).toBe(r.Rwindow_get_island(window));
 	expect(errors).toEqual([]);
 });
 

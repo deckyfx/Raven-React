@@ -142,6 +142,10 @@ function attributes(values: object, skip: ReadonlySet<string> = new Set()): stri
 		if (value === undefined || value === null || skip.has(name)) {
 			continue;
 		}
+		// (Raven would report it and skip it: it is a mistake of the code, not of a theme file)
+		if (typeof value === "number" && !Number.isFinite(value)) {
+			RavenError.throw(`themeXml: ${name}="${value}" is not a finite number`);
+		}
 		// (several states are written apart by spaces)
 		const written = Array.isArray(value) ? value.join(" ") : String(value);
 		text += ` ${name}="${escapeXml(written)}"`;

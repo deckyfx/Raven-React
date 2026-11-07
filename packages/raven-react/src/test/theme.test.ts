@@ -86,6 +86,12 @@ test("a mistake in a theme is reported by Raven, and the rest of the theme is us
 	errors.length = 0;
 });
 
+test("a number that is not finite throws, naming where it is: Raven would only skip it", () => {
+	expect(() => themeXml(defineTheme({ Name: "Broken", Metrics: { Spacing: Number.NaN } }))).toThrow('Spacing="NaN"');
+	expect(() => themeXml(defineTheme({ Name: "Broken", Styles: [{ Widget: "Button", CornerRadius: Infinity }] }))).toThrow(RavenError);
+	expect(() => loadTheme(defineTheme({ Name: "Broken", Glass: { Frost: -Infinity } }))).toThrow("not a finite number");
+});
+
 test("a theme Raven refuses altogether throws, with what Raven said", () => {
 	const refuse = spyOn(r, "Rtheme_load_from_memory").mockImplementation(() => null);
 	try {

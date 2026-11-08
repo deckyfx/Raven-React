@@ -438,6 +438,54 @@ test("an error boundary works", async () => {
 	expect(text("fallback")).toBe("failed");
 });
 
+/** A component that always throws while it renders. */
+function Thrower(): ReactNode {
+	throw new Error("in a render");
+}
+
+test("a render React throws away makes no widget and leaves no handler", async () => {
+	const report = console.error;
+	console.error = (): void => {};
+	const handlers = eventStats().handlers;
+	const made = spyOn(r, "Rwidget_create_from_xml");
+	// (React makes the Button, then Thrower throws: React renders again, then shows the fallback)
+	await mount(
+		<VBox>
+			<Boundary fallback={<Label Name="fallback">failed</Label>}>
+				<Button Name="thrown" OnClicked={() => {}}>never shown</Button>
+				<Thrower />
+			</Boundary>
+		</VBox>,
+	);
+	const buttons = made.mock.calls.filter(([xml]) => xml?.startsWith("<Button")).length;
+	made.mockRestore();
+	console.error = report;
+	expect(text("fallback")).toBe("failed");
+	expect(buttons).toBe(0);
+	root?.unmount();
+	root = null;
+	expect(eventStats().handlers).toBe(handlers);
+});
+
+test("a render React throws away opens no window", async () => {
+	const report = console.error;
+	console.error = (): void => {};
+	const opened = spyOn(r, "Rwindow_create_from_xml");
+	const windows = new RavenRoot();
+	windows.render(
+		<Boundary fallback={<Window Title="Fallback" Width={200} Height={100} />}>
+			<Window Title="Thrown" Width={200} Height={100} />
+			<Thrower />
+		</Boundary>,
+	);
+	await settle();
+	const titles = opened.mock.calls.map(([xml]) => /Title="(\w+)"/.exec(xml ?? "")?.[1]);
+	opened.mockRestore();
+	console.error = report;
+	windows.unmount();
+	expect(titles).toEqual(["Fallback"]);
+});
+
 test("a prop whose setter throws leaves the other handlers listening", async () => {
 	const report = console.error;
 	console.error = (): void => {};
@@ -504,22 +552,60 @@ test("Items that are not rows leave the rows of a TreeView as they were", async 
 	}
 });
 
-test("a widget that cannot be made leaves nothing in Raven", async () => {
+test("Items that are not rows are refused while React renders, before Raven makes anything", async () => {
 	const report = console.error;
 	console.error = (): void => {};
 	const made = spyOn(r, "Rwidget_create_from_xml");
+	// (the boundary is placed with the TreeView: only an error of the render reaches it)
 	await mount(
 		<Boundary fallback={<Label Name="fallback">failed</Label>}>
 			{/* @ts-expect-error Text that is not JSON, as a value from outside the types can be. */}
 			<TreeView Items="not json" />
 		</Boundary>,
 	);
-	const trees = made.mock.calls.flatMap(([xml], call) => (xml?.startsWith("<TreeView") ? [made.mock.results[call]?.value as r.Rid] : []));
+	const trees = made.mock.calls.filter(([xml]) => xml?.startsWith("<TreeView")).length;
 	made.mockRestore();
 	console.error = report;
 	expect(text("fallback")).toBe("failed");
-	expect(trees.length).toBeGreaterThan(0);
-	expect(trees.filter((tree) => r.Rwidget_is_valid(tree))).toEqual([]);
+	expect(trees).toBe(0);
+});
+
+test("a widget Raven cannot make, in a new part of the tree, leaves nothing of that part", async () => {
+	const report = console.error;
+	console.error = (): void => {};
+	const handlers = eventStats().handlers;
+	const made = spyOn(r, "Rwidget_create_from_xml");
+	const app = (more: boolean): ReactNode => (
+		<VBox Name="box">
+			<Boundary fallback={<Label Name="fallback">failed</Label>}>
+				<Label Name="first">first</Label>
+				{more && (
+					<VBox Name="part">
+						{/* (an attribute for its parent: given at the end of the commit, when the part is already gone) */}
+						<Button Name="inside" OnClicked={() => {}} Slot={{ Fill: 1 }}>inside</Button>
+						{/* XML Raven cannot read: Raven makes the VBox and the Button, then refuses this */}
+						<TreeView Markup="<" />
+					</VBox>
+				)}
+			</Boundary>
+		</VBox>
+	);
+	await mount(app(false));
+	root?.render(app(true));
+	await settle();
+	const widgets = made.mock.results.map(({ value }) => value as r.Rid).filter((id) => id !== r.R_INVALID_ID);
+	made.mockRestore();
+	console.error = report;
+	// (Raven said why it could not read the markup)
+	const said = errors.splice(0);
+	expect(said.some((detail) => detail.startsWith("Rwidget_create_from_xml"))).toBe(true);
+	// (and nothing else: nothing was given to a widget deleted with its part)
+	expect(said.filter((detail) => !detail.startsWith("Rwidget_create_from_xml"))).toEqual([]);
+	expect(namesUnder("box")).toEqual(["fallback"]);
+	expect(widgets.length).toBeGreaterThan(1);
+	// (only the box and the fallback are left of all it made: not the part, nor the Label it replaced)
+	expect(widgets.filter((id) => r.Rwidget_is_valid(id) && id !== find("box") && id !== find("fallback"))).toEqual([]);
+	expect(eventStats().handlers).toBe(handlers);
 });
 
 /** Presses and releases a key. */

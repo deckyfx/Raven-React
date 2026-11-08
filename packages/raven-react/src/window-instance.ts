@@ -72,36 +72,58 @@ function setWindowEvents(window: r.Rid, handlers: ReadonlyMap<string, EventHandl
 
 /**
  * A `<Window>` under React, and what a `ref` receives. It holds widgets but stands by itself:
- * it can be anywhere in the tree, and goes away when its element does.
+ * it can be anywhere in the tree, and goes away when its element does. It opens when React
+ * commits it: a render React throws away opens nothing.
  */
 export class WindowInstance implements HostNode {
 	readonly tag = "Window";
 	readonly nativeWidget = null;
-	private readonly content: WidgetInstance;
+	private id: r.Rid = r.R_INVALID_ID;
+	/** Where its widgets go, once it is open. */
+	private content: WidgetInstance | null = null;
+	/** The children React rendered with it, which go in when it opens. */
+	private readonly initial: HostNode[] = [];
 	/** Its `<Island>`: it floats above the content, as in XML, and the window owns it. */
 	private island: WidgetInstance | null = null;
+	private state: "pending" | "live" | "gone" = "pending";
 
-	private constructor(
-		/** Raven's handle of the window, for the functions of the `raven` export. */
-		readonly window: r.Rid,
-		content: r.Rid,
-		private resolved: ResolvedProps,
-	) {
-		this.content = WidgetInstance.forContainer(content);
+	private constructor(private resolved: ResolvedProps) {}
+
+	/** A new window, as React renders it: it opens at `materialize`, with what its props say. */
+	static create(props: RavenProps): WindowInstance {
+		return new WindowInstance(resolveProps(props));
 	}
 
-	/** A new window, shown with what its props say. */
-	static create(props: RavenProps): WindowInstance {
-		const resolved = resolveProps(props);
-		const { window, content } = makeWindow(resolved.attributes);
-		closeEvents.set(window, resolved.handlers.get("OnClose"));
-		setWindowEvents(window, resolved.handlers);
-		return new WindowInstance(window, content, resolved);
+	/** Raven's handle of the window, for the functions of the `raven` export: `R_INVALID_ID` until React commits it. */
+	get window(): r.Rid {
+		return this.id;
+	}
+
+	/** Opens the window, with its children. If any of it fails, the window is deleted. */
+	materialize(): void {
+		if (this.state !== "pending") {
+			return;
+		}
+		const { window, content } = makeWindow(this.resolved.attributes);
+		this.id = window;
+		this.content = WidgetInstance.forContainer(content);
+		this.state = "live";
+		try {
+			closeEvents.set(window, this.resolved.handlers.get("OnClose"));
+			setWindowEvents(window, this.resolved.handlers);
+			for (const child of this.initial.splice(0)) {
+				this.append(child);
+			}
+		} catch (error) {
+			this.forgetTree();
+			this.dispose();
+			throw error;
+		}
 	}
 
 	/** Whether the window still exists: without an `OnClose`, the user can close it at any time. */
 	get isOpen(): boolean {
-		return r.Rwindow_is_valid(this.window) !== 0;
+		return this.id !== r.R_INVALID_ID && r.Rwindow_is_valid(this.id) !== 0;
 	}
 
 	setParent(): void {}
@@ -111,7 +133,7 @@ export class WindowInstance implements HostNode {
 	/** What can change on a window that is open. The other attributes only count when it is made. */
 	update(props: RavenProps): void {
 		const next = resolveProps(props);
-		if (this.isOpen) {
+		if (this.state === "live" && this.isOpen) {
 			this.applyChanges(next);
 		}
 		this.resolved = next;
@@ -122,21 +144,29 @@ export class WindowInstance implements HostNode {
 		const previous = this.resolved.attributes;
 		for (const [name, value] of next.attributes) {
 			if (value !== previous.get(name)) {
-				SET_ON_OPEN_WINDOW[name]?.(this.window, value);
+				SET_ON_OPEN_WINDOW[name]?.(this.id, value);
 			}
 		}
 		const width = next.attributes.get("Width");
 		const height = next.attributes.get("Height");
 		if (width !== undefined && height !== undefined && (width !== previous.get("Width") || height !== previous.get("Height"))) {
-			r.Rwindow_set_size(this.window, Number(width), Number(height));
+			r.Rwindow_set_size(this.id, Number(width), Number(height));
 		}
 		for (const [name, value] of next.attributes) {
 			if (previous.get(name) !== value && !SET_ON_OPEN_WINDOW[name] && name !== "Width" && name !== "Height") {
 				console.warn(`raven-react: <Window> ${name} only counts when the window is made`);
 			}
 		}
-		closeEvents.set(this.window, next.handlers.get("OnClose"));
-		setWindowEvents(this.window, next.handlers);
+		closeEvents.set(this.id, next.handlers.get("OnClose"));
+		setWindowEvents(this.id, next.handlers);
+	}
+
+	/** The place of its widgets: React adds and removes children only once it committed the window. */
+	private get open(): WidgetInstance {
+		if (!this.content) {
+			return RavenError.throw("raven-react: a <Window> got a child before React committed it");
+		}
+		return this.content;
 	}
 
 	/** Makes a child the island of this window, if it is one and there is none yet. */
@@ -144,7 +174,8 @@ export class WindowInstance implements HostNode {
 		if (child.tag !== "Island" || this.island || !(child instanceof WidgetInstance)) {
 			return false;
 		}
-		const set = (widget: r.Rid): void => r.Rwindow_set_island(this.window, widget);
+		child.materialize();
+		const set = (widget: r.Rid): void => r.Rwindow_set_island(this.id, widget);
 		this.island = child;
 		child.setHolder(set);
 		set(child.widget);
@@ -153,22 +184,16 @@ export class WindowInstance implements HostNode {
 
 	append(child: HostNode): void {
 		if (child !== this.island && !this.takeIsland(child)) {
-			this.content.append(child);
+			this.open.append(child);
 		}
 	}
 
 	appendInitial(child: HostNode): void {
-		if (child !== this.island && !this.takeIsland(child)) {
-			this.content.appendInitial(child);
+		if (this.state === "live") {
+			this.append(child);
+		} else {
+			this.initial.push(child);
 		}
-	}
-
-	get hasWaiting(): boolean {
-		return this.content.hasWaiting;
-	}
-
-	attachWaiting(): void {
-		this.content.attachWaiting();
 	}
 
 	insertBefore(child: HostNode, before: HostNode): void {
@@ -177,15 +202,15 @@ export class WindowInstance implements HostNode {
 		}
 		// (the island is not among the widgets of the content: nothing can go before it there)
 		if (before === this.island) {
-			this.content.append(child);
+			this.open.append(child);
 		} else {
-			this.content.insertBefore(child, before);
+			this.open.insertBefore(child, before);
 		}
 	}
 
 	remove(child: HostNode): void {
 		if (child !== this.island) {
-			this.content.remove(child);
+			this.open.remove(child);
 			return;
 		}
 		child.forgetTree();
@@ -194,30 +219,38 @@ export class WindowInstance implements HostNode {
 		if (this.isOpen) {
 			// (this deletes it: the window owns it. What it holds of registered tags is theirs)
 			(child as WidgetInstance).releaseAdopted();
-			r.Rwindow_set_island(this.window, r.R_INVALID_ID);
+			r.Rwindow_set_island(this.id, r.R_INVALID_ID);
 		}
 		child.dispose();
 	}
 
 	forgetTree(): void {
-		this.content.forgetTree();
+		if (this.state !== "live") {
+			return;
+		}
+		this.content?.forgetTree();
 		this.island?.forgetTree();
-		closeEvents.set(this.window, undefined, false);
+		closeEvents.set(this.id, undefined, false);
 		for (const event of Object.values(WINDOW_EVENTS)) {
-			event.off(this.window, false);
+			event.off(this.id, false);
 		}
 	}
 
 	dispose(): void {
+		const state = this.state;
+		this.state = "gone";
+		if (state !== "live") {
+			return;
+		}
 		if (this.isOpen) {
 			// (the window destroys what it holds: those of registered tags are theirs)
-			this.content.releaseAdopted();
+			this.content?.releaseAdopted();
 			this.island?.releaseAdopted();
 		}
-		this.content.disposeDetached();
+		this.content?.disposeDetached();
 		this.island?.disposeDetached();
 		if (this.isOpen) {
-			r.Rwindow_destroy(this.window);
+			r.Rwindow_destroy(this.id);
 		}
 	}
 }

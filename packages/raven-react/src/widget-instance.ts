@@ -6,6 +6,16 @@ import { CLEARED, resolveProps, type RavenProps, type ResolvedProps, type TreeIt
 /** The host type of a widget Raven made and React only places: `adopt`. */
 export const ADOPTED_TAG = "raven-react:adopted";
 
+/**
+ * Where a node is. `pending`: React rendered it, and it is only props and children here, with
+ * nothing in Raven, as React may throw that render away. `live`: React committed it, and Raven
+ * made it. `gone`: it was deleted, or could not be made.
+ */
+type NodeState = "pending" | "live" | "gone";
+
+/** The nodes Raven made in this commit, whose attributes that need a parent wait for its end. */
+export const placedInThisCommit: WidgetInstance[] = [];
+
 /** What React's tree is made of: a widget, or a window, which is no widget of its parent. */
 export interface HostNode {
 	readonly tag: string;
@@ -13,15 +23,17 @@ export interface HostNode {
 	readonly nativeWidget: r.Rid | null;
 	/** Says who holds it. */
 	setParent(parent: WidgetInstance | null): void;
+	/**
+	 * Makes it in Raven, with what it holds, when React commits it: what React renders and then
+	 * throws away (an error, a render done again) never reaches Raven. Throws, leaving nothing in
+	 * Raven, when Raven cannot make it.
+	 */
+	materialize(): void;
 	update(props: RavenProps): void;
 	applyParentAttributes(): void;
 	append(child: HostNode): void;
-	/** Adds a child while React renders this new node: what is shown elsewhere goes in when it commits. */
+	/** Adds a child while React renders this new node, in its props only: Raven gets it at `materialize`. */
 	appendInitial(child: HostNode): void;
-	/** Whether children wait for the commit to go in. */
-	readonly hasWaiting: boolean;
-	/** Puts in the children that waited, once React commits this node. */
-	attachWaiting(): void;
 	insertBefore(child: HostNode, before: HostNode): void;
 	remove(child: HostNode): void;
 	/** Forgets the handlers of this node and of everything under it. */
@@ -114,12 +126,18 @@ function isRows(value: unknown): value is readonly TreeItem[] {
 	return Array.isArray(value) && value.every((row: TreeItem | null) => typeof row?.Text === "string" && isRows(row.Children ?? []));
 }
 
-/** Fills a TreeView from its `Items`, as text. Its rows are made again: their handles change. Text that is not rows leaves them. */
-function fillTree(tree: r.Rid, text: string): void {
+/** The rows of the `Items` of a TreeView, from its text. Throws when they are not rows. */
+function treeRows(text: string): readonly TreeItem[] {
 	const items: unknown = text ? JSON.parse(text) : [];
 	if (!isRows(items)) {
 		RavenError.throw("raven-react: the Items of a TreeView should be a list of rows, each with a Text");
 	}
+	return items;
+}
+
+/** Fills a TreeView from its `Items`, as text. Its rows are made again: their handles change. Text that is not rows leaves them. */
+function fillTree(tree: r.Rid, text: string): void {
+	const items = treeRows(text);
 	const add = (parent: r.Rid, items: readonly TreeItem[]): void => {
 		for (const item of items) {
 			const row = r.Rtree_view_add_item(tree, parent, item.Text);
@@ -179,6 +197,15 @@ const SET_BY_CALL: Readonly<Record<string, Readonly<Record<string, (widget: r.Ri
 	TreeView: { Items: fillTree },
 };
 
+/**
+ * What can be found wrong with props without Raven, by tag: it is checked while React renders, so
+ * that the nearest error boundary takes it, as for any error of a render. (React gives an error of
+ * its commit to a boundary above what it is placing: not to one placed with it)
+ */
+const CHECKED_AT_RENDER: Readonly<Record<string, Readonly<Record<string, (value: string) => void>>>> = {
+	TreeView: { Items: (value) => void treeRows(value) },
+};
+
 /** The prop that holds the elements XML takes inside a widget. It is part of how the widget is made. */
 const MARKUP = "Markup";
 
@@ -208,28 +235,59 @@ export class WidgetInstance implements HostNode {
 	private resolved: ResolvedProps = { attributes: new Map(), handlers: new Map() };
 	/** How many children the widget had when it was made: those of its markup come first. */
 	private madeChildren = 0;
-	/** Adopted children given while React rendered this widget, whose widgets go in when it commits. */
-	private readonly waiting: HostNode[] = [];
+	private state: NodeState;
 
 	private constructor(
 		private id: r.Rid,
 		readonly tag: string,
-	) {}
+		/** The props of a node React rendered, until Raven makes it. */
+		private pending: ResolvedProps | null = null,
+	) {
+		this.state = pending ? "pending" : "live";
+	}
 
-	/** A new widget of a tag, with its props but those that need a parent. */
+	/** A new widget of a tag, as React renders it: Raven makes it when React commits it, at `materialize`. */
 	static create(tag: string, props: RavenProps): WidgetInstance {
 		const resolved = resolveProps(props);
-		const instance = new WidgetInstance(WidgetInstance.make(tag, resolved.attributes.get(MARKUP)), tag);
-		instance.madeChildren = r.Rwidget_get_child_count(instance.id);
+		for (const [name, check] of Object.entries(CHECKED_AT_RENDER[tag] ?? {})) {
+			const value = resolved.attributes.get(name);
+			if (value !== undefined) {
+				check(value);
+			}
+		}
+		return new WidgetInstance(r.R_INVALID_ID, tag, resolved);
+	}
+
+	/**
+	 * Makes the widget, with its props but those that need a parent, then its children, in their
+	 * order: those of its markup come first. If any of it fails, what was made is deleted.
+	 */
+	materialize(): void {
+		const resolved = this.pending;
+		if (this.state !== "pending" || !resolved) {
+			return;
+		}
+		this.id = WidgetInstance.make(this.tag, resolved.attributes.get(MARKUP));
+		this.madeChildren = r.Rwidget_get_child_count(this.id);
+		this.state = "live";
+		this.pending = null;
 		try {
-			instance.applyAll(resolved);
+			this.applyAll(resolved);
+			for (const child of this.children) {
+				child.materialize();
+				// (an adopted widget Raven moves here from where it is shown; one its element destroyed is left out)
+				const widget = child.nativeWidget;
+				if (this.holds(child) && widget !== null && r.Rwidget_is_valid(widget)) {
+					r.Rwidget_add_child(this.id, widget);
+				}
+			}
 		} catch (error) {
-			// (React keeps no instance of it, and nothing else would destroy a widget without a parent)
-			forgetHandlers(tag, instance.id, true);
-			r.Rwidget_destroy(instance.id);
+			// (React keeps it, and takes it away with the rest of the tree that failed)
+			this.forgetTree();
+			this.dispose();
 			throw error;
 		}
-		return instance;
+		placedInThisCommit.push(this);
 	}
 
 	/** An instance for a widget React does not own: the top of a root. */
@@ -258,8 +316,9 @@ export class WidgetInstance implements HostNode {
 	}
 
 	/**
-	 * Raven's handle of the widget, for the functions of the `raven` export. Read it when you
-	 * need it and do not keep it: it changes if the widget has to be made again.
+	 * Raven's handle of the widget, for the functions of the `raven` export: `R_INVALID_ID` until
+	 * React commits it (a ref and an effect come after). Read it when you need it and do not keep
+	 * it: it changes if the widget has to be made again.
 	 */
 	get widget(): r.Rid {
 		return this.id;
@@ -406,7 +465,7 @@ export class WidgetInstance implements HostNode {
 	/** Goes from the last props to new ones, setting only what changed. */
 	update(props: RavenProps): void {
 		// (its window can be gone already: closed by the user, with no OnClose to ask first. An adopted widget has no props of React)
-		if (!r.Rwidget_is_valid(this.id) || this.tag === ADOPTED_TAG) {
+		if (this.state !== "live" || !r.Rwidget_is_valid(this.id) || this.tag === ADOPTED_TAG) {
 			return;
 		}
 		const next = resolveProps(props);
@@ -512,58 +571,23 @@ export class WidgetInstance implements HostNode {
 	}
 
 	/**
-	 * Adds a child while React renders this new widget. The widget of an adopted child is shown
-	 * elsewhere until React commits, which it may never do: it goes in with `attachWaiting`.
+	 * Adds a child while React renders this new widget: to the tree here only. Raven gets it with
+	 * this widget, at `materialize`, if React commits them. (An adopted child stays where it is
+	 * shown until then)
 	 */
 	appendInitial(child: HostNode): void {
-		if (child.tag !== ADOPTED_TAG) {
+		if (this.state === "live") {
 			this.append(child);
 			return;
 		}
-		this.checkHolds(child);
 		this.children.push(child);
 		child.setParent(this);
-		this.waiting.push(child);
 	}
 
-	/** Whether adopted children wait for the commit to go in. */
-	get hasWaiting(): boolean {
-		return this.waiting.length > 0;
-	}
-
-	/** Puts in the widgets of the adopted children, in their places, once React commits this widget. */
-	attachWaiting(): void {
-		const waiting = new Set(this.waiting.splice(0));
-		// (a new widget: those Raven made from its markup come first, then those of React)
-		let position = this.madeChildren;
-		for (const child of this.children) {
-			const widget = child.nativeWidget;
-			if (!this.holds(child) || widget === null || !r.Rwidget_is_valid(widget)) {
-				continue;
-			}
-			if (waiting.has(child)) {
-				r.Rwidget_insert_child(this.id, widget, position);
-				position++;
-			} else if (r.Rwidget_get_parent(widget) === this.id) {
-				position = this.positionOf(widget) + 1;
-			}
-		}
-	}
-
-	/** Where a widget is among those of this one, or -1. */
-	private positionOf(widget: r.Rid): number {
-		const count = r.Rwidget_get_child_count(this.id);
-		for (let position = 0; position < count; position++) {
-			if (r.Rwidget_get_child(this.id, position) === widget) {
-				return position;
-			}
-		}
-		return -1;
-	}
-
-	/** Adds a child at the end. A child already here moves to the end. */
+	/** Adds a child at the end, making it in Raven if React has just committed it. A child already here moves to the end. */
 	append(child: HostNode): void {
 		this.checkHolds(child);
+		child.materialize();
 		this.detach(child);
 		this.children.push(child);
 		child.setParent(this);
@@ -575,6 +599,7 @@ export class WidgetInstance implements HostNode {
 	/** Puts a child before another one. A child already here moves. */
 	insertBefore(child: HostNode, before: HostNode): void {
 		this.checkHolds(child);
+		child.materialize();
 		this.detach(child);
 		const index = this.children.indexOf(before);
 		if (index < 0) {
@@ -616,6 +641,10 @@ export class WidgetInstance implements HostNode {
 	}
 
 	forgetTree(): void {
+		// (a node Raven has not made has no handlers: React gives them at `materialize`)
+		if (this.state !== "live") {
+			return;
+		}
 		for (const child of this.children) {
 			child.forgetTree();
 		}
@@ -654,6 +683,11 @@ export class WidgetInstance implements HostNode {
 	dispose(): void {
 		if (this.tag === ADOPTED_TAG) {
 			// (its parent let it go, unless it was already placed elsewhere: it belongs to the element of its registered tag)
+			return;
+		}
+		const state = this.state;
+		this.state = "gone";
+		if (state !== "live") {
 			return;
 		}
 		if (r.Rwidget_is_valid(this.id)) {

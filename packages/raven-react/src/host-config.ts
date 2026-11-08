@@ -5,7 +5,7 @@ import { RavenError } from "./errors";
 import * as r from "./raven";
 import { eventScope, updatePriority } from "./events";
 import { childrenText, type RavenProps } from "./props";
-import { ADOPTED_TAG, WidgetInstance, type HostNode } from "./widget-instance";
+import { ADOPTED_TAG, placedInThisCommit, WidgetInstance, type HostNode } from "./widget-instance";
 import { WindowInstance } from "./window-instance";
 
 /** React asks for a context per level of the tree. Raven has no use for one, but it must exist. */
@@ -16,9 +16,6 @@ const NO_TIMEOUT = -1;
 
 /** A `<Separator>` in a `<Menu>`: a line of the menu, as in XML, which is an item there and no widget of its own. */
 const menuSeparator = (props: RavenProps): RavenProps => ({ ...(props.Name === undefined ? {} : { Name: props.Name }), Separator: true });
-
-/** Widgets whose attributes that need a parent wait for the end of the commit. */
-const placedInThisCommit: HostNode[] = [];
 
 updatePriority.default = DefaultEventPriority;
 updatePriority.discreteValue = DiscreteEventPriority;
@@ -42,6 +39,8 @@ const hostConfig: RavenHostConfig = {
 	NotPendingTransition: null,
 	HostTransitionContext: createContext<null>(null),
 
+	// (Raven makes nothing while React renders, which React may throw away: a node is made when it
+	// is placed, as React commits it, with what it holds. See `HostNode.materialize`)
 	createInstance: (tag, props, _root, context) => {
 		if (tag === "Window") {
 			return WindowInstance.create(props);
@@ -54,12 +53,8 @@ const hostConfig: RavenHostConfig = {
 	createTextInstance: (text) => RavenError.throw(`raven-react: text must be alone in a widget: "${text}"`),
 	shouldSetTextContent: (_tag, props) => childrenText(props.children) !== null,
 	appendInitialChild: (parent, child) => parent.appendInitial(child),
-	finalizeInitialChildren: (instance) => {
-		placedInThisCommit.push(instance);
-		// (`commitMount` runs only for what React commits)
-		return instance.hasWaiting;
-	},
-	commitMount: (instance) => instance.attachWaiting(),
+	finalizeInitialChildren: () => false,
+	commitMount: () => {},
 	getPublicInstance: (instance) => instance,
 	getRootHostContext: () => HOST_CONTEXT,
 	getChildHostContext: (parent, tag) => {

@@ -82,7 +82,7 @@ b843903a05198a0b52a61129206eb579000cf746 ede33eb src/widget/widget.h
 51d429e7006db6d55801a3f88f82631f2970cfc1 ede33eb src/widget/window.c
 6c521f32f01969f23096858c6d823105d3e0f9f3 1092a82 src/widgets/background_blur.c
 2ff2d3f5ade2315cd1293c0dd06e44b9dda16f80 1092a82 src/widgets/block_editor.c
-7008f833edf577f0594e16022c7587f54c519e75 1092a82 src/widgets/border.c
+04be0253a84ef3535f78486ff5594956893b0c4d a472444 src/widgets/border.c
 e83ab151a381b70e683c8d28e979bba4488796cd 1092a82 src/widgets/box_panel.c
 a7b7c3ad63334e323ada7a9b2af682a62221c272 1092a82 src/widgets/breadcrumb.c
 d985dea4ae5e6192ecba534e8049df137bb875d1 1092a82 src/widgets/button.c
@@ -102,7 +102,7 @@ ca94c12a7f5a67f5adf2df9dca38a62dbb1b5d08 1092a82 src/widgets/grid.c
 d152de046588f200d15edf5ab14605b91527987f 1092a82 src/widgets/header_bar.c
 52a62c358f38f1224969dd96a56ff17c44de07dd ede33eb src/widgets/image.c
 07cdfd7e625dac71f8aade95374df5cfbe892f91 1092a82 src/widgets/island.c
-3b8a4f5cd9baf8efce278b6214bc83cdb48e40f3 1092a82 src/widgets/label.c
+bbf52737e37899188b75b6747a27e00508777576 a472444 src/widgets/label.c
 1d4f6202c7662caf0e95905f967d0dfd90145ec6 1092a82 src/widgets/list_view.c
 ae51f9e41c2a48e538f450a1013923a57fe08aa8 1092a82 src/widgets/markdown.c
 e96cc0d1e2bf72712aeb2399db2002ace504ae9e ede33eb src/widgets/menu.c
@@ -112,7 +112,7 @@ c439f4ccb03f11ebf3f31f1ee88837e2558c7ea2 1092a82 src/widgets/overlay.c
 0881813fcd70a46f85d4b6618201229d2079d14c 1092a82 src/widgets/platform_looks.c
 5d74d03dc1677f9f410a7e3c4e5fc9eae5db6aa7 1092a82 src/widgets/progress_bar.c
 3ea8ade368bb7f7c1471b0d17fa9a4e7052f782a 1092a82 src/widgets/rating.c
-37bd839175274a33570b892b84428170c8a3ea50 1092a82 src/widgets/scroll_box.c
+0d99fcab6534749ca6400edf924807c2e87e8658 7f4411c src/widgets/scroll_box.c
 5339c749339aa600c76cbf04f511b7b6c32735f0 1092a82 src/widgets/size_box.c
 aea21cb55e35d639c2d45ec7c84687504bd3c61e 1092a82 src/widgets/slider.c
 dfe3c57e3ca4448782adf4fafb574db6f5dfb31e 1092a82 src/widgets/spin_box.c
@@ -121,13 +121,13 @@ c7f4dbab6282a537210517e6117ae4cfc9895639 1092a82 src/widgets/switcher.c
 8b206df31b7ff440acf770593dbe77628f73d40d 1092a82 src/widgets/syntax.c
 f99fda0cdaf5bbf1b99aa5d71a4e295c2e6fd50c 1092a82 src/widgets/tab_view.c
 f917ab1068aa2eb4582930fdbbc0a15909d5c1ef 1092a82 src/widgets/table.c
-3fa869897f310cebb27d4df47b7457f678b2450c 1092a82 src/widgets/text_editor.c
+ffc143721a362b1276c7a1e5ab36aa59ff0c655c 7f4411c src/widgets/text_editor.c
 ac46ceffaa032fb6774438173641089a46b473c8 1092a82 src/widgets/text_input.c
 099804f6674bcef70a2cc7b2ffbd139dce6a2c2a 1092a82 src/widgets/textedit.c
 012bfccbd9edb4d14db645605b5888468ec09e40 1092a82 src/widgets/tile_view.c
 354aedf9f9339d590f041e762045fdf3fae27e32 1092a82 src/widgets/time_picker.c
 458955af9bf5584ffec4887f02aef0eea20cc5ee ede33eb src/widgets/timeline.c
-7c224d89201d6e1b34eb159286579d1b4537a6c4 ede33eb src/widgets/toast.c
+17fe135916c4d4c19b2f916d90dc90d32cc8bf9a 7f4411c src/widgets/toast.c
 5da18a75c14310261143a8cbea3930c161a78d26 1092a82 src/widgets/tree_view.c
 90a17125fd84b6577ad23b6fe975ac8176336136 1092a82 src/widgets/viewport.c
 112bc54d3dc21522c6679a1b8d1310563c27c17b 1092a82 src/widgets/wrap_box.c

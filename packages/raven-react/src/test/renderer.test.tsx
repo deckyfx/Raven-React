@@ -581,7 +581,8 @@ test("a widget Raven cannot make, in a new part of the tree, leaves nothing of t
 				<Label Name="first">first</Label>
 				{more && (
 					<VBox Name="part">
-						<Button Name="inside" OnClicked={() => {}}>inside</Button>
+						{/* (an attribute for its parent: given at the end of the commit, when the part is already gone) */}
+						<Button Name="inside" OnClicked={() => {}} Slot={{ Fill: 1 }}>inside</Button>
 						{/* XML Raven cannot read: Raven makes the VBox and the Button, then refuses this */}
 						<TreeView Markup="<" />
 					</VBox>
@@ -598,6 +599,8 @@ test("a widget Raven cannot make, in a new part of the tree, leaves nothing of t
 	// (Raven said why it could not read the markup)
 	const said = errors.splice(0);
 	expect(said.some((detail) => detail.startsWith("Rwidget_create_from_xml"))).toBe(true);
+	// (and nothing else: nothing was given to a widget deleted with its part)
+	expect(said.filter((detail) => !detail.startsWith("Rwidget_create_from_xml"))).toEqual([]);
 	expect(namesUnder("box")).toEqual(["fallback"]);
 	expect(widgets.length).toBeGreaterThan(1);
 	// (only the box and the fallback are left of all it made: not the part, nor the Label it replaced)

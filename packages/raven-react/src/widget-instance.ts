@@ -455,6 +455,10 @@ export class WidgetInstance implements HostNode {
 
 	/** Sets the attributes that need a parent, once there is one. */
 	applyParentAttributes(): void {
+		// (a part that failed later in the commit deleted it: its children it held are still live, with no widget)
+		if (this.state !== "live" || !r.Rwidget_is_valid(this.id)) {
+			return;
+		}
 		for (const [name, value] of this.resolved.attributes) {
 			if (WidgetInstance.belongsToParent(name)) {
 				this.setAttribute(name, value);

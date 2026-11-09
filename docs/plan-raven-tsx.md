@@ -1,6 +1,6 @@
-# Plan: Raven-TSX
+# Plan: raven-tsx
 
-Raven-React becomes Raven-TSX: one library that makes Raven's native widgets from TSX. It splits into a core, which knows only Raven, and an adapter for each framework. React is the first adapter. Solid is the second, if a short test of its compiler on Bun works out.
+Raven-React becomes raven-tsx: one library that makes Raven's native widgets from TSX. It splits into a core, which knows only Raven, and an adapter for each framework. React is the first adapter. Solid is the second, if a short test of its compiler on Bun works out.
 
 Nothing has been published to npm (`@decky.fx/raven-react` and `@decky.fx/raven-tsx` are both free), so the rename does not need to stay compatible with anything.
 
@@ -39,10 +39,10 @@ The alternative is separate packages (`raven-tsx-core`, `raven-tsx-react`, `rave
 This phase is mechanical and changes no behaviour. It goes in its own PR, so the diff can be reviewed as nothing but names.
 
 **GitHub** (the user does this, or I do it on the user's say-so):
-- Rename the repository from `deckyfx/Raven-React` to `deckyfx/Raven-TSX`: `gh repo rename Raven-TSX -R deckyfx/Raven-React`, or in Settings.
+- Rename the repository from `deckyfx/Raven-React` to `deckyfx/raven-tsx`: `gh repo rename raven-tsx -R deckyfx/Raven-React`, or in Settings.
   - GitHub redirects the old URLs, and open PRs and issues stay where they are.
   - Do it after PR #7 is merged, so nothing is open across the rename.
-- Point the local remote at the new name: `git remote set-url origin git@github.com:deckyfx/Raven-TSX.git`.
+- Point the local remote at the new name: `git remote set-url origin git@github.com:deckyfx/raven-tsx.git`.
 
 **Repository.** Counted on 2026-11-08, outside `node_modules`, `vendor` and this plan:
 
@@ -118,7 +118,7 @@ If one of these fails, stop and write down why. React stays the only adapter.
 
 `solid-js/universal`'s `createRenderer` asks for these functions:
 
-| Solid asks | Raven-TSX does |
+| Solid asks | raven-tsx does |
 |---|---|
 | `createElement(tag)` | `WidgetInstance.create(tag, {})`, or a `WindowInstance` for `Window`. It stays pending: nothing in Raven yet. |
 | `setProperty(node, name, value)` | Writes the prop into the node's props and asks for a flush. A pending node takes its props when it is made; a live one gets `update(props)` at the flush. |
@@ -172,5 +172,5 @@ If one of these fails, stop and write down why. React stays the only adapter.
 ## Decisions for the user
 
 1. **Package layout.** One package with subpaths (recommended), or separate packages.
-2. **Repository name.** `Raven-TSX` (as in this plan) or `raven-tsx`, and whether to rename the local folder.
+2. **Repository name.** `raven-tsx`, all lowercase. Still open: whether to rename the local folder.
 3. **Whether to do Solid** after phase 2, or stop at a clean core until someone asks for it.

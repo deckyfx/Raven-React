@@ -481,7 +481,8 @@ export class WidgetInstance implements HostNode {
 			return;
 		}
 		controlledSync.set(this.id, () => {
-			if (data) {
+			// (with nothing to refuse the change, the user's value stays, as for `unreported`: other events of the widget come here too)
+			if (data && this.resolved.handlers.has("OnChanged")) {
 				eventScope.ignoringEvents(() => data.restore(this.id, this.resolved.data));
 			}
 			for (const { attribute, unreported } of controlled ?? []) {

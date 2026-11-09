@@ -1113,6 +1113,37 @@ test("the drag lines of a Plot give their value, and a controlled one stays wher
 	expect(views.at(-1)?.Y2.length).toBe(2);
 });
 
+test("a drag line nobody listens to stays where the user put it when the view moves", async () => {
+	const views: PlotView[] = [];
+	await mount(
+		<VBox>
+			<Plot
+				Name="p"
+				Height={300}
+				XMin={0}
+				XMax={4}
+				YMin={-2}
+				YMax={4}
+				Series={[{ X: [0, 4], Y: [0, 1] }]}
+				DragLines={[{ Axis: "X", Value: 2 }]}
+				OnViewChanged={(view) => views.push(view)}
+			/>
+		</VBox>,
+	);
+	const plot = find("p");
+	const [fromX, fromY] = r.Rplot_data_to_point(plot, 2, 1);
+	dragIn(plot, [fromX, fromY], [fromX + 30, fromY]);
+	await settle();
+	const moved = r.Rplot_get_drag_line_value(plot, 0);
+	expect(moved).toBeGreaterThan(2);
+	// (a drag away from the line pans: that event must not put the line back)
+	const before = views.length;
+	dragIn(plot, [fromX - 80, fromY + 40], [fromX - 40, fromY + 40]);
+	await settle();
+	expect(views.length).toBeGreaterThan(before);
+	expect(r.Rplot_get_drag_line_value(plot, 0)).toBe(moved);
+});
+
 test("a click in the legend of a Plot says which series and whether it shows", async () => {
 	const seen: Array<readonly [number, boolean]> = [];
 	await mount(<VBox><Plot Name="p" Height={300} Legend="TopLeft" XMin={0} XMax={4} YMin={-2} YMax={4} Series={[{ Name: "wave", X: [0, 4], Y: [0, 1] }]} OnSeriesToggled={(series, visible) => seen.push([series, visible])} /></VBox>);

@@ -29,8 +29,11 @@ class UpdatePriority {
 	discrete(run: () => void): void {
 		const before = this.current;
 		this.current = DiscreteEventPriority;
-		run();
-		this.current = before;
+		try {
+			run();
+		} finally {
+			this.current = before;
+		}
 	}
 }
 

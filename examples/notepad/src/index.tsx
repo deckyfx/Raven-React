@@ -28,7 +28,7 @@ import {
 	Window,
 	type WidgetInstance,
 	type WindowInstance,
-} from "@decky.fx/raven-react";
+} from "@decky.fx/raven-tsx/react";
 import { encodeText, languageNames, markNotes, proposeWords, registerIni, startsWithBom, usesCrlf } from "./languages";
 import { NotepadMenus, type MenuActions } from "./NotepadMenus";
 

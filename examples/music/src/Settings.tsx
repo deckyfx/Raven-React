@@ -1,7 +1,7 @@
 /** The settings. The look can be any look of Raven or any of the three themes of the player. */
 
 import { useRef, useState, type ReactNode } from "react";
-import { Border, Checkbox, ColorPicker, ComboBox, HBox, Label, raven, ScrollBox, Separator, Slider, VBox, type WidgetInstance } from "@decky.fx/raven-react";
+import { Border, Checkbox, ColorPicker, ComboBox, HBox, Label, raven, ScrollBox, Separator, Slider, VBox, type WidgetInstance } from "@decky.fx/raven-tsx/react";
 import { hex } from "./library";
 import { LOOK_NAMES, useMusic } from "./music";
 import { Heading } from "./tags";

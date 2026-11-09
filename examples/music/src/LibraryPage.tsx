@@ -1,7 +1,7 @@
 /** Everything in your library, as cards. */
 
 import type { ReactNode } from "react";
-import { Label, ScrollBox, VBox, WrapBox } from "@decky.fx/raven-react";
+import { Label, ScrollBox, VBox, WrapBox } from "@decky.fx/raven-tsx/react";
 import { albums, playlists } from "./library";
 import { useMusic } from "./music";
 import { Heading } from "./tags";

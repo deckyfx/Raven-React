@@ -11,7 +11,7 @@
  */
 
 import { useEffect, useState, type ReactNode } from "react";
-import { Button, HBox, Label, raven, runApp, ScrollBox, VBox, WrapBox } from "@decky.fx/raven-react";
+import { Button, HBox, Label, raven, runApp, ScrollBox, VBox, WrapBox } from "@decky.fx/raven-tsx/react";
 
 /** How many buttons a click adds. */
 const BATCH = 200;

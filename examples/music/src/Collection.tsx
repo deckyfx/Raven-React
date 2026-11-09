@@ -1,7 +1,7 @@
 /** An album or a playlist: the same page shows them all. */
 
 import { useEffect, useRef, type ReactNode } from "react";
-import { Border, Grid, HBox, Label, raven, ScrollBox, Separator, Spacer, VBox, type WidgetInstance } from "@decky.fx/raven-react";
+import { Border, Grid, HBox, Label, raven, ScrollBox, Separator, Spacer, VBox, type WidgetInstance } from "@decky.fx/raven-tsx/react";
 import { albumAt, albumSeconds, hex, playlistAt, trackAt } from "./library";
 import { useMusic } from "./music";
 import { Cover, Heading, Icon } from "./tags";

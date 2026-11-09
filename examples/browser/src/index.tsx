@@ -6,7 +6,7 @@
  */
 
 import { createElement, useEffect, useRef, useState, type ReactElement, type ReactNode, type RefObject } from "react";
-import { Button, ColorPicker, HBox, Label, raven, runApp, Separator, Slider, TextInput, VBox, type WidgetInstance } from "@decky.fx/raven-react";
+import { Button, ColorPicker, HBox, Label, raven, runApp, Separator, Slider, TextInput, VBox, type WidgetInstance } from "@decky.fx/raven-tsx/react";
 import * as web from "./web";
 
 const WELCOME_PAGE = `${import.meta.dir}/../assets/pages/welcome.html`;

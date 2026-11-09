@@ -10,7 +10,7 @@
  * RAVEN_MUSIC_ISLAND, to open on a given screen.
  */
 
-import { raven, runApp } from "@decky.fx/raven-react";
+import { raven, runApp } from "@decky.fx/raven-tsx/react";
 import { drawAtlas } from "./glyphs";
 import { initLibrary } from "./library";
 import { applyLook, LOOKS, MusicProvider } from "./music";

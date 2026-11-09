@@ -1,6 +1,6 @@
 /** What the notepad adds to the editor: a language of its own, and proposals. */
 
-import { raven } from "@decky.fx/raven-react";
+import { raven } from "@decky.fx/raven-tsx/react";
 
 /** A language of our own: the editor only needs to be told what its words and comments look like. */
 export function registerIni(): void {

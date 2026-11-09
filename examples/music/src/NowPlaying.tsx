@@ -1,7 +1,7 @@
 /** The panel of the song playing, on the right. */
 
 import type { ReactNode } from "react";
-import { Border, Button, HBox, Label, ScrollBox, VBox } from "@decky.fx/raven-react";
+import { Border, Button, HBox, Label, ScrollBox, VBox } from "@decky.fx/raven-tsx/react";
 import { albumAt, hex, trackAt } from "./library";
 import { useMusic } from "./music";
 import { Cover, Heading, Visualizer } from "./tags";

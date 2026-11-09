@@ -9,7 +9,7 @@ import {
 	Button, Checkbox, ComboBox, Custom, Expander, Grid, HBox, Label, ListView, Menu, MenuBar, MenuItem, raven, runApp, ScrollBox,
 	Separator, Slider, Spacer, SpinBox, Splitter, TabView, TextInput, TreeView, VBox, Viewport, useShortcut, Window,
 	type WidgetInstance, type WindowInstance,
-} from "@decky.fx/raven-react";
+} from "@decky.fx/raven-tsx/react";
 import { bobAt, COLOR_NAMES, makeObject, MAX_OBJECTS, objectAt, type SceneObject } from "./scene";
 import { SceneRenderer } from "./scene-renderer";
 

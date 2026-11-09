@@ -6,7 +6,7 @@
  */
 
 import type { ReactNode } from "react";
-import { Border, HBox, Label, registerTag, Separator, VBox } from "@decky.fx/raven-react";
+import { Border, HBox, Label, registerTag, Separator, VBox } from "@decky.fx/raven-tsx/react";
 
 /** A small colored label. */
 export function Badge({ Text = "new", Color = "#3B82F6" }: { readonly Text?: string; readonly Color?: string }): ReactNode {

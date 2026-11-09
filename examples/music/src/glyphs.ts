@@ -3,7 +3,7 @@
  * first half of `tags.c`. An `<Icon>` shows a region of this texture.
  */
 
-import { raven } from "@decky.fx/raven-react";
+import { raven } from "@decky.fx/raven-tsx/react";
 
 const CELL = 96;
 const COLUMNS = 8;

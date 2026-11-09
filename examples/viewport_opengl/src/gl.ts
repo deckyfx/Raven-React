@@ -5,7 +5,7 @@
  */
 
 import { dlopen, type Pointer } from "bun:ffi";
-import { raven } from "@decky.fx/raven-react";
+import { raven } from "@decky.fx/raven-tsx/react";
 
 export const GL_COLOR_BUFFER_BIT = 0x4000;
 export const GL_DEPTH_BUFFER_BIT = 0x0100;

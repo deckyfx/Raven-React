@@ -1,5 +1,5 @@
 {
-  "name": "raven-react-workspace",
+  "name": "raven-tsx-workspace",
   "private": true,
-  "workspaces": ["packages/raven-react", "packages/raven-react/native/*", "examples/*"]
+  "workspaces": ["packages/raven-tsx", "packages/raven-tsx/native/*", "examples/*"]
 }

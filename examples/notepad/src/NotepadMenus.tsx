@@ -1,7 +1,7 @@
 /** The menus of the notepad, in the header bar. */
 
 import type { ReactNode } from "react";
-import { Menu, MenuBar, MenuItem, raven } from "@decky.fx/raven-react";
+import { Menu, MenuBar, MenuItem, raven } from "@decky.fx/raven-tsx/react";
 
 /** What the menus do. */
 export interface MenuActions {

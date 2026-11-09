@@ -19,7 +19,7 @@ import { useEffect, useRef, useState, type ReactNode } from "react";
 import {
 	Border, Button, Checkbox, ColorPicker, ComboBox, HBox, Label, ListView, loadTheme, ProgressBar, raven, runApp, ScrollBox, Separator, Slider, Spacer, SpinBox, Splitter, TextEditor, TextInput, useAction, VBox,
 	type WidgetInstance,
-} from "@decky.fx/raven-react";
+} from "@decky.fx/raven-tsx/react";
 import { ocean, paper, tweaks } from "./themes";
 
 const ASSETS = `${import.meta.dir}/../assets`;

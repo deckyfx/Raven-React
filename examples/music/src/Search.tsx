@@ -1,7 +1,7 @@
 /** Search: while nothing is typed, the genres; then what matches. */
 
 import { useMemo, type ReactNode } from "react";
-import { Button, HBox, Label, ScrollBox, Switcher, VBox, WrapBox } from "@decky.fx/raven-react";
+import { Button, HBox, Label, ScrollBox, Switcher, VBox, WrapBox } from "@decky.fx/raven-tsx/react";
 import { albumAt, albums, ALBUM_COUNT, genreColor, genres, hex, tracks } from "./library";
 import { useMusic } from "./music";
 import { Cover, Heading } from "./tags";

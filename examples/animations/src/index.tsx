@@ -14,7 +14,7 @@ import { useEffect, useLayoutEffect, useRef, useState, type ReactNode, type RefO
 import {
 	Border, Button, Checkbox, Custom, HBox, Island, Label, Overlay, raven, runApp, ScrollBox, Slider, Spacer, VBox,
 	type WidgetInstance,
-} from "@decky.fx/raven-react";
+} from "@decky.fx/raven-tsx/react";
 
 /** What `OnPaint` of a `Custom` receives as its painter. */
 type Painter = Parameters<typeof raven.Rdraw_rect>[0];

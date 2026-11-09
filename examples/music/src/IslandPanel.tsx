@@ -4,7 +4,7 @@
  */
 
 import type { ReactNode, RefObject } from "react";
-import { ComboBox, HBox, Island, Label, Separator, Slider, VBox, type WidgetInstance } from "@decky.fx/raven-react";
+import { ComboBox, HBox, Island, Label, Separator, Slider, VBox, type WidgetInstance } from "@decky.fx/raven-tsx/react";
 import { hex, trackAt } from "./library";
 import { LOOK_NAMES, useMusic } from "./music";
 import { useProgress } from "./PlayerBar";

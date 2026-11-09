@@ -3,13 +3,14 @@
   "configVersion": 1,
   "workspaces": {
     "": {
-      "name": "raven-react-workspace",
+      "name": "raven-tsx-workspace",
     },
     "examples/animations": {
       "name": "example-animations",
       "dependencies": {
         "@decky.fx/raven-tsx": "workspace:*",
-        "react": "^19.2.0",
+        "react": "^19.3.0",
+        "react-reconciler": "^0.34.0",
       },
       "devDependencies": {
         "@types/bun": "latest",
@@ -20,7 +21,8 @@
       "name": "example-browser",
       "dependencies": {
         "@decky.fx/raven-tsx": "workspace:*",
-        "react": "^19.2.0",
+        "react": "^19.3.0",
+        "react-reconciler": "^0.34.0",
       },
       "devDependencies": {
         "@types/bun": "latest",
@@ -31,7 +33,8 @@
       "name": "example-components",
       "dependencies": {
         "@decky.fx/raven-tsx": "workspace:*",
-        "react": "^19.2.0",
+        "react": "^19.3.0",
+        "react-reconciler": "^0.34.0",
       },
       "devDependencies": {
         "@types/bun": "latest",
@@ -42,7 +45,8 @@
       "name": "example-editor",
       "dependencies": {
         "@decky.fx/raven-tsx": "workspace:*",
-        "react": "^19.2.0",
+        "react": "^19.3.0",
+        "react-reconciler": "^0.34.0",
       },
       "devDependencies": {
         "@types/bun": "latest",
@@ -53,7 +57,8 @@
       "name": "example-effects",
       "dependencies": {
         "@decky.fx/raven-tsx": "workspace:*",
-        "react": "^19.2.0",
+        "react": "^19.3.0",
+        "react-reconciler": "^0.34.0",
       },
       "devDependencies": {
         "@types/bun": "latest",
@@ -64,7 +69,8 @@
       "name": "example-glass",
       "dependencies": {
         "@decky.fx/raven-tsx": "workspace:*",
-        "react": "^19.2.0",
+        "react": "^19.3.0",
+        "react-reconciler": "^0.34.0",
       },
       "devDependencies": {
         "@types/bun": "latest",
@@ -75,7 +81,8 @@
       "name": "example-hello",
       "dependencies": {
         "@decky.fx/raven-tsx": "workspace:*",
-        "react": "^19.2.0",
+        "react": "^19.3.0",
+        "react-reconciler": "^0.34.0",
       },
       "devDependencies": {
         "@types/bun": "latest",
@@ -86,7 +93,8 @@
       "name": "helloworld",
       "dependencies": {
         "@decky.fx/raven-tsx": "workspace:*",
-        "react": "^19.2.0",
+        "react": "^19.3.0",
+        "react-reconciler": "^0.34.0",
       },
       "devDependencies": {
         "@types/bun": "latest",
@@ -100,7 +108,8 @@
       "name": "example-memory",
       "dependencies": {
         "@decky.fx/raven-tsx": "workspace:*",
-        "react": "^19.2.0",
+        "react": "^19.3.0",
+        "react-reconciler": "^0.34.0",
       },
       "devDependencies": {
         "@types/bun": "latest",
@@ -111,7 +120,8 @@
       "name": "example-music",
       "dependencies": {
         "@decky.fx/raven-tsx": "workspace:*",
-        "react": "^19.2.0",
+        "react": "^19.3.0",
+        "react-reconciler": "^0.34.0",
       },
       "devDependencies": {
         "@types/bun": "latest",
@@ -122,7 +132,8 @@
       "name": "example-notepad",
       "dependencies": {
         "@decky.fx/raven-tsx": "workspace:*",
-        "react": "^19.2.0",
+        "react": "^19.3.0",
+        "react-reconciler": "^0.34.0",
       },
       "devDependencies": {
         "@types/bun": "latest",
@@ -133,7 +144,8 @@
       "name": "example-overlay",
       "dependencies": {
         "@decky.fx/raven-tsx": "workspace:*",
-        "react": "^19.2.0",
+        "react": "^19.3.0",
+        "react-reconciler": "^0.34.0",
       },
       "devDependencies": {
         "@types/bun": "latest",
@@ -144,7 +156,8 @@
       "name": "example-studio",
       "dependencies": {
         "@decky.fx/raven-tsx": "workspace:*",
-        "react": "^19.2.0",
+        "react": "^19.3.0",
+        "react-reconciler": "^0.34.0",
       },
       "devDependencies": {
         "@types/bun": "latest",
@@ -155,7 +168,8 @@
       "name": "example-themes",
       "dependencies": {
         "@decky.fx/raven-tsx": "workspace:*",
-        "react": "^19.2.0",
+        "react": "^19.3.0",
+        "react-reconciler": "^0.34.0",
       },
       "devDependencies": {
         "@types/bun": "latest",
@@ -166,7 +180,8 @@
       "name": "example-viewport_opengl",
       "dependencies": {
         "@decky.fx/raven-tsx": "workspace:*",
-        "react": "^19.2.0",
+        "react": "^19.3.0",
+        "react-reconciler": "^0.34.0",
       },
       "devDependencies": {
         "@types/bun": "latest",
@@ -177,7 +192,8 @@
       "name": "example-viewport_vulkan",
       "dependencies": {
         "@decky.fx/raven-tsx": "workspace:*",
-        "react": "^19.2.0",
+        "react": "^19.3.0",
+        "react-reconciler": "^0.34.0",
       },
       "devDependencies": {
         "@types/bun": "latest",
@@ -188,39 +204,51 @@
       "name": "example-workspace",
       "dependencies": {
         "@decky.fx/raven-tsx": "workspace:*",
-        "react": "^19.2.0",
+        "react": "^19.3.0",
+        "react-reconciler": "^0.34.0",
       },
       "devDependencies": {
         "@types/bun": "latest",
         "@types/react": "^19",
       },
     },
-    "packages/raven-react": {
+    "packages/raven-tsx": {
       "name": "@decky.fx/raven-tsx",
       "version": "0.1.0",
       "dependencies": {
         "@types/react": "^19",
         "@types/react-reconciler": "^0.34",
-        "react-reconciler": "^0.34.0",
       },
       "devDependencies": {
         "@types/bun": "latest",
-        "react": "^19.2.0",
+        "react": "^19.3.0",
+        "react-reconciler": "^0.34.0",
         "typescript": "^6",
       },
       "peerDependencies": {
-        "react": "^19.2.0",
+        "react": "^19.3.0",
+        "react-reconciler": "^0.34.0",
       },
+      "optionalPeers": [
+        "react",
+        "react-reconciler",
+      ],
     },
-    "packages/raven-react/native/linux-x64": {
+    "packages/raven-tsx/native/linux-x64": {
       "name": "@decky.fx/raven-tsx-linux-x64",
+      "version": "0.1.0",
+    },
+    "packages/raven-tsx/native/win32-x64": {
+      "name": "@decky.fx/raven-tsx-win32-x64",
       "version": "0.1.0",
     },
   },
   "packages": {
-    "@decky.fx/raven-tsx": ["@decky.fx/raven-tsx@workspace:packages/raven-react"],
+    "@decky.fx/raven-tsx": ["@decky.fx/raven-tsx@workspace:packages/raven-tsx"],
 
-    "@decky.fx/raven-tsx-linux-x64": ["@decky.fx/raven-tsx-linux-x64@workspace:packages/raven-react/native/linux-x64"],
+    "@decky.fx/raven-tsx-linux-x64": ["@decky.fx/raven-tsx-linux-x64@workspace:packages/raven-tsx/native/linux-x64"],
+
+    "@decky.fx/raven-tsx-win32-x64": ["@decky.fx/raven-tsx-win32-x64@workspace:packages/raven-tsx/native/win32-x64"],
 
     "@types/bun": ["@types/bun@1.4.4", "", { "dependencies": { "bun-types": "1.4.4" } }, "sha512-9wkRDXUXK124pEnAutE6n/l18j+i9GC5IAHK8TmX/2nlySETmky0OU6yL5U8pW1AoKh++AN9auDCr647BfurjQ=="],
 

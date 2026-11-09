@@ -14,7 +14,7 @@ const outfile = windows ? "./binaries/helloworld-windows-x64.exe" : `./binaries/
 
 if (windows && !(await Bun.file("../../node_modules/@decky.fx/raven-tsx-win32-x64/raven.dll").exists())) {
 	// the executable would still compile, and only fail when it starts on Windows
-	console.error("raven.dll is not in the workspace. First: cd ../../packages/raven-react && bun run native:windows && bun install");
+	console.error("raven.dll is not in the workspace. First: cd ../../packages/raven-tsx && bun run native:windows && bun install");
 	process.exit(1);
 }
 

@@ -1,4 +1,4 @@
 [install]
-# One node_modules at the top: raven-react finds the native package of the workspace there,
+# One node_modules at the top: raven-tsx finds the native package of the workspace there,
 # as it finds a published one in an application, and there is one copy of React.
 linker = "hoisted"

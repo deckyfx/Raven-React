@@ -10,7 +10,8 @@
   },
   "dependencies": {
     "@decky.fx/raven-tsx": "workspace:*",
-    "react": "^19.2.0"
+    "react": "^19.3.0",
+    "react-reconciler": "^0.34.0"
   },
   "devDependencies": {
     "@types/bun": "latest",

@@ -11,6 +11,13 @@ import manifest from "../../package.json";
 const root = `${import.meta.dir}/../..`;
 const directory = `${argument("out")}/main`;
 
+// (npm's provenance refuses a package that names another repository than the one publishing it: said here, before any package goes out)
+const publishing = Bun.env.GITHUB_REPOSITORY;
+if (publishing && manifest.repository.url !== `git+https://github.com/${publishing}.git`) {
+	console.error(`prepare:publish: package.json names ${manifest.repository.url}, but ${publishing} is publishing it`);
+	process.exit(1);
+}
+
 await Bun.$`rm -rf ${directory} && mkdir -p ${directory}`;
 await Bun.$`cp -r ${root}/src ${directory}/src`;
 await Bun.$`rm -rf ${directory}/src/test ${directory}/src/tools`;

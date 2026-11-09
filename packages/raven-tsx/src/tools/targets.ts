@@ -3,6 +3,7 @@
 import { mkdirSync, readdirSync, renameSync, rmSync } from "node:fs";
 import { resolve } from "node:path";
 import { STAMP_FILE, type LibraryStamp } from "../core/library-check";
+import mainManifest from "../../package.json";
 
 export interface Target {
 	readonly os: string;
@@ -91,7 +92,7 @@ export async function writePlatformPackage(options: {
 		cpu: [cpu],
 		exports: { ".": "./index.ts" },
 		files,
-		repository: { type: "git", url: "git+https://github.com/deckyfx/Raven-TSX.git" },
+		repository: mainManifest.repository,
 	};
 	await replaceFile(`${directory}/package.json`, `${JSON.stringify(manifest, null, 2)}\n`);
 	for (const name of readdirSync(directory)) {

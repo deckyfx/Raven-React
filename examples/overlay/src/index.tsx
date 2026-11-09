@@ -12,7 +12,7 @@
  */
 
 import { useLayoutEffect, useRef, useState, type ReactNode } from "react";
-import { BackgroundBlur, Border, Button, ComboBox, HBox, Label, Overlay, raven, runApp, Slider, VBox, Window, type WindowInstance } from "@decky.fx/raven-react";
+import { BackgroundBlur, Border, Button, ComboBox, HBox, Label, Overlay, raven, runApp, Slider, VBox, Window, type WindowInstance } from "@decky.fx/raven-tsx/react";
 
 /** The backdrops of the ComboBox, in its order. */
 const BACKDROPS = [

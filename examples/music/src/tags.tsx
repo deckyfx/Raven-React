@@ -6,7 +6,7 @@
 
 import { useCallback, useLayoutEffect, useRef, type ComponentProps, type ReactNode } from "react";
 import type { Pointer } from "bun:ffi";
-import { Custom, Image, Label, raven, type WidgetInstance } from "@decky.fx/raven-react";
+import { Custom, Image, Label, raven, type WidgetInstance } from "@decky.fx/raven-tsx/react";
 import { atlasTexture, glyphRegion, type Glyph } from "./glyphs";
 import { albumAt } from "./library";
 import { usePlaying } from "./music";

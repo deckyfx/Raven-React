@@ -4,7 +4,7 @@ A React renderer for [Raven](https://github.com/oscar-soirey/Raven), for [Bun](h
 
 ```tsx
 import { useState } from "react";
-import { Button, Label, runApp, VBox } from "@decky.fx/raven-react";
+import { Button, Label, runApp, VBox } from "@decky.fx/raven-tsx/react";
 
 function App() {
 	const [count, setCount] = useState(0);
@@ -27,7 +27,7 @@ Every C example of Raven has a TSX port in [examples](../../examples), with scre
 
 Not on npm yet, and the name of the package is not final. Once it is published:
 
-    bun add @decky.fx/raven-react react
+    bun add @decky.fx/raven-tsx react
 
 ```json
 { "compilerOptions": { "jsx": "react-jsx", "types": ["bun", "react"] } }
@@ -37,9 +37,9 @@ Raven's native library comes with it: there is a package per platform, and the p
 
 | Platform | Package |
 |---|---|
-| Linux x64, arm64 | `@decky.fx/raven-react-linux-x64`, `-linux-arm64` |
-| macOS Apple Silicon, Intel | `@decky.fx/raven-react-darwin-arm64`, `-darwin-x64` |
-| Windows x64 | `@decky.fx/raven-react-win32-x64` |
+| Linux x64, arm64 | `@decky.fx/raven-tsx-linux-x64`, `-linux-arm64` |
+| macOS Apple Silicon, Intel | `@decky.fx/raven-tsx-darwin-arm64`, `-darwin-x64` |
+| Windows x64 | `@decky.fx/raven-tsx-win32-x64` |
 
 What the system must have: a Vulkan driver, and on Linux libX11. On macOS, version 14 or newer, Vulkan comes from MoltenVK: `brew install molten-vk`.
 
@@ -150,7 +150,7 @@ On macOS a `MenuBar` goes to the menu bar of the system; `Native={false}` keeps 
 A theme is a typed object, not a theme file: `defineTheme` checks it, and `loadTheme` gives it to Raven, which keeps it under its name. The colors and metrics take the names of Raven's schema, so a typo does not compile.
 
 ```tsx
-import { defineTheme, loadTheme, raven } from "@decky.fx/raven-react";
+import { defineTheme, loadTheme, raven } from "@decky.fx/raven-tsx/react";
 
 export const ocean = defineTheme({
 	Name: "Ocean",

@@ -30,7 +30,7 @@ import {
 	Window,
 	type WidgetInstance,
 	type WindowInstance,
-} from "@decky.fx/raven-react";
+} from "@decky.fx/raven-tsx/react";
 
 const WELCOME = `/*
  * Drag the tab of a panel:

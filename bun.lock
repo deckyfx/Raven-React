@@ -8,7 +8,7 @@
     "examples/animations": {
       "name": "example-animations",
       "dependencies": {
-        "@decky.fx/raven-react": "workspace:*",
+        "@decky.fx/raven-tsx": "workspace:*",
         "react": "^19.2.0",
       },
       "devDependencies": {
@@ -19,7 +19,7 @@
     "examples/browser": {
       "name": "example-browser",
       "dependencies": {
-        "@decky.fx/raven-react": "workspace:*",
+        "@decky.fx/raven-tsx": "workspace:*",
         "react": "^19.2.0",
       },
       "devDependencies": {
@@ -30,7 +30,7 @@
     "examples/components": {
       "name": "example-components",
       "dependencies": {
-        "@decky.fx/raven-react": "workspace:*",
+        "@decky.fx/raven-tsx": "workspace:*",
         "react": "^19.2.0",
       },
       "devDependencies": {
@@ -41,7 +41,7 @@
     "examples/editor": {
       "name": "example-editor",
       "dependencies": {
-        "@decky.fx/raven-react": "workspace:*",
+        "@decky.fx/raven-tsx": "workspace:*",
         "react": "^19.2.0",
       },
       "devDependencies": {
@@ -52,7 +52,7 @@
     "examples/effects": {
       "name": "example-effects",
       "dependencies": {
-        "@decky.fx/raven-react": "workspace:*",
+        "@decky.fx/raven-tsx": "workspace:*",
         "react": "^19.2.0",
       },
       "devDependencies": {
@@ -63,7 +63,7 @@
     "examples/glass": {
       "name": "example-glass",
       "dependencies": {
-        "@decky.fx/raven-react": "workspace:*",
+        "@decky.fx/raven-tsx": "workspace:*",
         "react": "^19.2.0",
       },
       "devDependencies": {
@@ -74,7 +74,7 @@
     "examples/hello": {
       "name": "example-hello",
       "dependencies": {
-        "@decky.fx/raven-react": "workspace:*",
+        "@decky.fx/raven-tsx": "workspace:*",
         "react": "^19.2.0",
       },
       "devDependencies": {
@@ -85,7 +85,7 @@
     "examples/helloworld": {
       "name": "helloworld",
       "dependencies": {
-        "@decky.fx/raven-react": "workspace:*",
+        "@decky.fx/raven-tsx": "workspace:*",
         "react": "^19.2.0",
       },
       "devDependencies": {
@@ -99,7 +99,7 @@
     "examples/memory": {
       "name": "example-memory",
       "dependencies": {
-        "@decky.fx/raven-react": "workspace:*",
+        "@decky.fx/raven-tsx": "workspace:*",
         "react": "^19.2.0",
       },
       "devDependencies": {
@@ -110,7 +110,7 @@
     "examples/music": {
       "name": "example-music",
       "dependencies": {
-        "@decky.fx/raven-react": "workspace:*",
+        "@decky.fx/raven-tsx": "workspace:*",
         "react": "^19.2.0",
       },
       "devDependencies": {
@@ -121,7 +121,7 @@
     "examples/notepad": {
       "name": "example-notepad",
       "dependencies": {
-        "@decky.fx/raven-react": "workspace:*",
+        "@decky.fx/raven-tsx": "workspace:*",
         "react": "^19.2.0",
       },
       "devDependencies": {
@@ -132,7 +132,7 @@
     "examples/overlay": {
       "name": "example-overlay",
       "dependencies": {
-        "@decky.fx/raven-react": "workspace:*",
+        "@decky.fx/raven-tsx": "workspace:*",
         "react": "^19.2.0",
       },
       "devDependencies": {
@@ -143,7 +143,7 @@
     "examples/studio": {
       "name": "example-studio",
       "dependencies": {
-        "@decky.fx/raven-react": "workspace:*",
+        "@decky.fx/raven-tsx": "workspace:*",
         "react": "^19.2.0",
       },
       "devDependencies": {
@@ -154,7 +154,7 @@
     "examples/themes": {
       "name": "example-themes",
       "dependencies": {
-        "@decky.fx/raven-react": "workspace:*",
+        "@decky.fx/raven-tsx": "workspace:*",
         "react": "^19.2.0",
       },
       "devDependencies": {
@@ -165,7 +165,7 @@
     "examples/viewport_opengl": {
       "name": "example-viewport_opengl",
       "dependencies": {
-        "@decky.fx/raven-react": "workspace:*",
+        "@decky.fx/raven-tsx": "workspace:*",
         "react": "^19.2.0",
       },
       "devDependencies": {
@@ -176,7 +176,7 @@
     "examples/viewport_vulkan": {
       "name": "example-viewport_vulkan",
       "dependencies": {
-        "@decky.fx/raven-react": "workspace:*",
+        "@decky.fx/raven-tsx": "workspace:*",
         "react": "^19.2.0",
       },
       "devDependencies": {
@@ -187,7 +187,7 @@
     "examples/workspace": {
       "name": "example-workspace",
       "dependencies": {
-        "@decky.fx/raven-react": "workspace:*",
+        "@decky.fx/raven-tsx": "workspace:*",
         "react": "^19.2.0",
       },
       "devDependencies": {
@@ -196,7 +196,7 @@
       },
     },
     "packages/raven-react": {
-      "name": "@decky.fx/raven-react",
+      "name": "@decky.fx/raven-tsx",
       "version": "0.1.0",
       "dependencies": {
         "@types/react": "^19",
@@ -213,20 +213,14 @@
       },
     },
     "packages/raven-react/native/linux-x64": {
-      "name": "@decky.fx/raven-react-linux-x64",
-      "version": "0.1.0",
-    },
-    "packages/raven-react/native/win32-x64": {
-      "name": "@decky.fx/raven-react-win32-x64",
+      "name": "@decky.fx/raven-tsx-linux-x64",
       "version": "0.1.0",
     },
   },
   "packages": {
-    "@decky.fx/raven-react": ["@decky.fx/raven-react@workspace:packages/raven-react"],
+    "@decky.fx/raven-tsx": ["@decky.fx/raven-tsx@workspace:packages/raven-react"],
 
-    "@decky.fx/raven-react-linux-x64": ["@decky.fx/raven-react-linux-x64@workspace:packages/raven-react/native/linux-x64"],
-
-    "@decky.fx/raven-react-win32-x64": ["@decky.fx/raven-react-win32-x64@workspace:packages/raven-react/native/win32-x64"],
+    "@decky.fx/raven-tsx-linux-x64": ["@decky.fx/raven-tsx-linux-x64@workspace:packages/raven-react/native/linux-x64"],
 
     "@types/bun": ["@types/bun@1.4.4", "", { "dependencies": { "bun-types": "1.4.4" } }, "sha512-9wkRDXUXK124pEnAutE6n/l18j+i9GC5IAHK8TmX/2nlySETmky0OU6yL5U8pW1AoKh++AN9auDCr647BfurjQ=="],
 

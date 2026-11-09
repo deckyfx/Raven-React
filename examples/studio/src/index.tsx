@@ -18,7 +18,7 @@ import {
 	useFrame,
 	VBox,
 	type WidgetInstance,
-} from "@decky.fx/raven-react";
+} from "@decky.fx/raven-tsx/react";
 import { GraphLink, GraphNode, hexColor, PinType, reaches, type NodeSpec, type PinShape, type PinSpec } from "./graph-elements";
 
 /** The themes of the list: Raven's, then the looks of the platforms, which the graph and the timeline follow with the look Auto. */

@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState, type ReactNode } from "react";
-import { Breadcrumb, Button, Checkbox, ComboBox, Custom, DatePicker, Expander, HBox, Label, ListView, Overlay, Pagination, raven, Rating, Slider, SpinBox, Table, TabView, TextInput, TimePicker, Toast, VBox, Window, type WidgetInstance } from "@decky.fx/raven-react";
+import { Breadcrumb, Button, Checkbox, ComboBox, Custom, DatePicker, Expander, HBox, Label, ListView, Overlay, Pagination, raven, Rating, Slider, SpinBox, Table, TabView, TextInput, TimePicker, Toast, VBox, Window, type WidgetInstance } from "@decky.fx/raven-tsx/react";
 
 /** A row of the list. Two rows can have the same text, so the id is what tells them apart. */
 interface Item {
@@ -147,7 +147,7 @@ function NewWidgets(): ReactNode {
 				<Pagination PageCount={12} Page={page} OnChanged={setPage} />
 				<HBox Spacing={8}>
 					<Button OnClicked={() => say(`Page ${page + 1}, ${stars} stars`)}>Show a toast</Button>
-					<Button OnClicked={() => raven.Rnotification_show("Hello World", "From raven-react", raven.R_NOTIFICATION_NORMAL)}>Notify the system</Button>
+					<Button OnClicked={() => raven.Rnotification_show("Hello World", "From raven-tsx", raven.R_NOTIFICATION_NORMAL)}>Notify the system</Button>
 				</HBox>
 			</VBox>
 			<Toast ref={toast} Kind="Success" Slot={{ HAlign: "Center", VAlign: "Bottom" }} />
@@ -155,7 +155,7 @@ function NewWidgets(): ReactNode {
 	);
 }
 
-/** The testing ground of raven-react. */
+/** The testing ground of raven-tsx. */
 export function App(): ReactNode {
 	const [extraOpen, setExtraOpen] = useState(false);
 	const [opened, setOpened] = useState(0);

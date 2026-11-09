@@ -8,7 +8,7 @@
  */
 
 import { toArrayBuffer } from "bun:ffi";
-import { raven } from "@decky.fx/raven-react";
+import { raven } from "@decky.fx/raven-tsx/react";
 
 export const ALBUM_COUNT = 24;
 export const MAX_TRACKS = 320;

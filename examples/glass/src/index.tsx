@@ -21,7 +21,7 @@ import { memo, useEffect, useRef, useState, type ReactNode, type RefObject } fro
 import {
 	Border, Button, Checkbox, ComboBox, HBox, Image, Label, Overlay, ProgressBar, raven, runApp, ScrollBox, Separator, Slider,
 	SpinBox, TextInput, TreeView, UniformGrid, VBox, Window, WrapBox, type WidgetInstance, type WindowInstance,
-} from "@decky.fx/raven-react";
+} from "@decky.fx/raven-tsx/react";
 
 /** Whether the program was started with the light glass. */
 const START_LIGHT = process.argv[2] === "light";

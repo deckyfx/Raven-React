@@ -8,7 +8,7 @@
  */
 
 import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from "react";
-import { Checkbox, HBox, Label, raven, runApp, Separator, Slider, VBox, Viewport, type WidgetInstance } from "@decky.fx/raven-react";
+import { Checkbox, HBox, Label, raven, runApp, Separator, Slider, VBox, Viewport, type WidgetInstance } from "@decky.fx/raven-tsx/react";
 import {
 	GL_COLOR_BUFFER_BIT,
 	GL_DEPTH_BUFFER_BIT,

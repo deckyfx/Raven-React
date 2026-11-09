@@ -7,7 +7,7 @@
  */
 
 import { createContext, use, useEffect, useLayoutEffect, useMemo, useReducer, useRef, useState, type ReactNode, type RefObject } from "react";
-import { raven, type WidgetInstance } from "@decky.fx/raven-react";
+import { raven, type WidgetInstance } from "@decky.fx/raven-tsx/react";
 import { albumAt, albumTracks, playlistAt, PLAYLIST_CAPACITY, tracks as allTracks, trackAt, type Album, type Rgb } from "./library";
 
 export const PAGE_HOME = 0;

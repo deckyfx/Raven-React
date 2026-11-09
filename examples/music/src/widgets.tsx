@@ -1,7 +1,7 @@
 /** The tags the C example declares in `ui/widgets.xml`, as components. */
 
 import { useLayoutEffect, useRef, type ComponentProps, type ReactNode, type RefObject } from "react";
-import { Border, Button, Grid, HBox, Label, Overlay, raven, VBox, type WidgetInstance } from "@decky.fx/raven-react";
+import { Border, Button, Grid, HBox, Label, Overlay, raven, VBox, type WidgetInstance } from "@decky.fx/raven-tsx/react";
 import type { Glyph } from "./glyphs";
 import { albumAt, formatTime, hex, trackAt, type Rgb } from "./library";
 import { useMusic } from "./music";

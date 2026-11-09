@@ -1,7 +1,7 @@
 /** The header: the window has no title bar of the system (`CustomHeader`), this bar moves it and holds its buttons. */
 
 import type { ReactNode } from "react";
-import { Border, Button, HBox, HeaderBar, Spacer, TextInput } from "@decky.fx/raven-react";
+import { Border, Button, HBox, HeaderBar, Spacer, TextInput } from "@decky.fx/raven-tsx/react";
 import { PAGE_HOME, PAGE_SETTINGS, useMusic } from "./music";
 import { Heading, Icon } from "./tags";
 import { IconButton } from "./widgets";

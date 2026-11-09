@@ -47,9 +47,12 @@ test("nothing in the core imports a framework or an adapter", async () => {
 });
 
 test("importing the core loads no framework", () => {
-	const script = `await import(${JSON.stringify(`${CORE}/index.ts`)}); console.log(Object.keys(require.cache).filter((path) => /node_modules\\/(react|react-reconciler|solid-js)\\//.test(path)).join(","));`;
+	const script = `await import(${JSON.stringify(`${CORE}/index.ts`)}); const loaded = Object.keys(require.cache); console.log(loaded.some((path) => /core[\\\\/]index\\.ts$/.test(path))); console.log(loaded.filter((path) => /node_modules[\\\\/](react|react-reconciler|solid-js)[\\\\/]/.test(path)).join(","));`;
 	const run = Bun.spawnSync(["bun", "-e", script], { stdout: "pipe", stderr: "pipe" });
 	expect(run.stderr.toString()).toBe("");
-	expect(run.stdout.toString().trim()).toBe("");
 	expect(run.success).toBe(true);
+	const [seesTheCore, frameworks] = run.stdout.toString().split(/\r?\n/);
+	// (the list of what was loaded has the core in it: an empty answer below means something)
+	expect(seesTheCore).toBe("true");
+	expect(frameworks).toBe("");
 });

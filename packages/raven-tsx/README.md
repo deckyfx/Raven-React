@@ -27,9 +27,9 @@ Every C example of Raven has a TSX port in [examples](../../examples), with scre
 
 Not on npm yet, and the name of the package is not final. Once it is published:
 
-    bun add @decky.fx/raven-tsx react
+    bun add @decky.fx/raven-tsx react react-reconciler
 
-`react` is an optional peer dependency: `@decky.fx/raven-tsx/react` needs it, and an application that uses only the core does not.
+`react` and `react-reconciler` are optional peer dependencies: `@decky.fx/raven-tsx/react` needs both, and an application that uses only the core installs neither.
 
 | Import | What it is |
 |---|---|

@@ -105,7 +105,10 @@ function render(element: Element): void {
 		element.mounted.mount.update(content);
 		return;
 	}
-	element.mounted?.mount.unmount();
+	// (forgotten first: taken away once, even if this or the new mount throws)
+	const previous = element.mounted;
+	element.mounted = null;
+	previous?.mount.unmount();
 	element.mounted = { registration, mount: registration.mount(content, element.widget) };
 }
 

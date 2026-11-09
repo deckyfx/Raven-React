@@ -28,7 +28,7 @@ import { Button, Label, runApp, VBox } from "@decky.fx/raven-tsx/solid";
 import { defineTheme, loadTheme, raven } from "@decky.fx/raven-tsx";   // the core, for code that is not a component
 ```
 
-- `react` and `solid-js` are optional peer dependencies. An app installs only the one it uses.
+- `react` (with `react-reconciler`) and `solid-js` are optional peer dependencies. An app installs only the one it uses.
 - Each adapter also exports everything in the core, so an app needs a single import.
 - There is one version and one set of native packages, `@decky.fx/raven-tsx-<platform>`.
 

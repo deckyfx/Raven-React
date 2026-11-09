@@ -1,6 +1,6 @@
 /** Registered tags through a plain adapter, with no framework: what the core does for any adapter. */
 
-import { afterAll, afterEach, beforeAll, expect, test } from "bun:test";
+import { afterAll, afterEach, beforeAll, expect, spyOn, test } from "bun:test";
 import * as r from "../../core/raven";
 import { registerTagWith, type TagAdapter, type TagContent, type TagMount } from "../../core/tags";
 
@@ -68,6 +68,29 @@ test("an adapter mounts a component with the attributes and the widgets of its e
 	expect(adapter.calls).toEqual(["mount card", "update card", "unmount card"]);
 	// (the adapter showed none of them: they went with the element)
 	expect(adopted.filter((widget) => r.Rwidget_is_valid(widget))).toEqual([]);
+});
+
+test("a component that was taken away is not taken away again when the new one fails to mount", async () => {
+	const first = new RecordingAdapter();
+	const failing: TagAdapter<string> = {
+		mount: () => {
+			throw new Error("cannot mount");
+		},
+	};
+	const quiet = spyOn(console, "error").mockImplementation(() => {});
+	try {
+		unregister.push(registerTagWith<string, { Title: string }, never>(first, "CoreFailing", "old", { attributes: { Title: "string" } }));
+		const swap = r.Rwidget_create_from_xml("<CoreFailing/>");
+		await placed();
+		unregister.push(registerTagWith<string, { Title: string }, never>(failing, "CoreFailing", "new", { attributes: { Title: "string" } }));
+		r.Rwidget_set_attribute(swap, "Title", "x");
+		r.Rwidget_set_attribute(swap, "Title", "y");
+		r.Rwidget_destroy(swap);
+		r.Rdraw_frame();
+		expect(first.calls).toEqual(["mount old", "unmount old"]);
+	} finally {
+		quiet.mockRestore();
+	}
 });
 
 test("a tag registered again renders the new component, through its own adapter", async () => {

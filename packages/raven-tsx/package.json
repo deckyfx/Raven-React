@@ -33,20 +33,24 @@
   },
   "dependencies": {
     "@types/react": "^19",
-    "@types/react-reconciler": "^0.34",
-    "react-reconciler": "^0.34.0"
+    "@types/react-reconciler": "^0.34"
   },
   "peerDependencies": {
-    "react": "^19.2.0"
+    "react": "^19.3.0",
+    "react-reconciler": "^0.34.0"
   },
   "peerDependenciesMeta": {
     "react": {
+      "optional": true
+    },
+    "react-reconciler": {
       "optional": true
     }
   },
   "devDependencies": {
     "@types/bun": "latest",
-    "react": "^19.2.0",
+    "react": "^19.3.0",
+    "react-reconciler": "^0.34.0",
     "typescript": "^6"
   }
 }

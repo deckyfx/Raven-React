@@ -14,7 +14,7 @@
   },
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/deckyfx/Raven-TSX.git"
+    "url": "git+https://github.com/deckyfx/raven-tsx.git"
   },
   "keywords": ["raven", "tsx", "bun", "gui", "desktop", "native", "widgets", "react", "vulkan"],
   "scripts": {

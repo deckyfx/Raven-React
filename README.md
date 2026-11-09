@@ -1,4 +1,4 @@
-# Raven-TSX
+# raven-tsx
 
 Native desktop interfaces in TSX, for [Bun](https://bun.com), on the real widgets of [Raven](https://github.com/oscar-soirey/Raven), drawn with Vulkan. A core knows only Raven, and an adapter for a framework is built on it; React is the one there is today. No XML, no webview, and no build step.
 
@@ -56,4 +56,4 @@ To run one, check out and build Raven at the pinned commit, and make the native 
 
 ## Raven
 
-Raven-TSX follows a pinned commit of Raven, written in [packages/raven-tsx/RAVEN_VERSION](packages/raven-tsx/RAVEN_VERSION). The components and their props are generated from that commit's schema, so they are always the ones the library has.
+raven-tsx follows a pinned commit of Raven, written in [packages/raven-tsx/RAVEN_VERSION](packages/raven-tsx/RAVEN_VERSION). The components and their props are generated from that commit's schema, so they are always the ones the library has.

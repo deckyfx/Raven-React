@@ -1,12 +1,12 @@
 # Plan: raven-tsx
 
-Raven-React becomes raven-tsx: one library that makes Raven's native widgets from TSX. It splits into a core, which knows only Raven, and an adapter for each framework. React is the first adapter. Solid is the second, if a short test of its compiler on Bun works out.
+raven-tsx is one library that makes Raven's native widgets from TSX. It is split into a core, which knows only Raven, and an adapter for each framework. React is the first adapter. Solid is the second, if a short test of its compiler on Bun works out.
 
-Nothing has been published to npm (`@decky.fx/raven-react` and `@decky.fx/raven-tsx` are both free), so the rename does not need to stay compatible with anything.
+Nothing has been published to npm yet.
 
 ## Where things stand
 
-The package is about 3,300 lines in `packages/raven-react/src`, not counting the generated binding in `vendor/` or the tools. About three quarters of it does not use React:
+Before the split, the package was about 3,300 lines, not counting the generated binding in `vendor/` or the tools. About three quarters of it does not use React:
 
 | Without React (about 2,500 lines) | With React (about 800 lines) |
 |---|---|
@@ -36,35 +36,7 @@ The alternative is separate packages (`raven-tsx-core`, `raven-tsx-react`, `rave
 
 ## Phase 1: rename
 
-This phase is mechanical and changes no behaviour. It goes in its own PR, so the diff can be reviewed as nothing but names.
-
-**GitHub** (the user does this, or I do it on the user's say-so):
-- Rename the repository from `deckyfx/Raven-React` to `deckyfx/raven-tsx`: `gh repo rename raven-tsx -R deckyfx/Raven-React`, or in Settings.
-  - GitHub redirects the old URLs, and open PRs and issues stay where they are.
-  - Do it after PR #7 is merged, so nothing is open across the rename.
-- Point the local remote at the new name: `git remote set-url origin git@github.com:deckyfx/raven-tsx.git`.
-
-**Repository.** Counted on 2026-11-08, outside `node_modules`, `vendor` and this plan:
-
-| What | Where | Count |
-|---|---|---|
-| Package name `@decky.fx/raven-react` | `package.json` of the package and of each of the 17 examples, imports in the examples, `bun.lock` | 85 |
-| Native packages `@decky.fx/raven-react-<platform>` | `native/*/package.json`, `native.ts`, `pack-platform.ts`, README | about 15 |
-| Folder `packages/raven-react` | root `package.json` workspaces, `.github/workflows/release.yml` (7 lines), `.coderabbit.yaml` (`path_filters`), `library-check.ts` message, both READMEs | about 20 |
-| Prefix `raven-react:` in messages | `widget-instance.ts`, `window-instance.ts`, `tags.ts`, `events.ts`, `frame.ts`, `root.ts`, `web.ts`, `hooks.ts`, `native.ts`, `host-config.ts`, `library-check.ts`, one test | 27 |
-| Names given to Raven | `ADOPTED_TAG` (`raven-react:adopted`), `CONTENT_NAME` (`raven-react.content`), action names `raven-react.<n>` and `raven-react.shortcut.<n>`, the DLL extracted on Windows | 6 |
-| Words | `README.md` (both), `NOTICE`, `index.ts` header, `drift.txt` header, `raven-status.ts`, `raven-drift.ts`, `raven-update.ts`, `bunfig.toml` comment, `description` and `keywords` | about 15 |
-
-Steps:
-1. `git mv packages/raven-react packages/raven-tsx`.
-2. Replace the names in the table above. `rendererPackageName` stays `raven-tsx-react` from the start.
-3. `bun install` to rewrite `bun.lock`.
-4. Check that `grep -rI raven-react` finds nothing outside `.git`, `node_modules` and the history in `drift.txt`.
-5. `bun check`, `bun test`, and type-check the 17 examples. CI must pass on all 5 platforms.
-6. After merging, update the memory notes that name the repository.
-7. Optionally, rename the local folder `bun/raven-react` to `bun/raven-tsx`.
-
-The root export still gives the React components in this phase. Phase 2 moves them to `/react`.
+Done. The packages, the folders, the messages and the GitHub repository (`deckyfx/raven-tsx`) all carry the new name.
 
 ## Phase 2: separate the core from React
 
@@ -172,5 +144,5 @@ If one of these fails, stop and write down why. React stays the only adapter.
 ## Decisions for the user
 
 1. **Package layout.** One package with subpaths (recommended), or separate packages.
-2. **Repository name.** `raven-tsx`, all lowercase. Still open: whether to rename the local folder.
+2. **Repository name.** Decided: `raven-tsx`, all lowercase.
 3. **Whether to do Solid** after phase 2, or stop at a clean core until someone asks for it.

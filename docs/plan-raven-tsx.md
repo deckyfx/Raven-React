@@ -20,7 +20,7 @@ PR #7 helps here: a node now lives only in JavaScript until it is placed, and `m
 
 ## Package layout
 
-**Recommended: one package, with a subpath for each framework.**
+**One package, with a subpath for each framework.**
 
 ```ts
 import { Button, Label, runApp, VBox } from "@decky.fx/raven-tsx/react";
@@ -32,7 +32,7 @@ import { defineTheme, loadTheme, raven } from "@decky.fx/raven-tsx";   // the co
 - Each adapter also exports everything in the core, so an app needs a single import.
 - There is one version and one set of native packages, `@decky.fx/raven-tsx-<platform>`.
 
-The alternative is separate packages (`raven-tsx-core`, `raven-tsx-react`, `raven-tsx-solid`). That means three versions to keep in step for no gain while one person maintains them all. It is easy to change to later, because the folders below already separate the parts.
+The alternative is separate packages (`raven-tsx-core`, `raven-tsx-react`, `raven-tsx-solid`). That means three versions to keep in step for no gain while one person maintains them all. It is easy to change to later, because the folders already separate the parts.
 
 ## Phase 1: rename
 
@@ -40,38 +40,19 @@ Done. The packages, the folders, the messages and the GitHub repository (`deckyf
 
 ## Phase 2: separate the core from React
 
-React users see one change: they import from `@decky.fx/raven-tsx/react`. Nothing else changes.
+Done in #10. `src/core` knows only Raven and `src/react` is the React adapter. React users import from `@decky.fx/raven-tsx/react`. `src/test/core/boundary.test.ts` keeps frameworks out of the core.
 
-**Folders:**
-
-```
-packages/raven-tsx/src/
-  core/     widget-instance, window-instance, events, frame, props, theme, web, native,
-            library-check, errors, raven, tags (the Raven half), props.generated
-  react/    host-config, root, hooks, tags (the React half), components.generated, index
-  solid/    (phase 4)
-  tools/  vendor/
-  test/core/  test/react/
-```
-
-**What has to change, beyond moving files:**
-- **`props.ts`.** `PropValue` names `ReactNode` for children. The core reads children only for their text (`childrenText`), so it can take them without the React type, and each adapter gives its own child type.
-- **The component generator.** It now emits one file. Instead it emits:
-  - `core/props.generated.ts`, with the props of each tag (`ButtonProps`, `VBoxProps`…) and no framework types;
-  - `react/components.generated.ts`, with the React wrappers that add `key`, `ref` and `children`.
-  - Phase 4 adds a Solid file next to it.
-- **End of commit.** `host-config.ts` drains `placedInThisCommit` in `resetAfterCommit`. The core instead exports one function that an adapter calls at the end of each batch of changes, `finishPlacing()`.
-- **`registerTag`.** Raven asks for a tag's widgets, and the code then renders a React component into them. The Raven half (callbacks, slots, adopted widgets) moves to the core, behind a small interface that each adapter implements: `mount(component, props, container)`, returning an object with `update` and `unmount`.
-- **Hooks.** The core exports plain subscriptions that each return a function to stop them: `onAction(name, handler)`, `onShortcut(window, keys, handler)`, `onFrame(handler)`. The React hooks wrap them. `updatePriority` in `events.ts` gives React's event priority, so it moves to `react/`.
-- **A test that keeps the core clean.** It fails if any file in `core/` imports `react`, `react-reconciler` or `solid-js`, in the style of `coverage.test.ts`.
-
-The tests split with the code. The tests of the core run once; the renderer tests stay in `test/react/`.
+What the core gives the next adapter:
+- `finishPlacing()`, called at the end of each batch of changes.
+- `registerTagWith()` and the `TagAdapter` interface: `mount(component, props, container)`, returning an object with `update` and `unmount`.
+- `onAction(name, handler)`, `onShortcut(window, keys, handler)` and `onFrame(handler)`, each returning a function that stops it.
+- `core/props.generated.ts`, the props of each tag with no framework types. The generator also writes each adapter's components file, so far `react/components.generated.ts`.
 
 ## Phase 3: Node.js backend (separate, in parallel)
 
-This is the Node-API binding recommended on 2026-11-08: `bindings/node` upstream, and the backend chosen by `exports` conditions. It is a layer *below* the core, while adapters are a layer above it, so it is independent of phases 2 and 4.
+This is the Node-API binding recommended on 2026-11-08: `bindings/node` upstream, and the backend chosen by `exports` conditions. It is a layer *below* the core, while adapters are a layer above it, so it is independent of phase 4.
 
-Its first step lives in the core folder that phase 2 creates: move the 36 direct uses of `bun:ffi` (`events.ts`, `frame.ts`, `tags.ts`), `web.ts` (`dlopen`) and `native.ts` (`Bun.file`, `Bun.hash`) behind a backend interface. So do phase 2 first, or both PRs will touch the same lines.
+Its first step is in `src/core`: move the direct uses of `bun:ffi` (`events.ts`, `frame.ts`, `tags.ts`), `web.ts` (`dlopen`) and `native.ts` (`Bun.file`, `Bun.hash`) behind a backend interface.
 
 ## Phase 4: Solid adapter
 
@@ -110,7 +91,7 @@ If one of these fails, stop and write down why. React stays the only adapter.
 ### 4c. The rest of the adapter
 - **`runApp`, `createWindow`, `RavenRoot`** on Solid's `render(() => <App />, container)`.
 - **Hooks** as Solid functions: `createAction`, `createShortcut`, `createFrame`, each on `onCleanup`. They don't need React's "latest value" ref.
-- **`registerTag`** through the phase 2 interface, with `render` into the container.
+- **`registerTag`** through `TagAdapter`, with `render` into the container.
 - **A portal**, the equivalent of `createPortal`, which renders into a widget.
 - **Refs.** `ref={el}` gives the `WidgetInstance` or `WindowInstance`, as with React.
 - **Generated components** in `solid/components.generated.ts`, from the same prop interfaces.
@@ -129,20 +110,20 @@ If one of these fails, stop and write down why. React stays the only adapter.
 ## Not planned
 
 - **Svelte.** Svelte components are `.svelte` files compiled by Svelte, not TSX, so it does not fit "TSX, any framework". Its custom-renderer API is also not released: the Svelte docs say it is "not yet available", and the work is tracked in sveltejs/svelte#15470.
-- **Vue.** This is the better third candidate, if one is wanted: it has an official, stable `createRenderer` and supports TSX through its JSX Babel plugin. The adapter interface of phase 2 should not rule it out, but it is not part of this plan.
+- **Vue.** This is the better third candidate, if one is wanted: it has an official, stable `createRenderer` and supports TSX through its JSX Babel plugin. The adapter interface should not rule it out, but it is not part of this plan.
 
 ## Order and size
 
 | Phase | Depends on | Size |
 |---|---|---|
-| 1. Rename | PR #7 merged | half a day |
-| 2. Core and React separated | 1 | 1–2 days |
-| 3. Node.js backend | 2 (shares the core folder), an upstream binding | its own plan |
-| 4a. Solid compiler test | 2 | half a day |
+| 1. Rename | nothing | done |
+| 2. Core and React separated | nothing | done |
+| 3. Node.js backend | an upstream binding | its own plan |
+| 4a. Solid compiler test | nothing | half a day |
 | 4b–d. Solid adapter, tests, two examples | 4a works | 3–5 days |
 
 ## Decisions for the user
 
-1. **Package layout.** One package with subpaths (recommended), or separate packages.
+1. **Package layout.** Decided: one package with subpaths.
 2. **Repository name.** Decided: `raven-tsx`, all lowercase.
-3. **Whether to do Solid** after phase 2, or stop at a clean core until someone asks for it.
+3. **Whether to do Solid**, or stop at a clean core until someone asks for it.

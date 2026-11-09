@@ -17,7 +17,7 @@
  */
 
 import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from "react";
-import { Button, Checkbox, Custom, HBox, Label, Overlay, raven, runApp, Splitter, VBox, Viewport, type WidgetInstance } from "@decky.fx/raven-react";
+import { Button, Checkbox, Custom, HBox, Label, Overlay, raven, runApp, Splitter, VBox, Viewport, type WidgetInstance } from "@decky.fx/raven-tsx/react";
 import { placeCorners, SoftwareTarget } from "./triangle";
 
 /** Cuts per side of the triangle of the right pane: Rdraw_triangle has one color, so colors are many small triangles. */

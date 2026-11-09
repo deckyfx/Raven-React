@@ -1,7 +1,7 @@
 /** A window, a label and two buttons. The port of `examples/hello` of Raven. */
 
 import { useState, type ReactNode } from "react";
-import { Button, HBox, Label, runApp, VBox } from "@decky.fx/raven-react";
+import { Button, HBox, Label, runApp, VBox } from "@decky.fx/raven-tsx/react";
 
 function App(): ReactNode {
 	const [clicks, setClicks] = useState(0);

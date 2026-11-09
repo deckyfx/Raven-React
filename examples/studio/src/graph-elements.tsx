@@ -1,5 +1,5 @@
 import { useEffect, useRef, type ReactNode, type RefObject } from "react";
-import { raven, RavenRoot, type WidgetInstance } from "@decky.fx/raven-react";
+import { raven, RavenRoot, type WidgetInstance } from "@decky.fx/raven-tsx/react";
 
 /** The ref of the `<NodeGraph>` the elements of this file belong to. */
 type GraphRef = RefObject<WidgetInstance | null>;

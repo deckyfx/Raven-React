@@ -1,6 +1,6 @@
 /** Renders the scene into a texture, on this thread or on all the cores. */
 
-import { raven } from "@decky.fx/raven-react";
+import { raven } from "@decky.fx/raven-tsx/react";
 import type { SceneObject } from "./scene";
 import { makeFrameBuffers, MAX_PIXEL_BYTES, SharedFrame, type FrameBuffers } from "./shared-frame";
 

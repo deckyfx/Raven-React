@@ -5,7 +5,7 @@
  * widget, for a class, or for both.
  */
 
-import { defineTheme } from "@decky.fx/raven-react";
+import { defineTheme } from "@decky.fx/raven-tsx/react";
 
 /** A dark theme, blue as deep water, that starts from the built-in Dark. */
 export const ocean = defineTheme({

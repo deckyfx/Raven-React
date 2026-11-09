@@ -1,7 +1,7 @@
 /** The side bar: the places of the player above, "Your library" below. */
 
 import type { ReactNode } from "react";
-import { Border, HBox, ScrollBox, VBox } from "@decky.fx/raven-react";
+import { Border, HBox, ScrollBox, VBox } from "@decky.fx/raven-tsx/react";
 import { albums, playlists } from "./library";
 import { PAGE_HOME, PAGE_LIBRARY, PAGE_SEARCH, PAGE_SETTINGS, useMusic } from "./music";
 import { Chip, IconButton, LibraryRow, NavItem } from "./widgets";

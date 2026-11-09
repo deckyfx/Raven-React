@@ -2,7 +2,7 @@
  * raven-react: the interface in TSX, on Raven's widgets.
  *
  *     import { useState } from "react";
- *     import { Button, Label, runApp, VBox } from "@decky.fx/raven-react";
+ *     import { Button, Label, runApp, VBox } from "@decky.fx/raven-tsx/react";
  *
  *     function App() {
  *       const [count, setCount] = useState(0);

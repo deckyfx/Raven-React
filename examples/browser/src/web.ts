@@ -1,12 +1,12 @@
 /**
  * The functions of raven_web this example uses, declared here through bun:ffi.
  *
- * The binding of raven-react has no raven_web.h, but the functions are in the same library
+ * The binding of raven-tsx has no raven_web.h, but the functions are in the same library
  * (`nm -D libraven.so | grep Rweb_`). Importing the package first is what makes
  * `RAVEN_LIBRARY` say where that library is: see `native.ts` of the package.
  */
 
-import "@decky.fx/raven-react";
+import "@decky.fx/raven-tsx/react";
 import { CString, JSCallback, dlopen, type Pointer } from "bun:ffi";
 
 /** What the library is told a view is: the handle of its widget. */
@@ -14,7 +14,7 @@ type ViewId = number;
 
 const library = process.env.RAVEN_LIBRARY;
 if (!library) {
-	throw new Error("raven-react did not say where its native library is (RAVEN_LIBRARY)");
+	throw new Error("raven-tsx did not say where its native library is (RAVEN_LIBRARY)");
 }
 
 const { symbols: web } = dlopen(library, {

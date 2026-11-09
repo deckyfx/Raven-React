@@ -1,11 +1,14 @@
 {
-  "name": "@decky.fx/raven-react",
+  "name": "@decky.fx/raven-tsx",
   "version": "0.1.0",
   "description": "A React renderer for Raven, for Bun: write native desktop interfaces in TSX, with typed components made from Raven's schema",
   "license": "Apache-2.0",
   "type": "module",
   "module": "src/index.ts",
-  "exports": "./src/index.ts",
+  "exports": {
+    ".": "./src/index.ts",
+    "./react": "./src/index.ts"
+  },
   "engines": {
     "bun": ">=1.4.4"
   },

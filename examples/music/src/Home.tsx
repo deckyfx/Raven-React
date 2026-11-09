@@ -1,7 +1,7 @@
 /** Home: the tiles, then rows of cards. */
 
 import { useMemo, type ReactNode } from "react";
-import { Grid, HBox, ScrollBox, VBox } from "@decky.fx/raven-react";
+import { Grid, HBox, ScrollBox, VBox } from "@decky.fx/raven-tsx/react";
 import { albumAt, albums, ALBUM_COUNT, playlistAt, playlists } from "./library";
 import { useMusic } from "./music";
 import { Heading } from "./tags";

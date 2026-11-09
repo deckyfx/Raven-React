@@ -1,7 +1,7 @@
 /** The window of the player: the port of `ui/main.xml`. Behind everything, a moving gradient in the colors of the cover. */
 
 import { useEffect, useLayoutEffect, useRef, type ReactNode } from "react";
-import { Border, HBox, Overlay, raven, Switcher, useShortcut, VBox, Window, type WidgetInstance, type WindowInstance } from "@decky.fx/raven-react";
+import { Border, HBox, Overlay, raven, Switcher, useShortcut, VBox, Window, type WidgetInstance, type WindowInstance } from "@decky.fx/raven-tsx/react";
 import { Collection } from "./Collection";
 import { Header } from "./Header";
 import { Home } from "./Home";

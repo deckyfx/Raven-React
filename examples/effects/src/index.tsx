@@ -6,7 +6,7 @@
  */
 
 import type { ReactNode } from "react";
-import { Border, HBox, Label, Overlay, raven, runApp, UniformGrid, VBox } from "@decky.fx/raven-react";
+import { Border, HBox, Label, Overlay, raven, runApp, UniformGrid, VBox } from "@decky.fx/raven-tsx/react";
 
 /** A shader of this example. */
 function shader(file: string): string {

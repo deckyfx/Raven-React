@@ -1,7 +1,7 @@
 /** The bar of the player, at the bottom: the song, the transport and its progress, the volume. */
 
 import type { ReactNode } from "react";
-import { Border, Grid, HBox, Label, Slider, VBox } from "@decky.fx/raven-react";
+import { Border, Grid, HBox, Label, Slider, VBox } from "@decky.fx/raven-tsx/react";
 import { formatTime, hex, trackAt } from "./library";
 import { useMusic, usePosition } from "./music";
 import { Cover, Visualizer } from "./tags";

@@ -4,7 +4,7 @@ A React renderer for [Raven](https://github.com/oscar-soirey/Raven), for [Bun](h
 
 ```tsx
 import { useState } from "react";
-import { Button, Label, runApp, VBox } from "@decky.fx/raven-react";
+import { Button, Label, runApp, VBox } from "@decky.fx/raven-tsx/react";
 
 function App() {
 	const [count, setCount] = useState(0);

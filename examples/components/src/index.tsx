@@ -15,7 +15,7 @@
  */
 
 import { useEffect, useRef, useState, type ReactNode } from "react";
-import { Button, Expander, HBox, Label, raven, runApp, ScrollBox, TextEditor, VBox, WrapBox, type WidgetInstance } from "@decky.fx/raven-react";
+import { Button, Expander, HBox, Label, raven, runApp, ScrollBox, TextEditor, VBox, WrapBox, type WidgetInstance } from "@decky.fx/raven-tsx/react";
 import { Badge, Card, registerTags, Stat, TAG_NAMES } from "./widgets";
 
 const DOCUMENT_TITLES = ["Builds", "Tickets", "Reviews", "Deploys"];

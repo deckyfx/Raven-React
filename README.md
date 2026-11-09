@@ -1,6 +1,6 @@
-# Raven-React
+# Raven-TSX
 
-A React renderer for [Raven](https://github.com/oscar-soirey/Raven), for [Bun](https://bun.com): native desktop interfaces in TSX, on Raven's own widgets, drawn with Vulkan. No XML, no webview, and no build step.
+Native desktop interfaces in TSX, for [Bun](https://bun.com), on the real widgets of [Raven](https://github.com/oscar-soirey/Raven), drawn with Vulkan. A core knows only Raven, and an adapter for a framework is built on it; React is the one there is today. No XML, no webview, and no build step.
 
 ```tsx
 import { useState } from "react";
@@ -19,7 +19,7 @@ function App() {
 await runApp(<App />, { Title: "Hello", Width: 480, Height: 240 });
 ```
 
-The package and its documentation are in [packages/raven-react](packages/raven-react).
+The package and its documentation are in [packages/raven-tsx](packages/raven-tsx).
 
 ## Examples
 
@@ -49,11 +49,11 @@ The C examples of Raven are ported to TSX in [examples](examples), with the same
 | [viewport_vulkan](examples/viewport_vulkan) | The scene of the original, rendered in software in TypeScript |
 | [browser](examples/browser), [editor](examples/editor), [effects](examples/effects), [music](examples/music), [notepad](examples/notepad), [studio](examples/studio), [themes](examples/themes), [workspace](examples/workspace) | Shown above |
 
-To run one, check out and build Raven at the pinned commit, and make the native package first (see [Working on this package](packages/raven-react#working-on-this-package)), then, from the root of this repository:
+To run one, check out and build Raven at the pinned commit, and make the native package first (see [Working on this package](packages/raven-tsx#working-on-this-package)), then, from the root of this repository:
 
     cd examples/studio
     bun run dev
 
 ## Raven
 
-Raven-React follows a pinned commit of Raven, written in [packages/raven-react/RAVEN_VERSION](packages/raven-react/RAVEN_VERSION). The components and their props are generated from that commit's schema, so they are always the ones the library has.
+Raven-TSX follows a pinned commit of Raven, written in [packages/raven-tsx/RAVEN_VERSION](packages/raven-tsx/RAVEN_VERSION). The components and their props are generated from that commit's schema, so they are always the ones the library has.

@@ -1,0 +1,52 @@
+{
+  "name": "@decky.fx/raven-tsx",
+  "version": "0.1.0",
+  "description": "Raven's native widgets from TSX, for Bun: a core that knows only Raven and an adapter for React, with typed components made from Raven's schema",
+  "license": "Apache-2.0",
+  "type": "module",
+  "module": "src/core/index.ts",
+  "exports": {
+    ".": "./src/core/index.ts",
+    "./react": "./src/react/index.ts"
+  },
+  "engines": {
+    "bun": ">=1.4.4"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/deckyfx/Raven-TSX.git"
+  },
+  "keywords": ["raven", "tsx", "bun", "gui", "desktop", "native", "widgets", "react", "vulkan"],
+  "scripts": {
+    "generate": "bun run src/tools/generate-components.ts",
+    "native:local": "bun run src/tools/native-local.ts",
+    "native:windows": "bun run src/tools/native-windows.ts",
+    "sync-binding": "bun run src/tools/sync-binding.ts",
+    "raven:status": "bun run src/tools/raven-status.ts",
+    "raven:check": "bun run src/tools/raven-status.ts --check",
+    "raven:update": "bun run src/tools/raven-update.ts",
+    "raven:drift": "bun run src/tools/raven-drift.ts",
+    "pack:platform": "bun run src/tools/pack-platform.ts",
+    "prepare:publish": "bun run src/tools/prepare-publish.ts",
+    "test": "bun test",
+    "typecheck": "bun check"
+  },
+  "dependencies": {
+    "@types/react": "^19",
+    "@types/react-reconciler": "^0.34",
+    "react-reconciler": "^0.34.0"
+  },
+  "peerDependencies": {
+    "react": "^19.2.0"
+  },
+  "peerDependenciesMeta": {
+    "react": {
+      "optional": true
+    }
+  },
+  "devDependencies": {
+    "@types/bun": "latest",
+    "react": "^19.2.0",
+    "typescript": "^6"
+  }
+}

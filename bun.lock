@@ -3,7 +3,7 @@
   "configVersion": 1,
   "workspaces": {
     "": {
-      "name": "raven-react-workspace",
+      "name": "raven-tsx-workspace",
     },
     "examples/animations": {
       "name": "example-animations",
@@ -195,7 +195,7 @@
         "@types/react": "^19",
       },
     },
-    "packages/raven-react": {
+    "packages/raven-tsx": {
       "name": "@decky.fx/raven-tsx",
       "version": "0.1.0",
       "dependencies": {
@@ -211,16 +211,25 @@
       "peerDependencies": {
         "react": "^19.2.0",
       },
+      "optionalPeers": [
+        "react",
+      ],
     },
-    "packages/raven-react/native/linux-x64": {
+    "packages/raven-tsx/native/linux-x64": {
       "name": "@decky.fx/raven-tsx-linux-x64",
+      "version": "0.1.0",
+    },
+    "packages/raven-tsx/native/win32-x64": {
+      "name": "@decky.fx/raven-tsx-win32-x64",
       "version": "0.1.0",
     },
   },
   "packages": {
-    "@decky.fx/raven-tsx": ["@decky.fx/raven-tsx@workspace:packages/raven-react"],
+    "@decky.fx/raven-tsx": ["@decky.fx/raven-tsx@workspace:packages/raven-tsx"],
 
-    "@decky.fx/raven-tsx-linux-x64": ["@decky.fx/raven-tsx-linux-x64@workspace:packages/raven-react/native/linux-x64"],
+    "@decky.fx/raven-tsx-linux-x64": ["@decky.fx/raven-tsx-linux-x64@workspace:packages/raven-tsx/native/linux-x64"],
+
+    "@decky.fx/raven-tsx-win32-x64": ["@decky.fx/raven-tsx-win32-x64@workspace:packages/raven-tsx/native/win32-x64"],
 
     "@types/bun": ["@types/bun@1.4.4", "", { "dependencies": { "bun-types": "1.4.4" } }, "sha512-9wkRDXUXK124pEnAutE6n/l18j+i9GC5IAHK8TmX/2nlySETmky0OU6yL5U8pW1AoKh++AN9auDCr647BfurjQ=="],
 

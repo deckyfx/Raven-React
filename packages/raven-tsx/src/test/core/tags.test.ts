@@ -93,6 +93,33 @@ test("a component that was taken away is not taken away again when the new one f
 	}
 });
 
+test("the widgets of an element are destroyed with it even when its component fails to unmount", async () => {
+	let children: readonly r.Rid[] = [];
+	const failing: TagAdapter<string> = {
+		mount: (_component, props) => {
+			children = props.children;
+			return {
+				update: () => {},
+				unmount: () => {
+					throw new Error("cannot unmount");
+				},
+			};
+		},
+	};
+	const quiet = spyOn(console, "error").mockImplementation(() => {});
+	try {
+		unregister.push(registerTagWith<string, object, never>(failing, "CoreStuck", "stuck"));
+		const card = r.Rwidget_create_from_xml('<CoreStuck><Label Name="body"/></CoreStuck>');
+		await placed();
+		expect(children.length).toBe(1);
+		r.Rwidget_destroy(card);
+		r.Rdraw_frame();
+		expect(children.filter((widget) => r.Rwidget_is_valid(widget))).toEqual([]);
+	} finally {
+		quiet.mockRestore();
+	}
+});
+
 test("a tag registered again renders the new component, through its own adapter", async () => {
 	const first = new RecordingAdapter();
 	const second = new RecordingAdapter();

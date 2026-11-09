@@ -210,11 +210,14 @@ function destroyed(widget: r.Rid): void {
 	const element = elements.get(widget);
 	elements.delete(widget);
 	intos.delete(widget);
-	element?.mounted?.mount.unmount();
-	// (those in its tree went with it; those the component did not show are held by nothing)
-	for (const child of element?.adopted ?? []) {
-		if (r.Rwidget_is_valid(child) && r.Rwidget_get_parent(child) === r.R_INVALID_ID) {
-			r.Rwidget_destroy(child);
+	try {
+		element?.mounted?.mount.unmount();
+	} finally {
+		// (those in its tree went with it; those the component did not show are held by nothing)
+		for (const child of element?.adopted ?? []) {
+			if (r.Rwidget_is_valid(child) && r.Rwidget_get_parent(child) === r.R_INVALID_ID) {
+				r.Rwidget_destroy(child);
+			}
 		}
 	}
 }

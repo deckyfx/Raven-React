@@ -28,6 +28,7 @@
     "raven:drift": "bun run src/tools/raven-drift.ts",
     "pack:platform": "bun run src/tools/pack-platform.ts",
     "prepare:publish": "bun run src/tools/prepare-publish.ts",
+    "check:consumer": "bun run src/tools/check-consumer.ts",
     "test": "bun test",
     "typecheck": "bun check"
   },

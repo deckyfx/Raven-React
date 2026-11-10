@@ -52,34 +52,34 @@ export const PART_SHAPES = [
 export type PartShape = (typeof PART_SHAPES)[number];
 
 /** A color for each role it names. */
-export type ThemeColors = { readonly [Role in ColorRole]?: ThemeColor };
+export type ThemeColors = { readonly [Role in ColorRole]?: ThemeColor | undefined };
 /** A value for each metric it names. */
-export type ThemeMetrics = { readonly [Metric in MetricName]?: number };
+export type ThemeMetrics = { readonly [Metric in MetricName]?: number | undefined };
 
 /** What a style gives a part of a widget, in its states. */
 export interface PartProperties {
 	/** What it is filled with; `None`, nothing. */
-	readonly Background?: ThemeColor | "None";
+	readonly Background?: ThemeColor | "None" | undefined;
 	/** Its text, marks and glyphs. */
-	readonly Foreground?: ThemeColor;
-	readonly BorderColor?: ThemeColor;
-	readonly BorderWidth?: number;
-	readonly BorderTopColor?: ThemeColor;
-	readonly BorderBottomColor?: ThemeColor;
-	readonly BorderBottomWidth?: number;
-	readonly CornerRadius?: number;
+	readonly Foreground?: ThemeColor | undefined;
+	readonly BorderColor?: ThemeColor | undefined;
+	readonly BorderWidth?: number | undefined;
+	readonly BorderTopColor?: ThemeColor | undefined;
+	readonly BorderBottomColor?: ThemeColor | undefined;
+	readonly BorderBottomWidth?: number | undefined;
+	readonly CornerRadius?: number | undefined;
 	/** The size of a part that has one of its own: a knob, a dot, a pill. */
-	readonly Size?: number;
+	readonly Size?: number | undefined;
 	/** From 0 to 1. */
-	readonly Opacity?: number;
+	readonly Opacity?: number | undefined;
 	/**
 	 * The shadow it drops: popups, and a `Border`, whose own `Shadow` comes before `ShadowSize`.
 	 * A `Border` of glass without an `Effect` takes only `ShadowSize`, and one with nothing to draw
 	 * (a transparent `Background`, no outline, no `Effect`) drops no shadow at all.
 	 */
-	readonly ShadowColor?: ThemeColor;
-	readonly ShadowSize?: number;
-	readonly Shape?: PartShape;
+	readonly ShadowColor?: ThemeColor | undefined;
+	readonly ShadowSize?: number | undefined;
+	readonly Shape?: PartShape | undefined;
 	/**
 	 * Light of its color around it, from 0 to 1: a `Label` (not one with `Markdown`, which Raven
 	 * draws without it), a `Border` (not one of glass without an `Effect`, nor one with nothing to
@@ -87,9 +87,9 @@ export interface PartProperties {
 	 * timelines. A node glows only with a `BorderWidth` above 0: a selected node has one, so give one
 	 * with `Glow` to the others.
 	 */
-	readonly Glow?: number;
+	readonly Glow?: number | undefined;
 	/** The color it fades to: a header of a node, a clip of the `Gradient` form. */
-	readonly Gradient?: ThemeColor;
+	readonly Gradient?: ThemeColor | undefined;
 }
 
 /**
@@ -100,13 +100,13 @@ export interface PartProperties {
  */
 export interface ThemeStyle extends ThemeColors, ThemeMetrics, PartProperties {
 	/** The tag of the widgets: `"Button"`. */
-	readonly Widget?: string;
+	readonly Widget?: string | undefined;
 	/** A class of `Class="..."` on widgets. */
-	readonly Class?: string;
-	readonly Part?: ThemePart;
+	readonly Class?: string | undefined;
+	readonly Part?: ThemePart | undefined;
 	/** A state, or several that must all hold. */
-	readonly State?: ThemeState | readonly ThemeState[];
-	readonly Material?: MaterialName;
+	readonly State?: ThemeState | readonly ThemeState[] | undefined;
+	readonly Material?: MaterialName | undefined;
 }
 
 /** A theme: what a theme file says, as an object. Any color or metric can also be given at its top. */
@@ -114,27 +114,27 @@ export interface ThemeSpec extends ThemeColors, ThemeMetrics {
 	/** The name the theme is kept under, for `Rtheme_use` and the `Theme` prop. */
 	readonly Name: string;
 	/** The look it starts from, and imposes. Without `Look` (nor `Base`) it is laid over the look in use, and follows it. */
-	readonly Look?: LookName;
+	readonly Look?: LookName | undefined;
 	/** A theme loaded before, or a look by its name of Raven 0.2 (`Dark`, `GlassLight`...); `Look` is the new way. */
-	readonly Base?: string;
+	readonly Base?: string | undefined;
 	/** `Springy`: things bounce (Raven). `Smooth`: short transitions that settle at once (the platforms). */
-	readonly Motion?: "Springy" | "Smooth";
+	readonly Motion?: "Springy" | "Smooth" | undefined;
 	/** The accent color, and the shades that follow from it. */
-	readonly Accent?: ThemeColor;
+	readonly Accent?: ThemeColor | undefined;
 	/** The material of its surfaces. (`Default` is for widgets and styles: it puts them back to the theme's) */
-	readonly Material?: Exclude<MaterialName, "Default">;
+	readonly Material?: Exclude<MaterialName, "Default"> | undefined;
 	/** Whether it is dark, when its base does not say it right. */
-	readonly Dark?: boolean;
+	readonly Dark?: boolean | undefined;
 	/** A font file: an absolute path, or one from the current folder. */
-	readonly Font?: string;
+	readonly Font?: string | undefined;
 	/** What is behind the content of the windows: an image file, `Dark`, `Light`, colors to blend (`"#1E3A8A,#7C3AED"`), or `None`. */
-	readonly Wallpaper?: string;
-	readonly Colors?: ThemeColors;
-	readonly Metrics?: ThemeMetrics;
-	readonly Glass?: { readonly [Property in GlassProperty]?: number };
+	readonly Wallpaper?: string | undefined;
+	readonly Colors?: ThemeColors | undefined;
+	readonly Metrics?: ThemeMetrics | undefined;
+	readonly Glass?: { readonly [Property in GlassProperty]?: number | undefined } | undefined;
 	/** The colors of code in the text editor. */
-	readonly Syntax?: { readonly [Token in SyntaxToken]?: ThemeColor };
-	readonly Styles?: readonly ThemeStyle[];
+	readonly Syntax?: { readonly [Token in SyntaxToken]?: ThemeColor | undefined } | undefined;
+	readonly Styles?: readonly ThemeStyle[] | undefined;
 }
 
 /** The keys of a spec that are its sections, not attributes of `<Theme>`. */

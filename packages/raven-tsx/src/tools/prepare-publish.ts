@@ -12,7 +12,7 @@ const root = `${import.meta.dir}/../..`;
 const directory = `${argument("out")}/main`;
 
 // (npm's provenance refuses a package that names another repository than the one publishing it: said here, before any package goes out)
-const publishing = Bun.env.GITHUB_REPOSITORY;
+const publishing = Bun.env["GITHUB_REPOSITORY"];
 if (publishing && manifest.repository.url !== `git+https://github.com/${publishing}.git`) {
 	console.error(`prepare:publish: package.json names ${manifest.repository.url}, but ${publishing} is publishing it`);
 	process.exit(1);

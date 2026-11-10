@@ -77,11 +77,11 @@ export function createWindow(options: WindowOptions = {}): { window: r.Rid; root
 /** How `runApp` starts Raven. */
 export interface RunOptions {
 	/** The name of the application: `RInitDesc::app_name`, which system notifications show. */
-	readonly appName?: string;
+	readonly appName?: string | undefined;
 	/** Runs after Raven started and before the first render: for a look, a theme, a registered tag. */
-	readonly setup?: () => void;
+	readonly setup?: (() => void) | undefined;
 	/** Raven's allocator: functions of C only, as it allocates on several threads. See `Rset_allocator`. */
-	readonly allocator?: Parameters<typeof r.Rset_allocator>[0];
+	readonly allocator?: Parameters<typeof r.Rset_allocator>[0] | undefined;
 }
 
 /**

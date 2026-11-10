@@ -56,8 +56,8 @@ test("an adapter mounts a component with the attributes and the widgets of its e
 	expect(adapter.calls).toEqual(["mount card"]);
 	expect(adapter.last?.attributes).toEqual({ Title: "Sales" });
 	expect(adapter.last?.children.map((widget) => r.Rwidget_get_name(widget))).toEqual(["body"]);
-	expect(adapter.last?.slots.footer?.map((widget) => r.Rwidget_get_name(widget))).toEqual(["ok"]);
-	const adopted = [...(adapter.last?.children ?? []), ...(adapter.last?.slots.footer ?? [])];
+	expect(adapter.last?.slots["footer"]?.map((widget) => r.Rwidget_get_name(widget))).toEqual(["ok"]);
+	const adopted = [...(adapter.last?.children ?? []), ...(adapter.last?.slots["footer"] ?? [])];
 
 	r.Rwidget_set_attribute(card, "Title", "Costs");
 	expect(adapter.calls).toEqual(["mount card", "update card"]);

@@ -591,7 +591,6 @@ test("a DockArea asks before a panel closes, and gives its layout when it change
 			</DockArea>
 		</VBox>,
 	);
-	const dock = find("dock");
 	const left = find("left");
 	const right = find("right");
 	// each on its own side, which only works with the slot set before the panel is added

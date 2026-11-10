@@ -29,9 +29,9 @@ type SlotOf<P, Node> = { [K in keyof P]-?: K extends "children" ? never : [Node]
 /** What a tag takes from its element. `Node` is what its framework renders. */
 export interface TagOptions<P, Node> {
 	/** The attributes it takes, each with the kind of its prop. The others stay the widget's: `Name`, `Width`, `Slot`... */
-	readonly attributes?: { readonly [K in keyof P]?: KindOf<NonNullable<P[K]>> };
+	readonly attributes?: { readonly [K in keyof P]?: KindOf<NonNullable<P[K]>> | undefined } | undefined;
 	/** Its props that take widgets, by name: the children of `<Into Name="...">` go there; the other children go to `children`. */
-	readonly slots?: readonly SlotOf<P, Node>[];
+	readonly slots?: readonly SlotOf<P, Node>[] | undefined;
 }
 
 /** What an element gives its component: its attributes, and the widgets Raven made for its children. */

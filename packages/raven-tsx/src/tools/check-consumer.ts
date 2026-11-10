@@ -11,12 +11,14 @@
 
 import { cpSync, mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
+import { resolve } from "node:path";
 import ts from "typescript";
 import manifest from "../../package.json";
 import { argument } from "./targets";
 
-const root = `${import.meta.dir}/../..`;
-const platform = argument("platform");
+// (absolute: a path that holds ".." fails on Windows in some of what is done with it)
+const root = resolve(`${import.meta.dir}/../..`);
+const platform = resolve(argument("platform"));
 const work = mkdtempSync(`${tmpdir()}/raven-tsx-consumer-`);
 
 /** Runs a command in a folder, and stops with its output if it fails. Returns what it printed. */

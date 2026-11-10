@@ -21,13 +21,18 @@ const root = resolve(`${import.meta.dir}/../..`);
 const platform = resolve(argument("platform"));
 const work = mkdtempSync(`${tmpdir()}/raven-tsx-consumer-`);
 
-/** Runs a command in a folder, and stops with its output if it fails. Returns what it printed. */
+/** A command that failed: its message holds what it printed. */
+class CommandFailed extends Error {}
+
+/**
+ * Runs a command in a folder and returns what it printed, or throws with that if it fails.
+ * (a throw and no exit: the folder of the application is removed on the way out)
+ */
 async function run(command: readonly string[], cwd: string): Promise<string> {
 	const child = Bun.spawn([...command], { cwd, stdout: "pipe", stderr: "pipe" });
 	const [output, errors, code] = await Promise.all([new Response(child.stdout).text(), new Response(child.stderr).text(), child.exited]);
 	if (code !== 0) {
-		console.error(`check:consumer: ${command.join(" ")} failed in ${cwd}:\n${output}${errors}`);
-		process.exit(1);
+		throw new CommandFailed(`check:consumer: ${command.join(" ")} failed in ${cwd}:\n${output}${errors}`);
 	}
 	return output;
 }
@@ -123,6 +128,10 @@ try {
 	console.log(`the application compiles with ${Object.keys(strictOptions()).join(", ")}`);
 	const loaded = await run(["bun", "-e", `import { raven } from "${manifest.name}"; console.log(raven.Rget_version());`], app);
 	console.log(`the library loads from ${nativeName}: Raven ${loaded.trim()}`);
+} catch (error) {
+	// (a failed command says what it printed; anything else keeps its stack)
+	console.error(error instanceof CommandFailed ? error.message : error);
+	process.exitCode = 1;
 } finally {
 	rmSync(work, { recursive: true, force: true });
 }

@@ -1270,7 +1270,7 @@ const _symbols = {
 /** Opens the library: RAVEN_LIBRARY, then beside this file, then where the system looks. */
 function _load() {
 	const names = process.platform === "win32" ? ["raven.dll", "libraven.dll"] : process.platform === "darwin" ? ["libraven.dylib"] : ["libraven.so", "libraven.so.0"];
-	const explicit = process.env.RAVEN_LIBRARY;
+	const explicit = process.env["RAVEN_LIBRARY"];
 	const candidates = [...(explicit ? [explicit] : []), ...names.map((name) => `${import.meta.dir}/${name}`), ...names];
 	const tried: string[] = [];
 	for (const candidate of candidates) {
@@ -5079,19 +5079,6 @@ function _adapt_RTaskCallback(function_: RTaskCallback | Pointer | null, threads
 
 export type RParallelRangeCallback = (begin: number, end: number, user_data: Pointer | null) => void;
 
-function _adapt_RParallelRangeCallback(function_: RParallelRangeCallback | Pointer | null, threadsafe = false): Pointer | null {
-	if (typeof function_ !== "function") {
-		return function_;
-	}
-	return _keep(new _JSCallback((begin: number, end: number, user_data: Pointer | null): void => {
-		try {
-			function_(begin, end, user_data);
-		} catch (error) {
-			_report(error as Error);
-		}
-	}, { args: ["u32", "u32", "ptr"], returns: "void", threadsafe }));
-}
-
 export type RTimerCallback = (timer: Rid, user_data: Pointer | null) => void;
 
 function _adapt_RTimerCallback(function_: RTimerCallback | Pointer | null, threadsafe = false): Pointer | null {
@@ -6213,19 +6200,6 @@ function _adapt_RNotificationClickedCallback(function_: RNotificationClickedCall
  * need to be restored. NULL removes the callback.
  */
 export type RViewportDrawCallback = (info: RViewportDrawInfo | null, user_data: Pointer | null) => void;
-
-function _adapt_RViewportDrawCallback(function_: RViewportDrawCallback | Pointer | null, threadsafe = false): Pointer | null {
-	if (typeof function_ !== "function") {
-		return function_;
-	}
-	return _keep(new _JSCallback((info: Pointer | null, user_data: Pointer | null): void => {
-		try {
-			function_(RViewportDrawInfo.from(info), user_data);
-		} catch (error) {
-			_report(error as Error);
-		}
-	}, { args: ["ptr", "ptr"], returns: "void", threadsafe }));
-}
 
 /** Called on the UI thread when the pixel size changes: resize your render target here. */
 export type RViewportResizeCallback = (viewport: Rid, width: number, height: number, user_data: Pointer | null) => void;
@@ -12261,7 +12235,12 @@ export function Rxml_node_get_index(node: Rid): number {
 	return _lib.Rxml_node_get_index(node);
 }
 
-/** index Where among the children; -1 for the end. */
+/**
+ * index Where among the children; -1 for the end.
+ * Returns: The new node; R_INVALID_ID (R_ERROR_XML) when it would be nested
+ *         deeper than a document can be: 256 levels under the root, as
+ *         when a text is read. The same holds for the functions below.
+ */
 export function Rxml_node_add_child(parent: Rid, tag: string | null, index: number): Rid {
 	return _lib.Rxml_node_add_child(parent, _s(tag), index);
 }
@@ -12288,7 +12267,7 @@ export function Rxml_node_remove(node: Rid): void {
  * Moves a node, with what it contains, under another parent of
  * the same document or elsewhere under its own.
  * index Where among the children of the new parent, counted once the node has left its place; -1 for the end.
- * Returns: R_FALSE when it cannot be done (the root, or a parent that is inside the node).
+ * Returns: R_FALSE when it cannot be done (the root, a parent that is inside the node, or a place too deep).
  */
 export function Rxml_node_move(node: Rid, new_parent: Rid, index: number): number {
 	return _lib.Rxml_node_move(node, new_parent, index);

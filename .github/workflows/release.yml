@@ -1,10 +1,11 @@
 # Builds Raven for every platform, tests raven-tsx on each, compiles the example, and on a
 # version tag publishes one npm package per platform and the main package that lists them.
 #
-# Publishing is off until the repository variable NPM_PUBLISH is set to "true"; until then, and on
-# anything but a version tag, the publish job rehearses with npm pack --dry-run. A package with
-# a trusted publisher on npm needs no secret. One that has none yet, which npm requires for its
-# first version, needs the secret NPM_TOKEN, with the right to publish in the @decky.fx scope.
+# Every run makes all the packages and rehearses with npm pack --dry-run. Publishing is off until
+# the repository variable NPM_PUBLISH is set to "true", and then happens on a version tag, in the
+# environment "npm". A package with a trusted publisher on npm needs no secret. One that has none
+# yet, which npm requires for its first version, needs the secret NPM_TOKEN, with the right to
+# publish in the @decky.fx scope.
 name: release
 
 on:
@@ -120,15 +121,11 @@ jobs:
           path: dist/npm/${{ matrix.target }}
           if-no-files-found: error
 
-  publish:
-    name: publish
+  # no id-token here: these steps run the code of the branch, and its dependencies
+  package:
+    name: package
     needs: native
     runs-on: ubuntu-latest
-    permissions:
-      contents: read
-      id-token: write
-    env:
-      RELEASE: ${{ vars.NPM_PUBLISH == 'true' && startsWith(github.ref, 'refs/tags/v') }}
     steps:
       - uses: actions/checkout@v4
 
@@ -144,9 +141,7 @@ jobs:
 
       - uses: actions/setup-node@v4
         with:
-          # (trusted publishing needs npm 11.5.1 or newer: the npm of Node 22 is 10)
           node-version: 24
-          registry-url: https://registry.npmjs.org
 
       - uses: actions/download-artifact@v4
         with:
@@ -159,22 +154,56 @@ jobs:
           cd packages/raven-tsx
           bun run prepare:publish --out ../../dist/npm
 
-      # the platforms first: the main package depends on them. npm tries the trusted publisher first
-      # and falls back on the token; only this step sees it, and only for a release, as the steps
-      # above run code of the branch
-      - name: Publish
-        env:
-          NODE_AUTH_TOKEN: ${{ env.RELEASE == 'true' && secrets.NPM_TOKEN || '' }}
+      # (packing and not npm publish --dry-run: npm refuses even a dry run of a version it already has)
+      - name: Rehearse
         run: |
           for directory in dist/artifacts/npm-* dist/npm/main; do
+            (cd "$directory" && npm pack --dry-run)
+          done
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: main-package
+          path: dist/npm/main
+          if-no-files-found: error
+
+  # only what the jobs above made is published: nothing of the repository runs where the token and
+  # the right to ask for an OIDC token are
+  publish:
+    name: publish
+    if: vars.NPM_PUBLISH == 'true' && startsWith(github.ref, 'refs/tags/v')
+    needs: package
+    runs-on: ubuntu-latest
+    environment: npm
+    permissions:
+      id-token: write
+    steps:
+      - uses: actions/setup-node@v4
+        with:
+          # (trusted publishing needs npm 11.5.1 or newer: the npm of Node 22 is 10)
+          node-version: 24
+          registry-url: https://registry.npmjs.org
+
+      - uses: actions/download-artifact@v4
+        with:
+          path: dist/artifacts
+
+      # the platforms first: the main package depends on them. npm tries the trusted publisher
+      # first and falls back on the token
+      - name: Publish
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+        run: |
+          for directory in dist/artifacts/npm-* dist/artifacts/main-package; do
             name="$(node -p "require('./$directory/package.json').name")"
             version="$(node -p "require('./$directory/package.json').version")"
-            # (a rehearsal packs: npm refuses even a dry run of a version it already has)
-            if [ "$RELEASE" != true ]; then
-              (cd "$directory" && npm pack --dry-run)
-            elif npm view "$name@$version" version >/dev/null 2>&1; then
+            if npm view "$name@$version" version >/dev/null 2>view.log; then
               echo "$name@$version is already published"
-            else
+            elif grep -q E404 view.log; then
               (cd "$directory" && npm publish --access public --provenance)
+            else
+              # (the registry did not answer: that says nothing about this version)
+              cat view.log
+              exit 1
             fi
           done

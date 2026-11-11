@@ -392,4 +392,4 @@ Publishing is off until the repository variable `NPM_PUBLISH` is `true`; until t
 
 npm can only trust a workflow for a package that exists, so the first version needs the secret `NPM_TOKEN`: a granular token that can write to the scope, with bypass 2FA on, as nobody is there to answer a prompt. Delete the secret after that release.
 
-Later versions publish through OIDC, with provenance. Just before pushing the next tag, give each of the 6 packages a trusted publisher on npm (repository `deckyfx/raven-tsx`, workflow `release.yml`, with `npm publish` allowed: by default it may only stage). A new one expires unless it publishes within 2 days; if that happens, delete it and make another.
+Later versions publish through OIDC, with provenance. Just before pushing the next tag, give each of the 6 packages a trusted publisher on npm (repository `deckyfx/raven-tsx`, workflow `release.yml`, environment `npm`, with `npm publish` allowed: by default it may only stage). Limit the GitHub environment `npm` to `v*` tags, so that a run of a branch cannot publish. A new publisher expires unless it publishes within 2 days; if that happens, delete it and make another.

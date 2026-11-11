@@ -2,7 +2,7 @@
 # version tag publishes one npm package per platform and the main package that lists them.
 #
 # Publishing is off until the repository variable NPM_PUBLISH is set to "true"; until then, and on
-# anything but a version tag, the publish job rehearses with npm publish --dry-run. A package with
+# anything but a version tag, the publish job rehearses with npm pack --dry-run. A package with
 # a trusted publisher on npm needs no secret. One that has none yet, which npm requires for its
 # first version, needs the secret NPM_TOKEN, with the right to publish in the @decky.fx scope.
 name: release
@@ -166,14 +166,15 @@ jobs:
         env:
           NODE_AUTH_TOKEN: ${{ env.RELEASE == 'true' && secrets.NPM_TOKEN || '' }}
         run: |
-          mode=--dry-run
-          if [ "$RELEASE" = true ]; then mode=--provenance; fi
           for directory in dist/artifacts/npm-* dist/npm/main; do
             name="$(node -p "require('./$directory/package.json').name")"
             version="$(node -p "require('./$directory/package.json').version")"
-            if npm view "$name@$version" version >/dev/null 2>&1; then
+            # (a rehearsal packs: npm refuses even a dry run of a version it already has)
+            if [ "$RELEASE" != true ]; then
+              (cd "$directory" && npm pack --dry-run)
+            elif npm view "$name@$version" version >/dev/null 2>&1; then
               echo "$name@$version is already published"
             else
-              (cd "$directory" && npm publish --access public "$mode")
+              (cd "$directory" && npm publish --access public --provenance)
             fi
           done

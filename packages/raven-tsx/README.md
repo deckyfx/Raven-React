@@ -25,8 +25,6 @@ Every C example of Raven has a TSX port in [examples](../../examples), with scre
 
 ## Install
 
-Not on npm yet, and the name of the package is not final. Once it is published:
-
     bun add @decky.fx/raven-tsx react react-reconciler
 
 `react` and `react-reconciler` are optional peer dependencies: `@decky.fx/raven-tsx/react` needs both, and an application that uses only the core installs neither.
@@ -390,4 +388,6 @@ Nothing in a library says which commit it is: `Rget_version` is the same for eve
 
 Every push builds Raven at `RAVEN_VERSION` on each platform, and runs `raven:check` and the tests there.
 
-Publishing is off for now. To turn it on, set the repository variable `NPM_PUBLISH` to `true` and the secret `NPM_TOKEN`. A new version is then: set `version` in `package.json`, and push the tag `v<version>`. The packages of the platforms are published first, then this one.
+Publishing is off until the repository variable `NPM_PUBLISH` is `true`; until then the workflow rehearses it with `npm publish --dry-run`. A new version is: set `version` in `package.json`, and push the tag `v<version>`. The packages of the platforms are published first, then this one.
+
+npm can only trust a workflow for a package that exists, so the first version needs the secret `NPM_TOKEN`: a granular token that can write to the scope, with bypass 2FA on, as nobody is there to answer a prompt. After it, give each of the 6 packages a trusted publisher on npm (repository `deckyfx/raven-tsx`, workflow `release.yml`, with `npm publish` allowed: by default it may only stage) and delete the secret. Later versions publish through OIDC, with provenance.

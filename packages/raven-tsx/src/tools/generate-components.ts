@@ -11,6 +11,7 @@
 
 import * as r from "../core/raven";
 import { COMMON_PROPS, EVENT_VALUE_TYPES, EXTRA_PROPS } from "../core/events";
+import { acceptUndefined } from "./optional-undefined";
 
 /** Choices the schema lists among others it does not: the name of a loaded theme, or `Language="Markdown"`. */
 const OPEN_CHOICES: ReadonlySet<string> = new Set(["Theme", "Language"]);
@@ -194,9 +195,28 @@ core.push(
 	`export type MaterialName = ${commonNames("Material").map((name) => JSON.stringify(name)).join(" | ")};`,
 );
 
+/**
+ * A generated file as an application compiles it: no name imported for types and left unused
+ * (`noUnusedLocals`), and optional props that take `undefined` (`exactOptionalPropertyTypes`).
+ */
+function finish(lines: readonly string[]): string {
+	const [header = "", ...rest] = lines;
+	const body = rest.filter((line) => !line.startsWith("import ")).join("\n");
+	const imports = rest.filter((line) => line.startsWith("import ")).flatMap((line) => {
+		const [, names, from] = line.match(/^import type \{ (.+) \} from (".+");$/) ?? [];
+		if (names === undefined || from === undefined) {
+			// (a value or a namespace: kept as it is)
+			return [line];
+		}
+		const used = names.split(", ").filter((name) => new RegExp(`\\b${name}\\b`).test(body));
+		return used.length > 0 ? [`import type { ${used.join(", ")} } from ${from};`] : [];
+	});
+	return `${acceptUndefined([header, ...imports, body].join("\n"))}\n`;
+}
+
 const outputs: ReadonlyArray<readonly [string, string]> = [
-	[`${import.meta.dir}/../core/props.generated.ts`, `${core.join("\n")}\n`],
-	[`${import.meta.dir}/../react/components.generated.ts`, `${react.join("\n")}\n`],
+	[`${import.meta.dir}/../core/props.generated.ts`, finish(core)],
+	[`${import.meta.dir}/../react/components.generated.ts`, finish(react)],
 ];
 r.Rshutdown();
 if (process.argv.includes("--check")) {

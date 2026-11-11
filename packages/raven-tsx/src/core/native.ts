@@ -68,7 +68,7 @@ function loadablePath(path: string): string {
 	return extracted;
 }
 
-if (!process.env.RAVEN_LIBRARY) {
+if (!process.env["RAVEN_LIBRARY"]) {
 	const packaged = findPackagedLibrary();
 	if (!packaged) {
 		throw new Error(
@@ -76,7 +76,7 @@ if (!process.env.RAVEN_LIBRARY) {
 				`Install @decky.fx/raven-tsx-${process.platform}-${process.arch}, or set RAVEN_LIBRARY to the path of a library you built.`,
 		);
 	}
-	process.env.RAVEN_LIBRARY = loadablePath(packaged);
+	process.env["RAVEN_LIBRARY"] = loadablePath(packaged);
 }
 
-checkLibrary(process.env.RAVEN_LIBRARY ?? "");
+checkLibrary(process.env["RAVEN_LIBRARY"] ?? "");

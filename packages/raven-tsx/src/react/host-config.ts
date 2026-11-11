@@ -18,7 +18,7 @@ const NO_TIMEOUT = -1;
 type ReactRavenProps = RavenProps<ReactNode>;
 
 /** A `<Separator>` in a `<Menu>`: a line of the menu, as in XML, which is an item there and no widget of its own. */
-const menuSeparator = (props: ReactRavenProps): ReactRavenProps => ({ ...(props.Name === undefined ? {} : { Name: props.Name }), Separator: true });
+const menuSeparator = (props: ReactRavenProps): ReactRavenProps => ({ ...(props["Name"] === undefined ? {} : { Name: props["Name"] }), Separator: true });
 
 /** The priority React asks about: discrete while a native event runs, as a click in React DOM. */
 class UpdatePriority {
@@ -65,12 +65,12 @@ const hostConfig: RavenHostConfig = {
 			return WindowInstance.create(props);
 		}
 		if (tag === ADOPTED_TAG) {
-			return WidgetInstance.adopt(typeof props.widget === "number" ? props.widget : r.R_INVALID_ID);
+			return WidgetInstance.adopt(typeof props["widget"] === "number" ? props["widget"] : r.R_INVALID_ID);
 		}
 		return tag === "Separator" && context.inMenu ? WidgetInstance.create("MenuItem", menuSeparator(props)) : WidgetInstance.create(tag, props);
 	},
 	createTextInstance: (text) => RavenError.throw(`raven-tsx: text must be alone in a widget: "${text}"`),
-	shouldSetTextContent: (_tag, props) => childrenText(props.children) !== null,
+	shouldSetTextContent: (_tag, props) => childrenText(props["children"]) !== null,
 	appendInitialChild: (parent, child) => parent.appendInitial(child),
 	finalizeInitialChildren: () => false,
 	commitMount: () => {},

@@ -40,6 +40,8 @@ Not on npm yet, and the name of the package is not final. Once it is published:
 { "compilerOptions": { "jsx": "react-jsx", "types": ["bun", "react"] } }
 ```
 
+The package is TypeScript, so your compiler checks it with your settings (`skipLibCheck` skips only `.d.ts` files). It compiles with `strict`, `noUncheckedIndexedAccess`, `exactOptionalPropertyTypes` (optional props take `undefined`, as React's do), `noUnusedParameters`, `noImplicitOverride`, `noImplicitReturns`, `noFallthroughCasesInSwitch`, `isolatedModules` and `verbatimModuleSyntax`. Not yet with `noUnusedLocals` or `noPropertyAccessFromIndexSignature`, which Raven's own binding does not pass yet, nor with `erasableSyntaxOnly`: that binding has `enum`s.
+
 Raven's native library comes with it: there is a package per platform, and the package manager installs the one that fits. No install script runs, and nothing is compiled on your machine.
 
 | Platform | Package |

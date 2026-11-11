@@ -6,8 +6,8 @@ export type EventHandler = (...values: never[]) => void;
 /** A row of a `TreeView` given by its `Items` prop, with the rows inside it. */
 export interface TreeItem {
 	readonly Text: string;
-	readonly Expanded?: boolean;
-	readonly Children?: readonly TreeItem[];
+	readonly Expanded?: boolean | undefined;
+	readonly Children?: readonly TreeItem[] | undefined;
 }
 
 /** Numbers given to Raven as they are: a list, or a typed array when there are many. */
@@ -16,38 +16,38 @@ export type PlotNumbers = Float64Array | readonly number[];
 /** A curve of a `Plot`: what `<Series>` is in XML. Curves are known by their place in the list. */
 export interface PlotSeries {
 	/** Its name in the legend. Without one it is not in the legend. */
-	readonly Name?: string;
+	readonly Name?: string | undefined;
 	/** The Y of its points; NaN leaves a gap. New values are a new array: the same array is taken for the same values. */
-	readonly Y?: PlotNumbers;
+	readonly Y?: PlotNumbers | undefined;
 	/** The X of its points, as many as Y. Without it they are numbered 0, 1, 2... */
-	readonly X?: PlotNumbers;
-	readonly Color?: ThemeColor;
+	readonly X?: PlotNumbers | undefined;
+	readonly Color?: ThemeColor | undefined;
 	/** `None` leaves only the markers: a scatter plot. */
-	readonly Line?: "Solid" | "Dashed" | "Dotted" | "DashDot" | "None";
-	readonly LineWidth?: number;
-	readonly Marker?: "None" | "Circle" | "Square" | "Diamond" | "TriangleUp" | "TriangleDown" | "Cross" | "Plus" | "Asterisk";
-	readonly MarkerSize?: number;
-	readonly MarkerFilled?: boolean;
+	readonly Line?: "Solid" | "Dashed" | "Dotted" | "DashDot" | "None" | undefined;
+	readonly LineWidth?: number | undefined;
+	readonly Marker?: "None" | "Circle" | "Square" | "Diamond" | "TriangleUp" | "TriangleDown" | "Cross" | "Plus" | "Asterisk" | undefined;
+	readonly MarkerSize?: number | undefined;
+	readonly MarkerFilled?: boolean | undefined;
 	/** Draws the line in steps. */
-	readonly Step?: boolean;
+	readonly Step?: boolean | undefined;
 	/** The opacity of the area between the line and zero, from 0 to 1. */
-	readonly Fill?: number;
-	readonly XAxis?: "X" | "X2";
-	readonly YAxis?: "Y" | "Y2";
+	readonly Fill?: number | undefined;
+	readonly XAxis?: "X" | "X2" | undefined;
+	readonly YAxis?: "Y" | "Y2" | undefined;
 	/** The user also hides a series, from the legend. */
-	readonly Visible?: boolean;
+	readonly Visible?: boolean | undefined;
 	/** Keeps only the last points, for data that streams in with `Rplot_add_point`. */
-	readonly MaxPoints?: number;
+	readonly MaxPoints?: number | undefined;
 }
 
 /** A line across the data of a `Plot` that the user drags: what `<DragLine>` is in XML. */
 export interface PlotDragLine {
 	readonly Value: number;
 	/** `X` or `X2` makes it vertical, `Y` or `Y2` horizontal. `X` by default. */
-	readonly Axis?: "X" | "Y" | "X2" | "Y2";
+	readonly Axis?: "X" | "Y" | "X2" | "Y2" | undefined;
 	/** Written on the line, before its value. */
-	readonly Label?: string;
-	readonly Color?: ThemeColor;
+	readonly Label?: string | undefined;
+	readonly Color?: ThemeColor | undefined;
 }
 
 /** A prop given to Raven by calling it, as it is, and never as text. */
@@ -145,7 +145,7 @@ export function resolveProps<Child>(props: RavenProps<Child>, dataProps: readonl
 			attributes.set(name, toText(value));
 		}
 	}
-	const text = childrenText(props.children);
+	const text = childrenText(props["children"]);
 	if (text !== null) {
 		attributes.set("Text", text);
 	}

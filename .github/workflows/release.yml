@@ -105,6 +105,13 @@ jobs:
         run: |
           bun run pack:platform --target ${{ matrix.target }} --lib "../../raven-source/${{ matrix.library }}" --raven ../../raven-source --out ../../dist/npm
 
+      # the packages as npm gives them, in an application that compiles our sources with its strict
+      # settings (skipLibCheck does not skip a .ts file), and loads the library of this platform
+      - name: Install the packages into an application, and compile it strictly
+        if: matrix.test
+        working-directory: packages/raven-tsx
+        run: bun run check:consumer --platform ../../dist/npm/${{ matrix.target }}
+
       - uses: actions/upload-artifact@v4
         with:
           name: npm-${{ matrix.target }}

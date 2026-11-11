@@ -180,7 +180,7 @@ test("the library has all the functions of the binding, and the check for it see
 	const binding = await Bun.file(`${import.meta.dir}/../../vendor/raven.ts`).text();
 	const functions = functionsOfBinding(binding);
 	expect(functions.length).toBeGreaterThan(900);
-	const library = Buffer.from(await Bun.file(process.env.RAVEN_LIBRARY ?? "").arrayBuffer());
+	const library = Buffer.from(await Bun.file(process.env["RAVEN_LIBRARY"] ?? "").arrayBuffer());
 	expect(missingFunctions(functions, library)).toEqual([]);
 	expect(missingFunctions([...functions, "Rnot_there_yet"], library)).toEqual(["Rnot_there_yet"]);
 	// (not a library: it says nothing rather than something false)
@@ -300,7 +300,7 @@ test("what differs between two APIs is said by name", () => {
  * work, so that this check cannot stop running without anyone seeing.
  */
 async function apiOfCheckout(): Promise<RavenApi | null> {
-	const required = process.env.RAVEN_CHECKOUT;
+	const required = process.env["RAVEN_CHECKOUT"];
 	const checkout = resolve(required ?? `${import.meta.dir}/../../../../../../../raven`);
 	const pin = await readPin();
 	const commit = existsSync(checkout) ? commitOf(checkout, pin) : null;

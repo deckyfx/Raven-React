@@ -49,15 +49,15 @@ const SYMBOLS = {
  * event callback, and this one forwards the mouse and the keys to the page.
  */
 export type WebViewProps = Omit<CustomProps, "OnPaint" | "OnMeasure" | "OnEvent"> & {
-	readonly Url?: string;
+	readonly Url?: string | undefined;
 	/** A file: it can also be given by `Url` as `file://...`. */
-	readonly Source?: string;
-	readonly Html?: string;
-	readonly Zoom?: number;
-	readonly Frames?: "Jpeg" | "Png";
-	readonly Quality?: number;
+	readonly Source?: string | undefined;
+	readonly Html?: string | undefined;
+	readonly Zoom?: number | undefined;
+	readonly Frames?: "Jpeg" | "Png" | undefined;
+	readonly Quality?: number | undefined;
 	/** Fired when the page changes: read it through a ref, with `webFunctions`. */
-	readonly OnChanged?: string | (() => void);
+	readonly OnChanged?: string | (() => void) | undefined;
 };
 
 let opened: ReturnType<typeof dlopen<typeof SYMBOLS>>["symbols"] | null = null;
@@ -65,7 +65,7 @@ let opened: ReturnType<typeof dlopen<typeof SYMBOLS>>["symbols"] | null = null;
 /** The functions of `raven_web.h`, as bun:ffi gives them: a text is a `Buffer` that ends with a zero. */
 export function webFunctions(): NonNullable<typeof opened> {
 	if (!opened) {
-		const library = process.env.RAVEN_LIBRARY;
+		const library = process.env["RAVEN_LIBRARY"];
 		if (r.Rget_version() === null || !library) {
 			RavenError.throw("raven-tsx: RAVEN_LIBRARY should say where the library is, and it does not");
 		}

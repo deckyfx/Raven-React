@@ -6,9 +6,9 @@ import type { WindowInstance } from "../core/window-instance";
 
 /** The props every component has from React. */
 interface ReactProps<R> {
-	readonly key?: Key;
-	readonly ref?: Ref<R>;
-	readonly children?: ReactNode;
+	readonly key?: Key | undefined;
+	readonly ref?: Ref<R> | undefined;
+	readonly children?: ReactNode | undefined;
 }
 
 /**

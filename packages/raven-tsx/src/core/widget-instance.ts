@@ -59,12 +59,12 @@ interface ControlledValue {
 	/** The value of the widget, as the attribute would be written. */
 	readonly read: (widget: r.Rid) => string;
 	/** Whether the widget already holds a value, when `sameValue` is not the way to tell. */
-	readonly same?: (held: string, wanted: string) => boolean;
+	readonly same?: ((held: string, wanted: string) => boolean) | undefined;
 	/**
 	 * The user changes it without an event that says so: it is not set to what it holds, and not
 	 * put back either, or the view would jump back at the next event of something else.
 	 */
-	readonly unreported?: true;
+	readonly unreported?: true | undefined;
 }
 
 const numberText = (value: number): string => String(value);

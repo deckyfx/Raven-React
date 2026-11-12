@@ -1,5 +1,7 @@
 import { afterAll, beforeAll, expect, test } from "bun:test";
 import * as r from "../../core/raven";
+import { eventStats } from "../../core/events";
+import { WidgetInstance } from "../../core/widget-instance";
 import { WindowInstance } from "../../core/window-instance";
 
 beforeAll(() => {
@@ -52,5 +54,18 @@ test("a window destroyed in Raven runs nothing more, queued or asked later", () 
 	window.materialize();
 	window.whenOpen(() => ran.push("later"));
 	expect(ran).toEqual([]);
+	window.dispose();
+});
+
+test("a live widget taken out of a window not open yet leaves no handler", () => {
+	const window = WindowInstance.create({ Title: "pending", Width: 100, Height: 100 });
+	const handlers = eventStats().handlers;
+	const button = WidgetInstance.create("Button", { OnClicked: () => {} });
+	button.materialize();
+	expect(eventStats().handlers).toBe(handlers + 1);
+	window.append(button);
+	window.remove(button);
+	expect(eventStats().handlers).toBe(handlers);
+	expect(r.Rwidget_is_valid(button.widget)).toBe(0);
 	window.dispose();
 });

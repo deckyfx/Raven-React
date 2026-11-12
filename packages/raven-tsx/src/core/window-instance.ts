@@ -289,6 +289,8 @@ export class WindowInstance implements HostNode {
 	remove(child: HostNode): void {
 		if (this.state === "pending") {
 			this.releaseInitial(child);
+			// (a child can be live already, moved here: its handlers go before it does)
+			child.forgetTree();
 			child.dispose();
 			return;
 		}

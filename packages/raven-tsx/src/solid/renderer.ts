@@ -23,11 +23,7 @@ export const {
 } = createRenderer<SolidNode>({
 	createElement: (tag) => SolidNode.element(tag),
 	createTextNode: (value) => SolidNode.text(value),
-	replaceText(node, value) {
-		node.text = value;
-		// (the parent shows it, as its Text)
-		node.parent?.refresh();
-	},
+	replaceText: (node, value) => node.setText(value),
 	isTextNode: (node) => node.isText,
 	setProperty: (node, name, value) => node.setProp(name, value),
 	insertNode: (parent, node, anchor) => parent.insert(node, anchor ?? null),

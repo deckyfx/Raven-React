@@ -5,6 +5,7 @@ import { afterAll, afterEach, beforeAll, expect, test } from "bun:test";
 import { createSignal, ErrorBoundary, For, onCleanup, onMount, Show, type JSX } from "solid-js";
 import * as r from "../../core/raven";
 import { eventStats } from "../../core/events";
+import { SolidNode } from "../../solid/node";
 import {
 	Border, Button, Checkbox, createAction, createFrame, createShortcut, createWindow, HBox, Island, Label, Menu, MenuBar, MenuItem, Portal, RavenRoot, Separator, TextInput, VBox, Window,
 	type WidgetInstance, type WindowInstance,
@@ -716,4 +717,29 @@ test("a shortcut waits for its window to open: one made before it is shown", asy
 	expect(fired).toBe(1);
 	windows.unmount();
 	expect(eventStats().handlers).toBe(0);
+});
+
+test("a tree that throws while it renders leaves nothing: its actions and its widgets go", () => {
+	let fired = 0;
+	function Failing(): JSX.Element {
+		createAction("test.solid.failing", () => fired++);
+		throw new Error("from a render");
+	}
+	const made = createWindow(WINDOW);
+	window = made.window;
+	root = made.root;
+	expect(() => made.root.render(() => <VBox Name="box"><Failing /></VBox>)).toThrow("from a render");
+	r.Raction_fire("test.solid.failing", r.R_INVALID_ID);
+	expect(fired).toBe(0);
+	expect(find("box")).toBe(r.R_INVALID_ID);
+	expect(eventStats().handlers).toBe(0);
+});
+
+test("text refused beside widgets leaves the text node as it was", () => {
+	const box = SolidNode.element("HBox");
+	const empty = SolidNode.text("");
+	box.insert(empty, null);
+	box.insert(SolidNode.element("Label"), null);
+	expect(() => empty.setText("x")).toThrow('text must be alone in a widget: "x"');
+	expect(empty.text).toBe("");
 });

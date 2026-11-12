@@ -129,6 +129,16 @@ export class SolidNode {
 		return { children: texts.map((child) => child.text ?? "") };
 	}
 
+	/** Changes the text of a text node, which its parent shows as `Text`. Refused text changes nothing. */
+	setText(value: string): void {
+		const siblings = this.parent?.children ?? [];
+		if (value !== "" && siblings.some((node) => !node.isText)) {
+			RavenError.throw(`raven-tsx: text must be alone in a widget: "${value}"`);
+		}
+		this.text = value;
+		this.parent?.refresh();
+	}
+
 	/** Text beside widgets is an error, as with React: said before anything changes, whichever comes first. */
 	private checkMixed(child: SolidNode): void {
 		const others = this.children.filter((node) => node !== child);

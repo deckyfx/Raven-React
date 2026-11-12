@@ -1,4 +1,4 @@
-import { createComponent, type JSX } from "solid-js";
+import { createComponent, createRoot, type JSX } from "solid-js";
 import * as r from "../core/raven";
 import { RavenError } from "../core/errors";
 import { resolveProps, type RavenProps } from "../core/props";
@@ -6,7 +6,7 @@ import type { WindowOptions } from "../core/props.generated";
 import { makeWindow } from "../core/window-instance";
 import { Window } from "./components.generated";
 import { SolidNode } from "./node";
-import { render } from "./renderer";
+import { insert } from "./renderer";
 
 /**
  * A tree of Solid, as `render` of solid-js/web. Given a widget, it renders into it.
@@ -20,10 +20,26 @@ export class RavenRoot {
 		this.node = SolidNode.container(parent);
 	}
 
-	/** Renders a tree, in place of the one it had. */
+	/**
+	 * Renders a tree, in place of the one it had. If the tree throws, what it made goes (its cleanups
+	 * run, its widgets go) and the error goes on. (as Solid's `render`, but the root is kept before the
+	 * code runs: `render` gives it back only once the code has returned)
+	 */
 	render(code: () => JSX.Element): void {
 		this.unmount();
-		this.dispose = render(code, this.node);
+		try {
+			createRoot((dispose) => {
+				this.dispose = dispose;
+				insert(this.node, code());
+			});
+		} catch (error) {
+			try {
+				this.unmount();
+			} catch (cleanup) {
+				console.error("raven-tsx: cleaning up a tree that failed:", cleanup);
+			}
+			throw error;
+		}
 	}
 
 	/** Removes the tree: its cleanups run, and its widgets and windows go. */

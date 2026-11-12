@@ -328,3 +328,101 @@ test("a window its own function closes as it is placed stays closed", () => {
 	outer.forgetTree();
 	outer.dispose();
 });
+
+test("windows side by side all close, also past one whose cleanup throws", () => {
+	const outer = WindowInstance.create(WINDOW);
+	const box = WidgetInstance.create("VBox", {});
+	const first = WindowInstance.create(WINDOW);
+	const second = WindowInstance.create(WINDOW);
+	box.append(first);
+	box.append(second);
+	outer.append(box);
+	outer.materialize();
+	first.whenOpen(() => () => {
+		throw new Error("from the first");
+	});
+	expect(() => outer.close()).toThrow("from the first");
+	expect([outer.isOpen, first.isOpen, second.isOpen]).toEqual([false, false, false]);
+	outer.materialize();
+	expect([outer.isOpen, first.isOpen, second.isOpen]).toEqual([true, true, true]);
+	outer.forgetTree();
+	expect(() => outer.dispose()).toThrow("from the first");
+	expect([outer.isOpen, first.isOpen, second.isOpen]).toEqual([false, false, false]);
+});
+
+test("an inner window whose function throws as the outer one opens goes with it", () => {
+	const outer = WindowInstance.create(WINDOW);
+	const inner = WindowInstance.create(WINDOW);
+	const after = WindowInstance.create(WINDOW);
+	inner.whenOpen(() => {
+		throw new Error("from the inner");
+	});
+	outer.append(inner);
+	outer.append(after);
+	expect(() => outer.materialize()).toThrow("from the inner");
+	expect([outer.isOpen, inner.isOpen, after.isOpen]).toEqual([false, false, false]);
+});
+
+test("a child that a function took away while it was made is not placed after all", () => {
+	const outer = WindowInstance.create(WINDOW);
+	outer.materialize();
+	const box = WidgetInstance.create("VBox", {});
+	const inner = WindowInstance.create(WINDOW);
+	box.append(inner);
+	inner.whenOpen(() => outer.release(box));
+	outer.append(box);
+	expect(box.placed).toBe(true);
+	expect(r.Rwidget_get_parent(box.widget)).toBe(r.R_INVALID_ID);
+	box.forgetTree();
+	box.dispose();
+	outer.dispose();
+});
+
+test("a child is placed at its place, also when user code added another after it while it was made", () => {
+	const outer = WindowInstance.create(WINDOW);
+	const parent = WidgetInstance.create("VBox", {});
+	outer.append(parent);
+	outer.materialize();
+	const box = WidgetInstance.create("VBox", { Name: "box" });
+	const inner = WindowInstance.create(WINDOW);
+	const sibling = WidgetInstance.create("Label", { Name: "sibling" });
+	box.append(inner);
+	inner.whenOpen(() => parent.append(sibling));
+	parent.append(box);
+	const order = Array.from({ length: r.Rwidget_get_child_count(parent.widget) }, (_, index) => r.Rwidget_get_name(r.Rwidget_get_child(parent.widget, index)));
+	expect(order).toEqual(["box", "sibling"]);
+	outer.forgetTree();
+	outer.dispose();
+});
+
+test("a window its function destroyed in Raven, then threw, is not kept as placed", () => {
+	const outer = WindowInstance.create(WINDOW);
+	const inner = WindowInstance.create(WINDOW);
+	inner.whenOpen(() => {
+		r.Rwindow_destroy(inner.window);
+		throw new Error("after destroying");
+	});
+	const handlers = eventStats().handlers;
+	outer.append(inner);
+	expect(() => outer.materialize()).toThrow("after destroying");
+	expect(inner.placed).toBe(false);
+	expect(eventStats().handlers).toBe(handlers);
+});
+
+test("windows side by side all go when the outer one does, also when a cleanup released one and threw", () => {
+	const outer = WindowInstance.create(WINDOW);
+	const box = WidgetInstance.create("VBox", {});
+	const first = WindowInstance.create(WINDOW);
+	const second = WindowInstance.create(WINDOW);
+	box.append(first);
+	box.append(second);
+	outer.append(box);
+	outer.materialize();
+	first.whenOpen(() => () => {
+		box.release(first);
+		throw new Error("from the first");
+	});
+	outer.forgetTree();
+	expect(() => outer.dispose()).toThrow("from the first");
+	expect(second.isOpen).toBe(false);
+});

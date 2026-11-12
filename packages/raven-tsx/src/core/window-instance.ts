@@ -100,6 +100,10 @@ interface Opening {
 export class WindowInstance implements HostNode {
 	readonly tag = "Window";
 	readonly nativeWidget = null;
+
+	get placed(): boolean {
+		return this.state === "live" && this.isOpen;
+	}
 	private id: r.Rid = r.R_INVALID_ID;
 	/** Where its widgets go, once it is open. */
 	private content: WidgetInstance | null = null;
@@ -149,9 +153,14 @@ export class WindowInstance implements HostNode {
 					r.Rwidget_add_child(content, widget);
 				}
 			}
-			for (const child of this.initial.splice(0)) {
-				this.append(child);
+			// (each child goes in, also past one that fails: then the window goes, with all of them)
+			// (one at a time: one that user code released meanwhile is no longer waiting here)
+			const failures: unknown[] = [];
+			for (let child = this.initial.shift(); child; child = this.initial.shift()) {
+				const next = child;
+				attempt(failures, () => this.append(next));
 			}
+			throwFirst(failures);
 		} catch (error) {
 			this.forgetTree();
 			this.dispose();
@@ -398,8 +407,9 @@ export class WindowInstance implements HostNode {
 	}
 
 	release(child: HostNode): void {
+		// (also while it opens: what waits to go in is let go too)
+		this.releaseInitial(child);
 		if (this.state !== "live") {
-			this.releaseInitial(child);
 			return;
 		}
 		if (child !== this.island) {

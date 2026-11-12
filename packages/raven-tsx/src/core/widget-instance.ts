@@ -4,6 +4,22 @@ import { applyHandlers, controlledSync, eventScope, forgetHandlers, setVirtualIt
 import { applyPlotData, checkPlotData, restorePlotData } from "./plot";
 import { CLEARED, resolveProps, type RavenProps, type ResolvedProps, type TreeItem } from "./props";
 
+/** Runs a function, and keeps its failure with the others, to go on with what must be done. */
+function attempt(failures: unknown[], run: () => void): void {
+	try {
+		run();
+	} catch (error) {
+		failures.push(error);
+	}
+}
+
+/** Throws the first of some failures, once all that could run has run. */
+function throwFirst(failures: readonly unknown[]): void {
+	if (failures.length > 0) {
+		throw failures[0];
+	}
+}
+
 /** The host type of a widget Raven made and an adapter only places: `adopt`. */
 export const ADOPTED_TAG = "raven-tsx:adopted";
 
@@ -32,6 +48,8 @@ export interface HostNode {
 	readonly tag: string;
 	/** The widget to put in a parent, or null for a window, which stands by itself. */
 	readonly nativeWidget: r.Rid | null;
+	/** Whether Raven has it: made, and not deleted. A window open whose function threw still is. */
+	readonly placed: boolean;
 	/** Says who holds it. */
 	setParent(parent: WidgetInstance | null): void;
 	/**
@@ -372,6 +390,10 @@ export class WidgetInstance implements HostNode {
 		return this.id;
 	}
 
+	get placed(): boolean {
+		return this.state === "live";
+	}
+
 	/**
 	 * Opens a `<Menu>` that stands by itself as a popup, at a position of its window. A right click
 	 * gives that position: `OnContext` of a TreeView or a TileView, in the window.
@@ -656,14 +678,44 @@ export class WidgetInstance implements HostNode {
 			return;
 		}
 		this.checkHolds(child);
-		child.materialize();
-		child.openWindows();
 		this.detach(child);
 		this.children.push(child);
 		child.setParent(this);
-		if (this.holds(child)) {
-			r.Rwidget_add_child(this.id, child.nativeWidget as r.Rid);
+		this.make(child, () => {
+			// (at its place, not at the end: making it ran user code, which may have added others after it)
+			if (this.holds(child)) {
+				r.Rwidget_insert_child(this.id, child.nativeWidget as r.Rid, this.nativeIndexOf(child, false));
+			}
+		});
+	}
+
+	/**
+	 * Makes a child that is here in Raven, then places it there. The child is recorded first: if
+	 * making it fails with something of it left in Raven (a window open whose function threw), what
+	 * deletes this deletes it. One that Raven does not have after a failure is not kept.
+	 */
+	private make(child: HostNode, place: () => void): void {
+		const failures: unknown[] = [];
+		attempt(failures, () => child.materialize());
+		if (failures.length > 0 && !child.placed) {
+			const index = this.children.indexOf(child);
+			if (index >= 0) {
+				this.children.splice(index, 1);
+			}
+			child.setParent(null);
+			// (what is left of it in JavaScript goes: its handlers, a window Raven destroyed)
+			attempt(failures, () => {
+				child.forgetTree();
+				child.dispose();
+			});
+			throwFirst(failures);
 		}
+		// (making it ran user code, which may have taken it away from here)
+		if (this.children.includes(child)) {
+			place();
+			attempt(failures, () => child.openWindows());
+		}
+		throwFirst(failures);
 	}
 
 	/** Puts a child before another one. A child already here moves. */
@@ -671,8 +723,6 @@ export class WidgetInstance implements HostNode {
 		const pending = this.state === "pending";
 		if (!pending) {
 			this.checkHolds(child);
-			child.materialize();
-			child.openWindows();
 		}
 		this.detach(child);
 		const index = this.children.indexOf(before);
@@ -681,8 +731,12 @@ export class WidgetInstance implements HostNode {
 		}
 		this.children.splice(index, 0, child);
 		child.setParent(this);
-		if (!pending && this.holds(child)) {
-			r.Rwidget_insert_child(this.id, child.nativeWidget as r.Rid, this.nativeIndexOf(child, false));
+		if (!pending) {
+			this.make(child, () => {
+				if (this.holds(child)) {
+					r.Rwidget_insert_child(this.id, child.nativeWidget as r.Rid, this.nativeIndexOf(child, false));
+				}
+			});
 		}
 	}
 
@@ -707,15 +761,25 @@ export class WidgetInstance implements HostNode {
 	}
 
 	closeWindows(): void {
-		for (const child of this.children) {
-			child.closeWindows();
+		// (all of them, also past one that throws)
+		const failures: unknown[] = [];
+		for (const child of [...this.children]) {
+			// (a cleanup of one may have moved another away: it is no longer this one's to close)
+			if (this.children.includes(child)) {
+				attempt(failures, () => child.closeWindows());
+			}
 		}
+		throwFirst(failures);
 	}
 
 	openWindows(): void {
-		for (const child of this.children) {
-			child.openWindows();
+		const failures: unknown[] = [];
+		for (const child of [...this.children]) {
+			if (this.children.includes(child)) {
+				attempt(failures, () => child.openWindows());
+			}
 		}
+		throwFirst(failures);
 	}
 
 	/** Takes every child out, alive, and gives them: a window that closes keeps what it holds. */
@@ -757,13 +821,20 @@ export class WidgetInstance implements HostNode {
 
 	/** Deletes what is in this tree without being a widget of it: deleting a widget does not reach those. */
 	disposeDetached(): void {
-		for (const child of this.children) {
+		// (all of them, also past one whose cleanup throws)
+		const failures: unknown[] = [];
+		for (const child of [...this.children]) {
+			// (a cleanup of one may have taken another away: it is no longer this one's)
+			if (!this.children.includes(child)) {
+				continue;
+			}
 			if (!this.holds(child)) {
-				child.dispose();
+				attempt(failures, () => child.dispose());
 			} else if (child instanceof WidgetInstance) {
-				child.disposeDetached();
+				attempt(failures, () => child.disposeDetached());
 			}
 		}
+		throwFirst(failures);
 	}
 
 	/**

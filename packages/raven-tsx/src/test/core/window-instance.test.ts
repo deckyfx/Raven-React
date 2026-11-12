@@ -439,6 +439,24 @@ test("a widget removed by a child as it is made makes none of the children after
 	window.dispose();
 });
 
+test("a child removed while it waits to go in does not go in", () => {
+	const errors: string[] = [];
+	r.Rerror_set_callback((_code, _severity, detail) => void errors.push(detail ?? ""));
+	const outer = WindowInstance.create(WINDOW);
+	const inner = WindowInstance.create(WINDOW);
+	const waiting = WidgetInstance.create("Label", { Name: "waiting", Text: "waiting" });
+	inner.whenOpen(() => outer.remove(waiting));
+	outer.appendInitial(inner);
+	outer.appendInitial(waiting);
+	outer.materialize();
+	expect(r.Rwidget_find(outer.window, "waiting")).toBe(r.R_INVALID_ID);
+	expect(waiting.placed).toBe(false);
+	outer.forgetTree();
+	outer.dispose();
+	r.Rerror_set_callback(null);
+	expect(errors).toEqual([]);
+});
+
 test("a function that throws as soon as whenOpen runs it is not kept", () => {
 	const window = WindowInstance.create(WINDOW);
 	window.materialize();

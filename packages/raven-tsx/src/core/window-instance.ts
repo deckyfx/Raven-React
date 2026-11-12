@@ -509,8 +509,9 @@ export class WindowInstance implements HostNode {
 	}
 
 	remove(child: HostNode): void {
+		// (also while it opens: what waits to go in goes from there, and does not go in after)
+		this.releaseInitial(child);
 		if (!this.content) {
-			this.releaseInitial(child);
 			// (a child can be live already, moved here: its handlers go before it does)
 			child.forgetTree();
 			child.dispose();

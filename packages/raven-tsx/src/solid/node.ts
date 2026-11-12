@@ -191,10 +191,20 @@ export class SolidNode {
 		}
 		const next = this.children.slice(this.children.indexOf(child) + 1).find((node) => !node.isText);
 		const beforeHost = next?.instance;
-		if (beforeHost) {
-			host.insertBefore(childHost, beforeHost);
-		} else {
-			host.append(childHost);
+		try {
+			if (beforeHost) {
+				host.insertBefore(childHost, beforeHost);
+			} else {
+				host.append(childHost);
+			}
+		} catch (error) {
+			// (the core did not take it: it is not in this tree either)
+			const index = this.children.indexOf(child);
+			if (index >= 0) {
+				this.children.splice(index, 1);
+			}
+			child.parent = null;
+			throw error;
 		}
 		// (moved to a parent not placed: its windows close, to open with it)
 		if (moved && !host.placed) {
@@ -254,7 +264,8 @@ export class SolidNode {
 		const failures: unknown[] = [];
 		for (const child of [...this.children]) {
 			try {
-				if (deleting) {
+				// (one that a cleanup moved to another parent meanwhile is that one's, owner and all)
+				if (deleting && child.parent === this) {
 					child.ownerGone = true;
 				}
 				this.release(child);

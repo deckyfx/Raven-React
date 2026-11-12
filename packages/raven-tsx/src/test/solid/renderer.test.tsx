@@ -782,6 +782,47 @@ test("a tree rendered by a cleanup of the one a render replaces is replaced too"
 	expect(nextCleanups).toBe(1);
 });
 
+test("a child the core refuses is not kept in the tree", () => {
+	const windows = SolidNode.container(r.R_INVALID_ID);
+	const label = SolidNode.element("Label");
+	// (a root of windows holds windows: a widget has nowhere to go)
+	expect(() => windows.insert(label, null)).toThrow("must be inside a <Window>");
+	expect(windows.children).toEqual([]);
+	expect(label.parent).toBe(null);
+});
+
+test("a child that a closing window moved elsewhere while its parent is cleared keeps its owner", () => {
+	createRoot((dispose) => {
+		const cleared = SolidNode.container(r.R_INVALID_ID);
+		const elsewhere = SolidNode.container(r.R_INVALID_ID);
+		const closing = SolidNode.element("Window");
+		const moved = SolidNode.element("Window");
+		let movedHost: WindowInstance | undefined;
+		moved.withInstance((instance) => {
+			movedHost = instance as WindowInstance;
+		});
+		cleared.insert(closing, null);
+		cleared.insert(moved, null);
+		let once = true;
+		closing.withInstance((instance) =>
+			(instance as WindowInstance).whenOpen(() => () => {
+				if (once) {
+					once = false;
+					elsewhere.insert(moved, null);
+				}
+			}),
+		);
+		cleared.clear();
+		expect(elsewhere.children).toEqual([moved]);
+		// (its owner is still there: taken out, it stays alive, and opens again when placed)
+		elsewhere.release(moved);
+		elsewhere.insert(moved, null);
+		expect(movedHost?.isOpen).toBe(true);
+		elsewhere.clear();
+		dispose();
+	});
+});
+
 test("an element kept in a variable, shown in a Portal, keeps its widget when the Portal comes back", async () => {
 	const [shown, setShown] = createSignal(true);
 	const box = r.Rwidget_create_from_xml('<VBox Name="by-hand"/>');

@@ -1,6 +1,6 @@
 # raven-tsx
 
-Native desktop interfaces in TSX, for [Bun](https://bun.com), on the real widgets of [Raven](https://github.com/oscar-soirey/Raven), drawn with Vulkan. A core knows only Raven, and an adapter for a framework is built on it; React is the one there is today. No XML, no webview, and no build step.
+Native desktop interfaces in TSX, for [Bun](https://bun.com), on the real widgets of [Raven](https://github.com/oscar-soirey/Raven), drawn with Vulkan. A core knows only Raven, and an adapter for a framework is built on it: React and Solid have one. No XML and no webview.
 
 ```tsx
 import { useState } from "react";
@@ -40,6 +40,7 @@ The C examples of Raven are ported to TSX in [examples](examples), with the same
 |---|---|
 | [hello](examples/hello) | A window, a label and two buttons |
 | [helloworld](examples/helloworld) | An application that tries everything, and compiles to one executable |
+| [solid-helloworld](examples/solid-helloworld) | The basics of helloworld with Solid: signals, `<Show>`, `<For>`, one executable |
 | [animations](examples/animations) | Transitions, springs in a custom widget, cards that pop |
 | [components](examples/components) | Tags of your own as React components, which Raven also builds from a document made by code ([screenshot](docs/screenshots/components.png)) |
 | [memory](examples/memory) | Where the memory of the library comes from, and how to watch it |

@@ -1,0 +1,2 @@
+# Solid's TSX is compiled by the plugin of raven-tsx, which also takes Solid's build for clients
+preload = ["@decky.fx/raven-tsx/solid/preload"]

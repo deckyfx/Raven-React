@@ -5,8 +5,10 @@
  *
  *     bun run check:consumer --platform <folder of pack:platform for this machine>
  *
- * The main package is made here, by prepare:publish. The application is the Hello World example,
- * with a file that passes `undefined` to optional props (`exactOptionalPropertyTypes`).
+ * The main package is made here, by prepare:publish. There are two applications, one of React and
+ * one of Solid: each is a Hello World example, with a file that passes `undefined` to optional props
+ * (`exactOptionalPropertyTypes`). The one of Solid runs through the plugin of the package, as its
+ * bunfig.toml preloads it, and renders a signal.
  */
 
 import { cpSync, mkdtempSync, rmSync } from "node:fs";
@@ -50,84 +52,140 @@ function strictOptions(): Record<string, boolean> {
 	return Object.fromEntries(Object.entries(options).filter((entry): entry is [string, boolean] => typeof entry[1] === "boolean"));
 }
 
+/** The compiler options of `bun init`, with every setting this package holds its sources to. */
+function compilerOptions(jsx: Readonly<Record<string, string>>, types: readonly string[]): Record<string, unknown> {
+	return {
+		lib: ["ESNext"],
+		target: "ESNext",
+		module: "Preserve",
+		moduleDetection: "force",
+		...jsx,
+		allowJs: true,
+		types,
+		moduleResolution: "bundler",
+		allowImportingTsExtensions: true,
+		verbatimModuleSyntax: true,
+		noEmit: true,
+		skipLibCheck: true,
+		noUncheckedIndexedAccess: true,
+		...strictOptions(),
+	};
+}
+
+/** Writes an application, installs the packages into it from their tarballs, and compiles it. */
+async function makeApp(app: string, files: Readonly<Record<string, string>>, main: string, native: string, nativeName: string, dependencies: Readonly<Record<string, string>>, devDependencies: Readonly<Record<string, string>>): Promise<void> {
+	const manifestOf = {
+		name: "consumer",
+		private: true,
+		type: "module",
+		dependencies: { [manifest.name]: `file:${main}`, ...dependencies },
+		// (the platform package of this machine is the one just made, not one on npm)
+		overrides: { [nativeName]: `file:${native}` },
+		devDependencies: { "@types/bun": manifest.devDependencies["@types/bun"], typescript: manifest.devDependencies.typescript, ...devDependencies },
+	};
+	await Bun.write(`${app}/package.json`, JSON.stringify(manifestOf, null, 2));
+	for (const [name, text] of Object.entries(files)) {
+		await Bun.write(`${app}/${name}`, text);
+	}
+	await run(["bun", "install"], app);
+	await run(["bun", "check", "--all"], app);
+}
+
 try {
 	await run(["bun", "run", "src/tools/prepare-publish.ts", "--out", `${work}/npm`], root);
 	const main = await pack(`${work}/npm/main`);
 	const native = await pack(platform);
 	const nativeName = (await Bun.file(`${platform}/package.json`).json()).name as string;
+	const strict = Object.keys(strictOptions()).join(", ");
 
-	const app = `${work}/app`;
-	await Bun.write(
-		`${app}/package.json`,
-		JSON.stringify(
-			{
-				name: "consumer",
-				private: true,
-				type: "module",
-				dependencies: { [manifest.name]: `file:${main}`, react: manifest.devDependencies.react, "react-reconciler": manifest.devDependencies["react-reconciler"] },
-				// (the platform package of this machine is the one just made, not one on npm)
-				overrides: { [nativeName]: `file:${native}` },
-				devDependencies: { "@types/bun": manifest.devDependencies["@types/bun"], typescript: manifest.devDependencies.typescript },
-			},
-			null,
-			2,
-		),
+	const react = `${work}/react`;
+	cpSync(`${root}/../../examples/helloworld/src`, `${react}/src`, { recursive: true });
+	await makeApp(
+		react,
+		{
+			"tsconfig.json": JSON.stringify({ compilerOptions: compilerOptions({ jsx: "react-jsx" }, ["bun"]), include: ["src"] }, null, 2),
+			"src/optional.tsx": [
+				'import { defineTheme } from "@decky.fx/raven-tsx";',
+				'import { Button, Label, VBox } from "@decky.fx/raven-tsx/react";',
+				"",
+				"/** Optional props given a value that may be undefined, as `exactOptionalPropertyTypes` checks them. */",
+				"export function Optional(props: { readonly tip?: string | undefined; readonly onClick?: (() => void) | undefined }) {",
+				"\treturn (",
+				'\t\t<VBox Name="optional" Tooltip={props.tip}>',
+				"\t\t\t<Button OnClicked={props.onClick}>ok</Button>",
+				'\t\t\t<Label Slot={{ Title: props.tip }}>text</Label>',
+				"\t\t</VBox>",
+				"\t);",
+				"}",
+				"",
+				'export const theme = defineTheme({ Name: "optional", Accent: undefined, Styles: [{ Widget: "Button", Class: undefined }] });',
+				"",
+			].join("\n"),
+		},
+		main, native, nativeName,
+		{ react: manifest.devDependencies.react, "react-reconciler": manifest.devDependencies["react-reconciler"] },
+		{},
 	);
-	// (what bun init writes, and every setting this package holds its sources to)
-	await Bun.write(
-		`${app}/tsconfig.json`,
-		JSON.stringify(
-			{
-				compilerOptions: {
-					lib: ["ESNext"],
-					target: "ESNext",
-					module: "Preserve",
-					moduleDetection: "force",
-					jsx: "react-jsx",
-					allowJs: true,
-					types: ["bun"],
-					moduleResolution: "bundler",
-					allowImportingTsExtensions: true,
-					verbatimModuleSyntax: true,
-					noEmit: true,
-					skipLibCheck: true,
-					noUncheckedIndexedAccess: true,
-					...strictOptions(),
-				},
-				include: ["src"],
-			},
-			null,
-			2,
-		),
-	);
-	cpSync(`${root}/../../examples/helloworld/src`, `${app}/src`, { recursive: true });
-	await Bun.write(
-		`${app}/src/optional.tsx`,
-		[
-			'import { defineTheme } from "@decky.fx/raven-tsx";',
-			'import { Button, Label, VBox } from "@decky.fx/raven-tsx/react";',
-			"",
-			"/** Optional props given a value that may be undefined, as `exactOptionalPropertyTypes` checks them. */",
-			"export function Optional(props: { readonly tip?: string | undefined; readonly onClick?: (() => void) | undefined }) {",
-			"\treturn (",
-			'\t\t<VBox Name="optional" Tooltip={props.tip}>',
-			"\t\t\t<Button OnClicked={props.onClick}>ok</Button>",
-			'\t\t\t<Label Slot={{ Title: props.tip }}>text</Label>',
-			"\t\t</VBox>",
-			"\t);",
-			"}",
-			"",
-			'export const theme = defineTheme({ Name: "optional", Accent: undefined, Styles: [{ Widget: "Button", Class: undefined }] });',
-			"",
-		].join("\n"),
-	);
-
-	await run(["bun", "install"], app);
-	console.log(`installed ${manifest.name} and ${nativeName} from their tarballs`);
-	await run(["bun", "check", "--all"], app);
-	console.log(`the application compiles with ${Object.keys(strictOptions()).join(", ")}`);
-	const loaded = await run(["bun", "-e", `import { raven } from "${manifest.name}"; console.log(raven.Rget_version());`], app);
+	console.log(`installed ${manifest.name} and ${nativeName} from their tarballs into an application of React`);
+	console.log(`it compiles with ${strict}`);
+	const loaded = await run(["bun", "-e", `import { raven } from "${manifest.name}"; console.log(raven.Rget_version());`], react);
 	console.log(`the library loads from ${nativeName}: Raven ${loaded.trim()}`);
+
+	const solid = `${work}/solid`;
+	cpSync(`${root}/../../examples/solid-helloworld/src`, `${solid}/src`, { recursive: true });
+	await makeApp(
+		solid,
+		{
+			"bunfig.toml": `preload = ["${manifest.name}/solid/preload"]\n`,
+			"tsconfig.json": JSON.stringify({ compilerOptions: compilerOptions({ jsx: "preserve", jsxImportSource: "solid-js" }, ["bun"]), include: ["src"] }, null, 2),
+			"src/optional.tsx": [
+				'import { Button, Label, VBox } from "@decky.fx/raven-tsx/solid";',
+				"",
+				"/** Optional props given a value that may be undefined, as `exactOptionalPropertyTypes` checks them. */",
+				"export function Optional(props: { readonly tip?: string | undefined; readonly onClick?: (() => void) | undefined }) {",
+				"\treturn (",
+				'\t\t<VBox Name="optional" Tooltip={props.tip}>',
+				"\t\t\t<Button OnClicked={props.onClick}>ok</Button>",
+				'\t\t\t<Label Slot={{ Title: props.tip }}>text</Label>',
+				"\t\t</VBox>",
+				"\t);",
+				"}",
+				"",
+			].join("\n"),
+			// (rendered without a window system or a GPU: a signal must reach the widget)
+			"src/check.tsx": [
+				'import { createSignal } from "solid-js";',
+				'import { createWindow, Label, raven as r, VBox } from "@decky.fx/raven-tsx/solid";',
+				"",
+				"const desc = new r.RInitDesc();",
+				"desc.backend = r.R_BACKEND_NULL;",
+				"desc.headless = 1;",
+				"if (!r.Rinit_ex(desc)) {",
+				'\tthrow new Error("Raven cannot start");',
+				"}",
+				"const [count, setCount] = createSignal(1);",
+				'const { window, root } = createWindow({ Title: "check", Width: 200, Height: 100 });',
+				'root.render(() => <VBox><Label Name="count">{count()}</Label></VBox>);',
+				"setCount(2);",
+				'const shown = r.Rlabel_get_text(r.Rwidget_find(window, "count"));',
+				"root.unmount();",
+				"r.Rwindow_destroy(window);",
+				"r.Rshutdown();",
+				'if (shown !== "2") {',
+				'\tthrow new Error(`the label shows ${shown}, not what its signal says`);',
+				"}",
+				'console.log(r.Rget_version());',
+				"",
+			].join("\n"),
+		},
+		main, native, nativeName,
+		{ "solid-js": manifest.devDependencies["solid-js"] },
+		{ "@babel/core": manifest.devDependencies["@babel/core"], "babel-preset-solid": manifest.devDependencies["babel-preset-solid"] },
+	);
+	console.log(`installed ${manifest.name} and ${nativeName} from their tarballs into an application of Solid`);
+	console.log(`it compiles with ${strict}`);
+	const rendered = await run(["bun", "run", "src/check.tsx"], solid);
+	console.log(`a signal reaches its widget, through the plugin of the package: Raven ${rendered.trim()}`);
 } catch (error) {
 	// (a failed command says what it printed; anything else keeps its stack)
 	console.error(error instanceof CommandFailed ? error.message : error);

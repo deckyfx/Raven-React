@@ -96,10 +96,13 @@ jobs:
           RAVEN_CHECKOUT: ${{ github.workspace }}/raven-source
         run: bun test
 
-      - name: Compile the example
+      - name: Compile the examples
         if: matrix.test
         run: |
           cd examples/helloworld
+          bun run typecheck
+          bun run ./build.ts
+          cd ../solid-helloworld
           bun run typecheck
           bun run ./build.ts
 

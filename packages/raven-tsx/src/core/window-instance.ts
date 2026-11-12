@@ -122,6 +122,8 @@ export class WindowInstance implements HostNode {
 	private openings = 0;
 	/** What the application put in its content itself, kept alive while it is closed. */
 	private readonly keptNative: r.Rid[] = [];
+	/** The widgets of its content when it closed, in order: what the application put there goes back to its place. */
+	private keptOrder: r.Rid[] = [];
 
 	private constructor(private resolved: ResolvedProps) {}
 
@@ -148,26 +150,57 @@ export class WindowInstance implements HostNode {
 		try {
 			closeEvents.set(window, this.resolved.handlers.get("OnClose"));
 			setWindowEvents(window, this.resolved.handlers);
-			for (const widget of this.keptNative.splice(0)) {
-				if (r.Rwidget_is_valid(widget)) {
-					r.Rwidget_add_child(content, widget);
-				}
-			}
 			// (each child goes in, also past one that fails: then the window goes, with all of them)
-			// (one at a time: one that user code released meanwhile is no longer waiting here)
+			// (one at a time: one that user code released meanwhile is no longer waiting here. And not
+			// once user code closed the window: what is left waits for the next opening)
 			const failures: unknown[] = [];
-			for (let child = this.initial.shift(); child; child = this.initial.shift()) {
-				const next = child;
-				attempt(failures, () => this.append(next));
+			while (this.state === "live") {
+				const child = this.initial.shift();
+				if (!child) {
+					break;
+				}
+				attempt(failures, () => this.append(child));
 			}
 			throwFirst(failures);
+			if (this.state === "live") {
+				this.restoreNative(content);
+			}
 		} catch (error) {
 			this.forgetTree();
 			this.dispose();
 			throw error;
 		}
+		// (closed while it opened: that was no opening, and the next placing opens it)
+		if (this.state !== "live") {
+			return;
+		}
 		this.openings++;
 		this.runOpening();
+	}
+
+	/**
+	 * Puts back what the application put in the content itself, each just before the first widget
+	 * that came after it when the window closed: its place among the children of the framework.
+	 */
+	private restoreNative(content: r.Rid): void {
+		const order = this.keptOrder;
+		this.keptOrder = [];
+		for (const widget of this.keptNative.splice(0)) {
+			if (!r.Rwidget_is_valid(widget)) {
+				continue;
+			}
+			const at = order.indexOf(widget);
+			const after = new Set(at < 0 ? [] : order.slice(at + 1));
+			const count = r.Rwidget_get_child_count(content);
+			let position = count;
+			for (let index = 0; index < count; index++) {
+				if (after.has(r.Rwidget_get_child(content, index))) {
+					position = index;
+					break;
+				}
+			}
+			r.Rwidget_insert_child(content, widget, position);
+		}
 	}
 
 	/** Runs what waits for the window to open, each once: the first that threw says so after. */
@@ -267,6 +300,9 @@ export class WindowInstance implements HostNode {
 		this.state = "closing";
 		const failures: unknown[] = [];
 		const cleanups = this.takeClosing();
+		const content = this.content?.widget ?? r.R_INVALID_ID;
+		// (the order of the content, before the children of the framework leave it)
+		const order = r.Rwidget_is_valid(content) ? Array.from({ length: r.Rwidget_get_child_count(content) }, (_, index) => r.Rwidget_get_child(content, index)) : [];
 		// (the windows in it close too, kept to open with it)
 		attempt(failures, () => this.content?.closeWindows());
 		attempt(failures, () => this.island?.closeWindows());
@@ -275,8 +311,9 @@ export class WindowInstance implements HostNode {
 		if (island) {
 			this.detachIsland(island);
 		}
-		// (what the application put in the content itself stays alive too)
-		const content = this.content?.widget ?? r.R_INVALID_ID;
+		// (what the application put in the content itself stays alive too. What is still kept from
+		// before, not put back since, keeps its place after)
+		this.keptOrder = [...order, ...this.keptOrder.filter((widget) => !order.includes(widget))];
 		while (r.Rwidget_is_valid(content) && r.Rwidget_get_child_count(content) > 0) {
 			const widget = r.Rwidget_get_child(content, 0);
 			r.Rwidget_remove_child(content, widget);
@@ -512,6 +549,7 @@ export class WindowInstance implements HostNode {
 					r.Rwidget_destroy(widget);
 				}
 			}
+			this.keptOrder = [];
 			throwFirst(failures);
 			return;
 		}

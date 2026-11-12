@@ -622,6 +622,35 @@ test("a Separator whose ref disposes the root of its Menu leaves nothing in the 
 	expect(menu?.placed).toBe(false);
 });
 
+test("a window that moves to another parent stays open, the same window", async () => {
+	const [where, setWhere] = createSignal<"a" | "b">("a");
+	let kept: WindowInstance | undefined;
+	function Moving(): JSX.Element {
+		const own = (
+			<Window ref={kept} Title="kept" Width={120} Height={80}>
+				<Label Name="in-kept">in</Label>
+			</Window>
+		);
+		// (b comes first: its effect places the window while a still has it, which is a move)
+		return (
+			<VBox>
+				<VBox Name="b">{where() === "b" && own}</VBox>
+				<VBox Name="a">{where() === "a" && own}</VBox>
+			</VBox>
+		);
+	}
+	await mount(() => <Moving />);
+	const opened = kept?.window;
+	expect(kept?.isOpen).toBe(true);
+	setWhere("b");
+	expect(kept?.isOpen).toBe(true);
+	expect(kept?.window).toBe(opened);
+	// (back: b lets it go first, which closes it, as a window shown no more; a then opens it again)
+	setWhere("a");
+	expect(kept?.isOpen).toBe(true);
+	expect(r.Rwidget_find(kept?.window ?? r.R_INVALID_ID, "in-kept")).not.toBe(r.R_INVALID_ID);
+});
+
 test("an element kept in a variable, shown in a Portal, keeps its widget when the Portal comes back", async () => {
 	const [shown, setShown] = createSignal(true);
 	const box = r.Rwidget_create_from_xml('<VBox Name="by-hand"/>');

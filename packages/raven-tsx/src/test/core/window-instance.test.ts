@@ -222,6 +222,46 @@ test("a widget the application put in the content itself is kept while the windo
 	window.dispose();
 });
 
+test("what the application put in the content comes back at its place among the widgets of the window", () => {
+	const window = WindowInstance.create(WINDOW);
+	const first = WidgetInstance.create("Label", { Name: "first", Text: "first" });
+	const last = WidgetInstance.create("Label", { Name: "last", Text: "last" });
+	window.appendInitial(first);
+	window.materialize();
+	const content = (): r.Rid => r.Rwidget_find(window.window, CONTENT_NAME);
+	const own = r.Rwidget_create_from_xml('<Label Name="own" Text="own"/>');
+	r.Rwidget_add_child(content(), own);
+	window.append(last);
+	const names = (): string[] => Array.from({ length: r.Rwidget_get_child_count(content()) }, (_, index) => r.Rwidget_get_name(r.Rwidget_get_child(content(), index)) ?? "");
+	expect(names()).toEqual(["first", "own", "last"]);
+	window.close();
+	window.materialize();
+	expect(names()).toEqual(["first", "own", "last"]);
+	window.dispose();
+});
+
+test("a window inside that closes the outer one as it opens stops the opening, which comes at the next placing", () => {
+	const outer = WindowInstance.create(WINDOW);
+	const inner = WindowInstance.create(WINDOW);
+	let closed = false;
+	inner.whenOpen(() => {
+		if (!closed) {
+			closed = true;
+			outer.close();
+		}
+	});
+	let opened = 0;
+	outer.whenOpen(() => void opened++);
+	outer.appendInitial(inner);
+	outer.materialize();
+	// (closed while it opened: it is not an opening, and what waits for one did not run)
+	expect([outer.isOpen, inner.isOpen, opened]).toEqual([false, false, 0]);
+	outer.materialize();
+	expect([outer.isOpen, inner.isOpen, opened]).toEqual([true, true, 1]);
+	outer.forgetTree();
+	outer.dispose();
+});
+
 test("a function that throws as soon as whenOpen runs it is not kept", () => {
 	const window = WindowInstance.create(WINDOW);
 	window.materialize();

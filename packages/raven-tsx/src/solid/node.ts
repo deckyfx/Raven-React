@@ -166,9 +166,10 @@ export class SolidNode {
 			return;
 		}
 		this.checkMixed(child);
-		if (child.parent && child.parent !== this) {
-			// (a move: the child stays alive on the way, whatever its owner)
-			child.parent.detach(child);
+		const moved = child.parent !== null && child.parent !== this;
+		if (child.parent && moved) {
+			// (a move: the child stays alive on the way, whatever its owner, and its windows open)
+			child.parent.detach(child, false);
 		}
 		const current = this.children.indexOf(child);
 		if (current >= 0) {
@@ -194,12 +195,16 @@ export class SolidNode {
 		} else {
 			host.append(childHost);
 		}
+		// (moved to a parent not placed: its windows close, to open with it)
+		if (moved && !host.placed) {
+			childHost.closeWindows();
+		}
 		// (what was made now has its parent: the attributes of its place go to it)
 		finishPlacing();
 	}
 
-	/** Takes a child out, alive, wherever it goes next. */
-	private detach(child: SolidNode): void {
+	/** Takes a child out, alive, wherever it goes next. Its windows close, unless it moves to another place now. */
+	private detach(child: SolidNode, closing = true): void {
 		const index = this.children.indexOf(child);
 		if (index < 0) {
 			return;
@@ -211,7 +216,9 @@ export class SolidNode {
 		} else if (child.host) {
 			this.instance.release(child.host);
 			// (a window is no widget of its parent: out of the tree, it closes, and those it holds, to open when placed again)
-			child.host.closeWindows();
+			if (closing) {
+				child.host.closeWindows();
+			}
 		}
 	}
 

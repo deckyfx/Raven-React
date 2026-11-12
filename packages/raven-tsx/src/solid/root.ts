@@ -49,8 +49,11 @@ export class RavenRoot {
 		try {
 			dispose?.();
 		} finally {
-			// (the widgets and windows go, also when a cleanup threw)
-			this.node.clear();
+			// (the widgets and windows go, also when a cleanup threw. Unless a cleanup rendered a tree
+			// again: that one stays, and it took this one away first)
+			if (this.dispose === null) {
+				this.node.clear();
+			}
 		}
 	}
 }

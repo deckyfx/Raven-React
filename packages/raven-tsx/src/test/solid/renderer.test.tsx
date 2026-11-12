@@ -718,6 +718,47 @@ test("a Portal whose children fail takes away those it placed", async () => {
 	r.Rwidget_destroy(box);
 });
 
+test("the Text of a widget comes back when the text in it goes", async () => {
+	const [shown, setShown] = createSignal(false);
+	const [value, setValue] = createSignal("abc");
+	await mount(() => (
+		<VBox>
+			<Label Name="fallback" Text="fallback">
+				{shown() ? "shown" : null}
+				{shown() ? "!" : null}
+			</Label>
+			<Label Name="plain">{value()}</Label>
+		</VBox>
+	));
+	expect(text("fallback")).toBe("fallback");
+	setShown(true);
+	expect(text("fallback")).toBe("shown!");
+	setShown(false);
+	expect(text("fallback")).toBe("fallback");
+	// (with no Text of its own, an empty text is its Text: the same widget, with nothing in it)
+	const plain = find("plain");
+	setValue("");
+	expect(text("plain")).toBe("");
+	expect(find("plain")).toBe(plain);
+});
+
+test("a tree rendered by a cleanup of the one that goes stays", async () => {
+	let again = true;
+	function First(): JSX.Element {
+		onCleanup(() => {
+			if (again) {
+				again = false;
+				root?.render(() => <Label Name="next">next</Label>);
+			}
+		});
+		return <Label Name="first">first</Label>;
+	}
+	await mount(() => <First />);
+	root?.unmount();
+	expect(find("first")).toBe(r.R_INVALID_ID);
+	expect(text("next")).toBe("next");
+});
+
 test("an element kept in a variable, shown in a Portal, keeps its widget when the Portal comes back", async () => {
 	const [shown, setShown] = createSignal(true);
 	const box = r.Rwidget_create_from_xml('<VBox Name="by-hand"/>');

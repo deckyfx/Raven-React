@@ -420,6 +420,25 @@ test("a widget not placed deletes what it holds that is", () => {
 	expect(eventStats().handlers).toBeLessThan(before);
 });
 
+test("a widget removed by a child as it is made makes none of the children after", () => {
+	const window = WindowInstance.create(WINDOW);
+	window.materialize();
+	const parent = WidgetInstance.create("VBox", { Name: "parent" });
+	const first = WidgetInstance.create("VBox", { Name: "first" });
+	const after = WidgetInstance.create("Button", { Name: "after", OnClicked: () => {} });
+	const inner = WindowInstance.create(WINDOW);
+	inner.whenOpen(() => window.remove(parent));
+	first.append(inner);
+	parent.append(first);
+	parent.append(after);
+	const handlers = eventStats().handlers;
+	window.append(parent);
+	expect([parent.placed, after.placed]).toEqual([false, false]);
+	expect(eventStats().handlers).toBe(handlers);
+	window.forgetTree();
+	window.dispose();
+});
+
 test("a function that throws as soon as whenOpen runs it is not kept", () => {
 	const window = WindowInstance.create(WINDOW);
 	window.materialize();

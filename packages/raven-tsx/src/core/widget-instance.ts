@@ -330,14 +330,18 @@ export class WidgetInstance implements HostNode {
 		try {
 			this.applyAll(resolved);
 			for (const child of [...this.children]) {
-				// (user code run for an earlier one may have taken it away)
+				// (user code run for an earlier one may have deleted this one: the others are not made)
+				if (this.state !== "live") {
+					break;
+				}
+				// (or taken it away)
 				if (!this.children.includes(child)) {
 					continue;
 				}
 				child.materialize();
 				child.openWindows();
-				// (opening its windows ran user code, which may have taken it away from here)
-				if (!this.children.includes(child)) {
+				// (opening its windows ran user code, which may have taken it away from here, or deleted this)
+				if (this.state !== "live" || !this.children.includes(child)) {
 					continue;
 				}
 				// (an adopted widget Raven moves here from where it is shown; one its element destroyed is left out)
@@ -352,7 +356,9 @@ export class WidgetInstance implements HostNode {
 			this.dispose();
 			throw error;
 		}
-		placedInThisBatch.push(this);
+		if (this.state === "live") {
+			placedInThisBatch.push(this);
+		}
 	}
 
 	/**

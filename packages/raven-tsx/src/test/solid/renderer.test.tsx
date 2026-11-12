@@ -2,7 +2,7 @@
 /** Solid on real Raven widgets, without a window system or a GPU, clicked and typed into for real. */
 
 import { afterAll, afterEach, beforeAll, expect, test } from "bun:test";
-import { createSignal, ErrorBoundary, For, onCleanup, onMount, Show, type JSX } from "solid-js";
+import { createRoot, createSignal, ErrorBoundary, For, onCleanup, onMount, Show, type JSX } from "solid-js";
 import * as r from "../../core/raven";
 import { eventStats } from "../../core/events";
 import { SolidNode } from "../../solid/node";
@@ -601,6 +601,25 @@ test("the ref of a Separator in a Menu gives its line of the menu", async () => 
 	));
 	expect(line?.widget).toBe(find("line"));
 	expect(r.Rwidget_get_type(find("line"))).toBe(r.R_WIDGET_MENU_ITEM);
+});
+
+test("a Separator whose ref disposes the root of its Menu leaves nothing in the tree", async () => {
+	let menu: WidgetInstance | undefined;
+	await mount(() => (
+		<VBox>
+			<MenuBar Name="bar">
+				{createRoot((dispose) => (
+					<Menu ref={menu} Name="m" Title="File">
+						<Separator ref={() => dispose()} Name="line" />
+					</Menu>
+				))}
+			</MenuBar>
+		</VBox>
+	));
+	// (the Menu went with its root, before it was placed: neither it nor its line is anywhere)
+	expect(namesUnder("bar")).toEqual([]);
+	expect(find("line")).toBe(r.R_INVALID_ID);
+	expect(menu?.placed).toBe(false);
 });
 
 test("an element kept in a variable, shown in a Portal, keeps its widget when the Portal comes back", async () => {

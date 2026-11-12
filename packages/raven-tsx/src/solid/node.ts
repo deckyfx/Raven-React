@@ -183,10 +183,16 @@ export class SolidNode {
 		}
 		const next = this.children.slice(this.children.indexOf(child) + 1).find((node) => !node.isText);
 		const host = this.instance;
-		if (next) {
-			host.insertBefore(child.instance, next.instance);
+		const childHost = child.instance;
+		const beforeHost = next?.instance;
+		// (making a `<Separator>` ran its ref, which may have taken the child away, or deleted it or this)
+		if (child.parent !== this || child.destroyed || this.destroyed) {
+			return;
+		}
+		if (beforeHost) {
+			host.insertBefore(childHost, beforeHost);
 		} else {
-			host.append(child.instance);
+			host.append(childHost);
 		}
 		// (what was made now has its parent: the attributes of its place go to it)
 		finishPlacing();

@@ -32,7 +32,7 @@ afterEach(() => {
 		window = r.R_INVALID_ID;
 	}
 	r.Rdraw_frame();
-	expect(errors.filter((detail) => !detail.includes("invalid widget handle 0xFFFFFFFF"))).toEqual([]);
+	expect(errors).toEqual([]);
 	errors.length = 0;
 });
 
@@ -76,6 +76,7 @@ function click(name: string): void {
 /** The names of the widgets under a widget, in order. */
 function namesUnder(name: string): string[] {
 	const parent = find(name);
+	expect(parent).not.toBe(r.R_INVALID_ID);
 	return Array.from({ length: r.Rwidget_get_child_count(parent) }, (_, index) => r.Rwidget_get_name(r.Rwidget_get_child(parent, index)) ?? "");
 }
 
@@ -663,4 +664,56 @@ test("unmount takes the widgets away even when a cleanup throws", async () => {
 	expect(() => root?.unmount()).toThrow("from a cleanup");
 	root = null;
 	expect(r.Rwidget_is_valid(box)).toBe(0);
+});
+
+test("a child kept by an outer owner leaves alive when the widget that held it goes", async () => {
+	const [shown, setShown] = createSignal(true);
+	function Outer(): JSX.Element {
+		const kept = <Label Name="kept">kept</Label>;
+		return (
+			<VBox Name="outer">
+				<Show when={shown()}>
+					<VBox Name="inner">{kept}</VBox>
+				</Show>
+			</VBox>
+		);
+	}
+	await mount(() => <Outer />);
+	const widget = find("kept");
+	const inner = find("inner");
+	setShown(false);
+	expect(r.Rwidget_is_valid(inner)).toBe(0);
+	expect(r.Rwidget_is_valid(widget)).toBe(1);
+	setShown(true);
+	expect(find("kept")).toBe(widget);
+	expect(r.Rwidget_get_parent(widget)).toBe(find("inner"));
+});
+
+test("a shortcut waits for its window to open: one made before it is shown", async () => {
+	let fired = 0;
+	const [open, setOpen] = createSignal(false);
+	let owner: WindowInstance | undefined;
+	function Keys(): JSX.Element {
+		// (the element is made now, and its ref set, but the window opens when it is shown)
+		const later = (
+			<Window ref={owner} Width={200} Height={100}>
+				<Label>later</Label>
+			</Window>
+		);
+		createShortcut(() => owner, "Ctrl+J", () => fired++);
+		return <Show when={open()}>{later}</Show>;
+	}
+	const windows = new RavenRoot();
+	windows.render(() => <Keys />);
+	await settle();
+	expect(owner?.isOpen).toBe(false);
+	setOpen(true);
+	await settle();
+	const id = owner?.window ?? r.R_INVALID_ID;
+	expect(r.Rwindow_is_valid(id)).toBe(1);
+	r.Rwindow_inject_key(id, r.R_KEY_J, 1, r.R_MOD_CTRL);
+	r.Rwindow_inject_key(id, r.R_KEY_J, 0, r.R_MOD_CTRL);
+	expect(fired).toBe(1);
+	windows.unmount();
+	expect(eventStats().handlers).toBe(0);
 });

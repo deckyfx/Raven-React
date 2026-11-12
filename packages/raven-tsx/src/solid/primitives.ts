@@ -19,14 +19,23 @@ export function createAction(name: string, handler: (sender: r.Rid) => void): vo
 
 /**
  * A keyboard shortcut of a window: `createShortcut(() => window, "Ctrl+S", save)`, with `window`
- * set by the `ref` of a `<Window>`. It starts once the window is open.
+ * set by the `ref` of a `<Window>`. It starts once the window is open. With a signal for the ref
+ * (`<Window ref={setWindow}>`, `createShortcut(window, ...)`), it follows a window that comes later.
  */
 export function createShortcut(window: () => WindowInstance | null | undefined, keys: string, handler: () => void): void {
 	createEffect(() => {
 		const owner = window();
-		if (owner) {
-			onCleanup(onShortcut(owner.window, keys, handler));
+		if (!owner) {
+			return;
 		}
+		let stop: (() => void) | null = null;
+		const cancel = owner.whenOpen(() => {
+			stop = onShortcut(owner.window, keys, handler);
+		});
+		onCleanup(() => {
+			cancel();
+			stop?.();
+		});
 	});
 }
 

@@ -42,7 +42,7 @@ function pick(entry: ExportsEntry | undefined, conditions: readonly string[]): s
 	return undefined;
 }
 
-/** The files of Solid for servers, by package folder, each with the file for clients that replaces it. */
+/** The files of Solid for servers, by package folder and build, each with the file for clients that replaces it. */
 const clientFiles = new Map<string, ReadonlyMap<string, string>>();
 
 /**
@@ -50,7 +50,8 @@ const clientFiles = new Map<string, ReadonlyMap<string, string>>();
  * import, as Node picks them from `exports` (Bun takes `node` and finds the server's).
  */
 function clientFilesOf(root: string, development: boolean): ReadonlyMap<string, string> {
-	let files = clientFiles.get(root);
+	const key = `${root}\0${development}`;
+	let files = clientFiles.get(key);
 	if (!files) {
 		const { exports } = JSON.parse(readFileSync(`${root}/package.json`, "utf8")) as { readonly exports: Readonly<Record<string, ExportsEntry>> };
 		const map = new Map<string, string>();
@@ -64,7 +65,7 @@ function clientFilesOf(root: string, development: boolean): ReadonlyMap<string, 
 			}
 		}
 		files = map;
-		clientFiles.set(root, files);
+		clientFiles.set(key, files);
 	}
 	return files;
 }

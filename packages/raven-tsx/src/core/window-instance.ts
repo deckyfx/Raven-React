@@ -86,6 +86,8 @@ export class WindowInstance implements HostNode {
 	/** Its `<Island>`: it floats above the content, as in XML, and the window owns it. */
 	private island: WidgetInstance | null = null;
 	private state: "pending" | "live" | "gone" = "pending";
+	/** What waits for the window to open. */
+	private readonly opening = new Set<() => void>();
 
 	private constructor(private resolved: ResolvedProps) {}
 
@@ -119,6 +121,42 @@ export class WindowInstance implements HostNode {
 			this.dispose();
 			throw error;
 		}
+		// (the window is open: what waited for it runs, and the first that threw says so after. A failure
+		// of one is not a failure of the window, which stays. One that was cancelled meanwhile, or all of
+		// them once the window is gone, disposed or destroyed in Raven, do not run)
+		const failures: unknown[] = [];
+		for (const run of [...this.opening]) {
+			if (!this.opening.delete(run) || !this.isOpen) {
+				continue;
+			}
+			try {
+				run();
+			} catch (error) {
+				failures.push(error);
+			}
+		}
+		if (failures.length > 0) {
+			throw failures[0];
+		}
+	}
+
+	/**
+	 * Runs a function once the window is open: now if it is, or when it is placed. Returns what
+	 * cancels it, if it has not run. A framework's ref gives the window before it opens.
+	 */
+	whenOpen(run: () => void): () => void {
+		if (this.state === "live") {
+			// (a window the user closed, or Raven destroyed, does not open again)
+			if (this.isOpen) {
+				run();
+			}
+			return () => {};
+		}
+		if (this.state === "gone") {
+			return () => {};
+		}
+		this.opening.add(run);
+		return () => void this.opening.delete(run);
 	}
 
 	/** Whether the window still exists: without an `OnClose`, the user can close it at any time. */
@@ -284,6 +322,7 @@ export class WindowInstance implements HostNode {
 	dispose(): void {
 		const state = this.state;
 		this.state = "gone";
+		this.opening.clear();
 		if (state !== "live") {
 			return;
 		}

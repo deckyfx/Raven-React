@@ -222,6 +222,8 @@ export class SolidNode {
 			return;
 		}
 		this.destroyed = true;
+		// (a child whose owner is still there leaves alive: it may be shown again; the others go)
+		this.releaseAll();
 		this.host.forgetTree();
 		this.host.dispose();
 	}

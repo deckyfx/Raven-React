@@ -1,0 +1,88 @@
+import { createComponent, type JSX } from "solid-js";
+import * as r from "../core/raven";
+import { RavenError } from "../core/errors";
+import { resolveProps, type RavenProps } from "../core/props";
+import type { WindowOptions } from "../core/props.generated";
+import { makeWindow } from "../core/window-instance";
+import { Window } from "./components.generated";
+import { SolidNode } from "./node";
+import { render } from "./renderer";
+
+/**
+ * A tree of Solid, as `render` of solid-js/web. Given a widget, it renders into it.
+ * Without one, it renders `<Window>` elements, each its own window.
+ */
+export class RavenRoot {
+	private readonly node: SolidNode;
+	private dispose: (() => void) | null = null;
+
+	constructor(parent: r.Rid = r.R_INVALID_ID) {
+		this.node = SolidNode.container(parent);
+	}
+
+	/** Renders a tree, in place of the one it had. */
+	render(code: () => JSX.Element): void {
+		this.unmount();
+		this.dispose = render(code, this.node);
+	}
+
+	/** Removes the tree: its cleanups run, and its widgets and windows go. */
+	unmount(): void {
+		const dispose = this.dispose;
+		this.dispose = null;
+		dispose?.();
+		this.node.clear();
+	}
+}
+
+/** Makes a window with a place for a tree, and returns the handle of the window with its root. */
+export function createWindow(options: WindowOptions = {}): { window: r.Rid; root: RavenRoot } {
+	const { window, content } = makeWindow(resolveProps(options as RavenProps).attributes);
+	return { window, root: new RavenRoot(content) };
+}
+
+/** How `runApp` starts Raven. */
+export interface RunOptions {
+	/** The name of the application: `RInitDesc::app_name`, which system notifications show. */
+	readonly appName?: string | undefined;
+	/** Runs after Raven started and before the first render: for a look, a theme, a registered tag. */
+	readonly setup?: (() => void) | undefined;
+	/** Raven's allocator: functions of C only, as it allocates on several threads. See `Rset_allocator`. */
+	readonly allocator?: Parameters<typeof r.Rset_allocator>[0] | undefined;
+}
+
+/**
+ * Starts Raven, shows a tree and runs until the last window closes, the event loop of Bun
+ * running beside it. Then the tree is cleaned up and Raven stops, also when the run ends with an
+ * error, so that it can start again.
+ *
+ * With options, the tree goes in one window made from them. Without, the tree says what windows
+ * there are, with `<Window>` elements.
+ *
+ *     await runApp(() => <App />, { Title: "Hello", Width: 480, Height: 240 });
+ */
+export async function runApp(code: () => JSX.Element, options?: WindowOptions, start?: RunOptions): Promise<void> {
+	if (start?.allocator) {
+		r.Rset_allocator(start.allocator);
+	}
+	const desc = new r.RInitDesc();
+	desc.backend = r.R_BACKEND_VULKAN;
+	desc.app_name = start?.appName ?? null;
+	if (!r.Rinit_ex(desc)) {
+		RavenError.fromLibrary("Raven cannot start");
+	}
+	let root: RavenRoot | null = null;
+	try {
+		start?.setup?.();
+		root = new RavenRoot();
+		root.render(options ? () => createComponent(Window, { ...options, get children() { return code(); } }) : code);
+		// (Rwait_frame ends once the last window closed: until there was one, it goes on)
+		await r.runLoop();
+	} finally {
+		try {
+			root?.unmount();
+		} finally {
+			r.Rshutdown();
+		}
+	}
+}

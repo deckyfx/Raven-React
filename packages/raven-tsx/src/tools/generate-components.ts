@@ -6,7 +6,8 @@
  *     bun run generate --check     fails if a file is not what this would write
  *
  * `core/props.generated.ts` holds the props and knows no framework. `react/components.generated.ts`
- * holds the React wrappers, which add `key`, `ref` and `children`.
+ * holds the React wrappers, which add `key`, `ref` and `children`, and `solid/components.generated.ts`
+ * the Solid ones, which add `ref` and `children` (see `solid/tag.ts`).
  */
 
 import * as r from "../core/raven";
@@ -128,6 +129,13 @@ const react = [
 	"\treturn (props) => createElement(name, props);",
 	"}",
 ];
+/** The Solid wrappers: `tag` is written by hand, as it makes nodes of the renderer. */
+const solid = [
+	HEADER,
+	'import type * as Props from "../core/props.generated";',
+	'import type { WindowInstance } from "../core/window-instance";',
+	'import { tag } from "./tag";',
+];
 let components = 0;
 for (let index = 0; index < r.Rxml_get_tag_count(); index++) {
 	const name = r.Rxml_get_tag_name(index);
@@ -138,6 +146,7 @@ for (let index = 0; index < r.Rxml_get_tag_count(); index++) {
 	const comment = description ? [`/** ${description.replace(/\*\//g, "*\\/")} */`] : [];
 	core.push("");
 	react.push("");
+	solid.push("");
 	if (name === "Window") {
 		// not a widget: its attributes are also what createWindow and runApp take
 		core.push(
@@ -154,10 +163,18 @@ for (let index = 0; index < r.Rxml_get_tag_count(); index++) {
 			" */",
 			'export const Window = tag<Props.WindowProps, WindowInstance>("Window");',
 		);
+		solid.push(
+			"/**",
+			" * A window of its own, wherever it is in the tree: it opens with its element and closes with it.",
+			" * With `OnClose`, closing is a request: the window stays until the element is taken out.",
+			" */",
+			'export const Window = tag<Props.WindowProps, WindowInstance>("Window");',
+		);
 		continue;
 	}
 	core.push(...comment, `export interface ${name}Props { ${propsOf(name)} }`);
 	react.push(...comment, `export const ${name} = tag<Props.${name}Props>(${JSON.stringify(name)});`);
+	solid.push(...comment, `export const ${name} = tag<Props.${name}Props>(${JSON.stringify(name)});`);
 	components++;
 }
 /** The names of a group every widget has (`Color.Window`, `Metric.FontSize`), or the choices of one of its attributes. */
@@ -217,6 +234,7 @@ function finish(lines: readonly string[]): string {
 const outputs: ReadonlyArray<readonly [string, string]> = [
 	[`${import.meta.dir}/../core/props.generated.ts`, finish(core)],
 	[`${import.meta.dir}/../react/components.generated.ts`, finish(react)],
+	[`${import.meta.dir}/../solid/components.generated.ts`, finish(solid)],
 ];
 r.Rshutdown();
 if (process.argv.includes("--check")) {

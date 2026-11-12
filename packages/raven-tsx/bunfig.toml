@@ -1,0 +1,3 @@
+[test]
+# (the tests of src/test/solid are compiled for Solid: see src/solid/plugin.ts)
+preload = ["./src/test/solid/preload.ts"]

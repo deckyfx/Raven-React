@@ -125,7 +125,8 @@ jobs:
   package:
     name: package
     needs: native
-    runs-on: ubuntu-latest
+    # (named, not ubuntu-latest, which moves to a new Ubuntu by itself: these jobs only pack and publish)
+    runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v7
         with:
@@ -177,7 +178,7 @@ jobs:
     name: publish
     if: vars.NPM_PUBLISH == 'true' && startsWith(github.ref, 'refs/tags/v')
     needs: package
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     environment: npm
     permissions:
       id-token: write

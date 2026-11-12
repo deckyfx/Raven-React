@@ -759,6 +759,29 @@ test("a tree rendered by a cleanup of the one that goes stays", async () => {
 	expect(text("next")).toBe("next");
 });
 
+test("a tree rendered by a cleanup of the one a render replaces is replaced too", async () => {
+	let again = true;
+	let nextCleanups = 0;
+	function Next(): JSX.Element {
+		onCleanup(() => void nextCleanups++);
+		return <Label Name="next">next</Label>;
+	}
+	function First(): JSX.Element {
+		onCleanup(() => {
+			if (again) {
+				again = false;
+				root?.render(() => <Next />);
+			}
+		});
+		return <Label Name="first">first</Label>;
+	}
+	await mount(() => <First />);
+	root?.render(() => <Label Name="final">final</Label>);
+	expect([find("first"), find("next")]).toEqual([r.R_INVALID_ID, r.R_INVALID_ID]);
+	expect(text("final")).toBe("final");
+	expect(nextCleanups).toBe(1);
+});
+
 test("an element kept in a variable, shown in a Portal, keeps its widget when the Portal comes back", async () => {
 	const [shown, setShown] = createSignal(true);
 	const box = r.Rwidget_create_from_xml('<VBox Name="by-hand"/>');

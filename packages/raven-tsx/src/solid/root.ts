@@ -27,6 +27,10 @@ export class RavenRoot {
 	 */
 	render(code: () => JSX.Element): void {
 		this.unmount();
+		// (a cleanup may have rendered a tree again: this render replaces that one too)
+		while (this.dispose !== null) {
+			this.unmount();
+		}
 		try {
 			createRoot((dispose) => {
 				this.dispose = dispose;

@@ -729,7 +729,11 @@ class ActionEvents {
 	}
 
 	/** Takes the function of such an action away. */
-	unbind(name: string): void {
+	unbind(name: string, handler?: (sender: r.Rid) => void): void {
+		// (a name given again since belongs to the one that gave it last: the first one going leaves it)
+		if (handler !== undefined && this.handlers.get(name) !== handler) {
+			return;
+		}
 		this.handlers.delete(name);
 		r.Raction_unbind(name);
 	}

@@ -45,8 +45,10 @@ export function parseKeys(keys: string): { key: r.RKey; modifiers: number } {
  * action. Returns what takes the name away.
  */
 export function onAction(name: string, handler: (sender: r.Rid) => void): () => void {
-	actionEvents.bind(name, handler);
-	return () => actionEvents.unbind(name);
+	// (a function of its own: the same handler given twice is two registrations)
+	const registered = (sender: r.Rid): void => handler(sender);
+	actionEvents.bind(name, registered);
+	return () => actionEvents.unbind(name, registered);
 }
 
 let nextShortcut = 0;

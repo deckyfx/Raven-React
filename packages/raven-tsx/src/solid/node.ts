@@ -27,6 +27,8 @@ export class SolidNode {
 	 */
 	private ownerGone: boolean;
 	private destroyed = false;
+	/** The top of a tree: its widget is the application's, which a tree never changes. */
+	private isContainer = false;
 	/** What waits for the node of the core: the `ref` of a `<Separator>` not placed yet. */
 	private readonly waiting: ((instance: HostNode) => void)[] = [];
 
@@ -57,7 +59,9 @@ export class SolidNode {
 
 	/** The top of a tree: a widget the application owns, or nothing, for a tree of windows. */
 	static container(widget: r.Rid): SolidNode {
-		return new SolidNode("", WidgetInstance.forContainer(widget), null, false);
+		const node = new SolidNode("", WidgetInstance.forContainer(widget), null, false);
+		node.isContainer = true;
+		return node;
 	}
 
 	/** A widget Raven made, a child of a registered tag in XML, which is only placed: see `WidgetInstance.adopt`. */
@@ -103,7 +107,8 @@ export class SolidNode {
 
 	/** Gives the node of the core all the props, with the text of the children. */
 	refresh(): void {
-		if (!this.host || this.destroyed) {
+		// (the widget of a container is not the tree's: nothing of its props is set)
+		if (!this.host || this.destroyed || this.isContainer) {
 			return;
 		}
 		const props = this.host.tag === "MenuItem" && this.tag === "Separator" ? menuSeparator(this.props) : this.props;
@@ -132,6 +137,9 @@ export class SolidNode {
 	/** Changes the text of a text node, which its parent shows as `Text`. Refused text changes nothing. */
 	setText(value: string): void {
 		const siblings = this.parent?.children ?? [];
+		if (value !== "" && this.parent?.isContainer) {
+			RavenError.throw(`raven-tsx: text must be in a widget: "${value}"`);
+		}
 		if (value !== "" && siblings.some((node) => !node.isText)) {
 			RavenError.throw(`raven-tsx: text must be alone in a widget: "${value}"`);
 		}
@@ -141,6 +149,10 @@ export class SolidNode {
 
 	/** Text beside widgets is an error, as with React: said before anything changes, whichever comes first. */
 	private checkMixed(child: SolidNode): void {
+		// (as with React: text at the top of a tree, in a root or a portal, has no widget to be the Text of)
+		if (this.isContainer && child.isText && child.text !== "") {
+			RavenError.throw(`raven-tsx: text must be in a widget: "${child.text}"`);
+		}
 		const others = this.children.filter((node) => node !== child);
 		const text = child.isText ? (child.text !== "" && others.some((node) => !node.isText) ? child.text : null) : (others.find((node) => node.isText && node.text !== "")?.text ?? null);
 		if (text !== null) {

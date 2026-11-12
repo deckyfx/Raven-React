@@ -835,3 +835,23 @@ test("a window taken out of the tree goes, when its owner is gone, even if a cle
 	instance?.materialize();
 	expect(instance?.isOpen).toBe(false);
 });
+
+test("text at the top of a tree, in a root or a portal, has no widget and is refused", async () => {
+	const box = r.Rwidget_create_from_xml('<Label Name="by-hand" Text="mine"/>');
+	const [said, setSaid] = createSignal("");
+	await mount(() => (
+		<VBox Name="outer">
+			<ErrorBoundary fallback={(error: Error) => <Label Name="error">{error.message}</Label>}>
+				<Portal widget={box}>{said()}</Portal>
+			</ErrorBoundary>
+		</VBox>
+	));
+	r.Rwidget_add_child(find("outer"), box);
+	setSaid("hello");
+	expect(text("error")).toContain('text must be in a widget: "hello"');
+	expect(r.Rwidget_is_valid(box)).toBe(1);
+	expect(r.Rlabel_get_text(box)).toBe("mine");
+	const windows = new RavenRoot();
+	expect(() => windows.render(() => "loose")).toThrow('text must be in a widget: "loose"');
+	windows.unmount();
+});

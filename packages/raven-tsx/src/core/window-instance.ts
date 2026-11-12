@@ -376,6 +376,8 @@ export class WindowInstance implements HostNode {
 		this.island = child;
 		child.setHolder(set);
 		set(child.widget);
+		// (an island kept while the window was closed opens the windows in it again)
+		child.openWindows();
 		return true;
 	}
 
@@ -409,11 +411,12 @@ export class WindowInstance implements HostNode {
 	release(child: HostNode): void {
 		// (also while it opens: what waits to go in is let go too)
 		this.releaseInitial(child);
-		if (this.state !== "live") {
+		// (while it closes too, it has its content: what it keeps to open again is read from there)
+		if (!this.content) {
 			return;
 		}
 		if (child !== this.island) {
-			this.open.release(child);
+			this.content.release(child);
 			return;
 		}
 		this.detachIsland(child);
@@ -452,7 +455,7 @@ export class WindowInstance implements HostNode {
 	}
 
 	remove(child: HostNode): void {
-		if (this.state !== "live") {
+		if (!this.content) {
 			this.releaseInitial(child);
 			// (a child can be live already, moved here: its handlers go before it does)
 			child.forgetTree();
@@ -460,7 +463,7 @@ export class WindowInstance implements HostNode {
 			return;
 		}
 		if (child !== this.island) {
-			this.open.remove(child);
+			this.content.remove(child);
 			return;
 		}
 		child.forgetTree();

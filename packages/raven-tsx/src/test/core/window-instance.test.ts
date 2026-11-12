@@ -426,3 +426,72 @@ test("windows side by side all go when the outer one does, also when a cleanup r
 	expect(() => outer.dispose()).toThrow("from the first");
 	expect(second.isOpen).toBe(false);
 });
+
+test("the windows in an island kept while its window was closed open again with it", () => {
+	const outer = WindowInstance.create(WINDOW);
+	const island = WidgetInstance.create("Island", {});
+	const inner = WindowInstance.create(WINDOW);
+	island.append(inner);
+	outer.append(island);
+	outer.materialize();
+	expect(inner.isOpen).toBe(true);
+	outer.close();
+	expect(inner.isOpen).toBe(false);
+	outer.materialize();
+	expect(inner.isOpen).toBe(true);
+	outer.forgetTree();
+	outer.dispose();
+});
+
+test("a child released by a cleanup while its window closes does not come back when it opens", () => {
+	const outer = WindowInstance.create(WINDOW);
+	const inner = WindowInstance.create(WINDOW);
+	const sibling = WidgetInstance.create("Label", { Name: "sibling" });
+	outer.append(inner);
+	outer.append(sibling);
+	outer.materialize();
+	inner.whenOpen(() => () => outer.release(sibling));
+	outer.close();
+	outer.materialize();
+	expect(r.Rwidget_find(outer.window, "sibling")).toBe(r.R_INVALID_ID);
+	sibling.forgetTree();
+	sibling.dispose();
+	outer.forgetTree();
+	outer.dispose();
+});
+
+test("a child taken away by a window it holds as its parent is made is not placed in that parent", () => {
+	const outer = WindowInstance.create(WINDOW);
+	const parent = WidgetInstance.create("VBox", {});
+	const child = WidgetInstance.create("VBox", {});
+	const inner = WindowInstance.create(WINDOW);
+	child.append(inner);
+	child.materialize();
+	child.closeWindows();
+	inner.whenOpen(() => parent.release(child));
+	parent.append(child);
+	outer.append(parent);
+	outer.materialize();
+	expect(r.Rwidget_get_parent(child.widget)).toBe(r.R_INVALID_ID);
+	child.forgetTree();
+	child.dispose();
+	outer.forgetTree();
+	outer.dispose();
+});
+
+test("a later child taken away by an earlier one's window as their parent is made is not made there", () => {
+	const outer = WindowInstance.create(WINDOW);
+	const parent = WidgetInstance.create("VBox", {});
+	const first = WindowInstance.create(WINDOW);
+	const later = WindowInstance.create(WINDOW);
+	parent.append(first);
+	parent.append(later);
+	first.whenOpen(() => parent.release(later));
+	outer.append(parent);
+	outer.materialize();
+	expect(first.isOpen).toBe(true);
+	expect(later.isOpen).toBe(false);
+	outer.forgetTree();
+	outer.dispose();
+	later.dispose();
+});

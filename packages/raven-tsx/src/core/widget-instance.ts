@@ -329,9 +329,17 @@ export class WidgetInstance implements HostNode {
 		this.pending = null;
 		try {
 			this.applyAll(resolved);
-			for (const child of this.children) {
+			for (const child of [...this.children]) {
+				// (user code run for an earlier one may have taken it away)
+				if (!this.children.includes(child)) {
+					continue;
+				}
 				child.materialize();
 				child.openWindows();
+				// (opening its windows ran user code, which may have taken it away from here)
+				if (!this.children.includes(child)) {
+					continue;
+				}
 				// (an adopted widget Raven moves here from where it is shown; one its element destroyed is left out)
 				const widget = child.nativeWidget;
 				if (this.holds(child) && widget !== null && r.Rwidget_is_valid(widget)) {

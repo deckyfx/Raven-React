@@ -2,7 +2,7 @@
 /** Solid components as tags of Raven: built by Raven from XML, as `<Button>` is, with no declaration in XML. */
 
 import { afterAll, afterEach, beforeAll, expect, test } from "bun:test";
-import { onCleanup, onMount, splitProps, type JSX } from "solid-js";
+import { createSignal, onCleanup, onMount, splitProps, type JSX } from "solid-js";
 import * as r from "../../core/raven";
 import { Border, createWindow, HBox, Label, RavenRoot, registerTag, VBox } from "../../solid/index";
 
@@ -158,4 +158,24 @@ test("an attribute set later reaches the props that splitProps gave out", async 
 	expect(r.Rwidget_set_attribute(find("s"), "Text", "late")).toBeTruthy();
 	await settle();
 	expect(r.Rlabel_get_text(r.Rwidget_find(find("s"), "split"))).toBe("late 5");
+});
+
+test("a child of the element that the component hides and shows again comes back", async () => {
+	const [open, setOpen] = createSignal(true);
+	function Fold(props: { readonly children?: JSX.Element }): JSX.Element {
+		return <VBox Name="fold-body">{open() && props.children}</VBox>;
+	}
+	unregister.push(registerTag("Fold", Fold, {}));
+	const fold = await build('<Fold Name="f"><Label Name="inner"/></Fold>');
+	const inner = r.Rwidget_find(fold, "inner");
+	expect(namesUnder(r.Rwidget_find(fold, "fold-body"))).toEqual(["inner"]);
+	setOpen(false);
+	expect(namesUnder(r.Rwidget_find(fold, "fold-body"))).toEqual([]);
+	setOpen(true);
+	// (the same widget: the element's child, which hiding did not delete)
+	expect(namesUnder(r.Rwidget_find(fold, "fold-body"))).toEqual(["inner"]);
+	expect(r.Rwidget_find(fold, "inner")).toBe(inner);
+	setOpen(false);
+	setOpen(true);
+	expect(r.Rwidget_find(fold, "inner")).toBe(inner);
 });

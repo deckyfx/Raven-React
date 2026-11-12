@@ -651,6 +651,55 @@ test("a window that moves to another parent stays open, the same window", async 
 	expect(r.Rwidget_find(kept?.window ?? r.R_INVALID_ID, "in-kept")).not.toBe(r.R_INVALID_ID);
 });
 
+test("a Separator whose ref adds a sibling after it goes before that sibling", async () => {
+	await mount(() => <VBox Name="list" />);
+	createRoot((dispose) => {
+		const list = SolidNode.container(find("list"));
+		const label = (name: string): SolidNode => {
+			const node = SolidNode.element("Label");
+			node.setProp("Name", name);
+			return node;
+		};
+		const [first, middle, last] = [label("first"), label("middle"), label("last")];
+		list.insert(first, null);
+		list.insert(last, null);
+		const line = SolidNode.element("Separator");
+		line.setProp("Name", "line");
+		line.withInstance(() => list.insert(middle, last));
+		list.insert(line, last);
+		expect(list.children).toEqual([first, line, middle, last]);
+		expect(namesUnder("list")).toEqual(["first", "line", "middle", "last"]);
+		list.clear();
+		dispose();
+	});
+});
+
+test("a window whose closing cleanup places it elsewhere is not deleted there", async () => {
+	await mount(() => <VBox />);
+	const before = SolidNode.container(r.R_INVALID_ID);
+	const after = SolidNode.container(r.R_INVALID_ID);
+	// (made with no owner: as soon as it is out of a tree, it would go)
+	const node = SolidNode.element("Window");
+	let host: WindowInstance | undefined;
+	node.withInstance((instance) => {
+		host = instance as WindowInstance;
+	});
+	before.insert(node, null);
+	expect(host?.isOpen).toBe(true);
+	let moved = false;
+	host?.whenOpen(() => () => {
+		if (!moved) {
+			moved = true;
+			after.insert(node, null);
+		}
+	});
+	before.release(node);
+	expect(after.children).toEqual([node]);
+	expect(host?.isOpen).toBe(true);
+	after.clear();
+	expect(host?.isOpen).toBe(false);
+});
+
 test("an element kept in a variable, shown in a Portal, keeps its widget when the Portal comes back", async () => {
 	const [shown, setShown] = createSignal(true);
 	const box = r.Rwidget_create_from_xml('<VBox Name="by-hand"/>');

@@ -876,9 +876,13 @@ export class WidgetInstance implements HostNode {
 		if (r.Rwidget_is_valid(this.id)) {
 			this.releaseAdopted();
 		}
-		this.disposeDetached();
-		if (r.Rwidget_is_valid(this.id)) {
-			r.Rwidget_destroy(this.id);
+		try {
+			this.disposeDetached();
+		} finally {
+			// (also when a cleanup of what it held threw: it is gone, and nothing deletes it after)
+			if (r.Rwidget_is_valid(this.id)) {
+				r.Rwidget_destroy(this.id);
+			}
 		}
 	}
 }

@@ -182,14 +182,15 @@ export class SolidNode {
 			this.refresh();
 			return;
 		}
-		const next = this.children.slice(this.children.indexOf(child) + 1).find((node) => !node.isText);
 		const host = this.instance;
 		const childHost = child.instance;
-		const beforeHost = next?.instance;
-		// (making a `<Separator>` ran its ref, which may have taken the child away, or deleted it or this)
+		// (making a `<Separator>` ran its ref, which may have taken the child away, or deleted it or
+		// this, or put others beside it: what comes after it is read after)
 		if (child.parent !== this || child.destroyed || this.destroyed) {
 			return;
 		}
+		const next = this.children.slice(this.children.indexOf(child) + 1).find((node) => !node.isText);
+		const beforeHost = next?.instance;
 		if (beforeHost) {
 			host.insertBefore(childHost, beforeHost);
 		} else {
@@ -230,8 +231,9 @@ export class SolidNode {
 		try {
 			this.detach(child);
 		} finally {
-			// (also when closing its windows threw: it is out of the tree)
-			if (child.ownerGone) {
+			// (also when closing its windows threw: it is out of the tree. Unless a cleanup of its
+			// windows placed it elsewhere: it is that parent's now)
+			if (child.ownerGone && child.parent === null) {
 				child.destroy();
 			}
 		}

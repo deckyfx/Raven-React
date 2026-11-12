@@ -262,6 +262,65 @@ test("a window inside that closes the outer one as it opens stops the opening, w
 	outer.dispose();
 });
 
+test("a window inside that closes and opens the outer one again as it opens leaves one opening", () => {
+	const outer = WindowInstance.create(WINDOW);
+	const inner = WindowInstance.create(WINDOW);
+	let reopened = false;
+	inner.whenOpen(() => {
+		if (!reopened) {
+			reopened = true;
+			outer.close();
+			outer.materialize();
+		}
+	});
+	let runs = 0;
+	let cleanups = 0;
+	outer.whenOpen(() => {
+		runs++;
+		return () => void cleanups++;
+	});
+	outer.appendInitial(inner);
+	outer.materialize();
+	expect([outer.isOpen, inner.isOpen, runs]).toEqual([true, true, 1]);
+	outer.close();
+	expect(cleanups).toBe(1);
+	outer.forgetTree();
+	outer.dispose();
+});
+
+test("what the application put in the content goes, when the window fails to open again", () => {
+	const window = WindowInstance.create(WINDOW);
+	window.materialize();
+	const own = r.Rwidget_create_from_xml('<Label Name="own" Text="own"/>');
+	r.Rwidget_add_child(r.Rwidget_find(window.window, CONTENT_NAME), own);
+	window.close();
+	const inner = WindowInstance.create(WINDOW);
+	inner.whenOpen(() => {
+		throw new Error("from inner");
+	});
+	window.appendInitial(inner);
+	expect(() => window.materialize()).toThrow("from inner");
+	expect([window.isOpen, r.Rwidget_is_valid(own)]).toEqual([false, 0]);
+});
+
+test("a widget is destroyed when a window under it fails to close", () => {
+	const window = WindowInstance.create(WINDOW);
+	window.materialize();
+	const box = WidgetInstance.create("VBox", { Name: "box" });
+	window.append(box);
+	const inner = WindowInstance.create(WINDOW);
+	inner.whenOpen(() => () => {
+		throw new Error("from cleanup");
+	});
+	box.append(inner);
+	expect(inner.isOpen).toBe(true);
+	const widget = box.widget;
+	expect(() => box.dispose()).toThrow("from cleanup");
+	expect([r.Rwidget_is_valid(widget), inner.isOpen]).toEqual([0, false]);
+	window.forgetTree();
+	window.dispose();
+});
+
 test("a function that throws as soon as whenOpen runs it is not kept", () => {
 	const window = WindowInstance.create(WINDOW);
 	window.materialize();

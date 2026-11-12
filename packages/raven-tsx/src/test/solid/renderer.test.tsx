@@ -700,6 +700,24 @@ test("a window whose closing cleanup places it elsewhere is not deleted there", 
 	expect(host?.isOpen).toBe(false);
 });
 
+test("a Portal whose children fail takes away those it placed", async () => {
+	const box = r.Rwidget_create_from_xml('<VBox Name="by-hand"/>');
+	const made = createWindow(WINDOW);
+	window = made.window;
+	root = made.root;
+	// (no ErrorBoundary: the failure leaves the render, which deletes the tree)
+	expect(() =>
+		made.root.render(() => (
+			<Portal widget={box}>
+				<Button Name="placed" OnClicked={() => {}} />
+				{"words"}
+			</Portal>
+		)),
+	).toThrow('text must be in a widget: "words"');
+	expect(r.Rwidget_get_child_count(box)).toBe(0);
+	r.Rwidget_destroy(box);
+});
+
 test("an element kept in a variable, shown in a Portal, keeps its widget when the Portal comes back", async () => {
 	const [shown, setShown] = createSignal(true);
 	const box = r.Rwidget_create_from_xml('<VBox Name="by-hand"/>');

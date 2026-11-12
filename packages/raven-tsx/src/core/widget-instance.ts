@@ -343,7 +343,7 @@ export class WidgetInstance implements HostNode {
 				// (an adopted widget Raven moves here from where it is shown; one its element destroyed is left out)
 				const widget = child.nativeWidget;
 				if (this.holds(child) && widget !== null && r.Rwidget_is_valid(widget)) {
-					r.Rwidget_add_child(this.id, widget);
+					r.Rwidget_insert_child(this.id, widget, this.placeAmongPlaced(child));
 				}
 			}
 		} catch (error) {
@@ -353,6 +353,26 @@ export class WidgetInstance implements HostNode {
 			throw error;
 		}
 		placedInThisBatch.push(this);
+	}
+
+	/**
+	 * Where a child goes while this one is made: at the end, unless user code run meanwhile placed
+	 * a sibling that comes after it. Then it goes just before that one.
+	 */
+	private placeAmongPlaced(child: HostNode): number {
+		const count = r.Rwidget_get_child_count(this.id);
+		const after = new Set(
+			this.children
+				.slice(this.children.indexOf(child) + 1)
+				.filter((other) => this.holds(other))
+				.map((other) => other.nativeWidget),
+		);
+		for (let index = 0; index < count; index++) {
+			if (after.has(r.Rwidget_get_child(this.id, index))) {
+				return index;
+			}
+		}
+		return count;
 	}
 
 	/** An instance for a widget the framework does not own: the top of a root. */
@@ -755,7 +775,8 @@ export class WidgetInstance implements HostNode {
 			this.children.splice(index, 1);
 			const widget = child.nativeWidget;
 			// (a node not placed yet has no widget, and neither has a child that was not placed with it)
-			if (this.state === "live" && this.holds(child) && widget !== null && r.Rwidget_is_valid(widget) && r.Rwidget_get_parent(widget) === this.id) {
+			// (also while it is disposed: a cleanup run then may take one away, which must not go with it)
+			if (r.Rwidget_is_valid(this.id) && this.holds(child) && widget !== null && r.Rwidget_is_valid(widget) && r.Rwidget_get_parent(widget) === this.id) {
 				r.Rwidget_remove_child(this.id, widget);
 			}
 		}
@@ -817,14 +838,14 @@ export class WidgetInstance implements HostNode {
 	}
 
 	forgetTree(): void {
-		// (a node Raven has not made has no handlers: it gets them at `materialize`)
-		if (this.state !== "live") {
-			return;
-		}
+		// (what it holds may be made, added to it while it waited)
 		for (const child of this.children) {
 			child.forgetTree();
 		}
-		forgetHandlers(this.tag, this.id, false);
+		// (a node Raven has not made has no handlers: it gets them at `materialize`)
+		if (this.state === "live") {
+			forgetHandlers(this.tag, this.id, false);
+		}
 	}
 
 	/** Deletes what is in this tree without being a widget of it: deleting a widget does not reach those. */
@@ -871,6 +892,12 @@ export class WidgetInstance implements HostNode {
 		const state = this.state;
 		this.state = "gone";
 		if (state !== "live") {
+			// (what it holds may be made, added to it while it waited: deleting no widget deletes those)
+			const failures: unknown[] = [];
+			for (const child of [...this.children]) {
+				attempt(failures, () => child.dispose());
+			}
+			throwFirst(failures);
 			return;
 		}
 		if (r.Rwidget_is_valid(this.id)) {

@@ -321,6 +321,105 @@ test("a widget is destroyed when a window under it fails to close", () => {
 	window.dispose();
 });
 
+test("what a window inside asks of the outer one as it opens runs once, with the opening", () => {
+	const outer = WindowInstance.create(WINDOW);
+	const inner = WindowInstance.create(WINDOW);
+	let runs = 0;
+	let cleanups = 0;
+	let asked = false;
+	inner.whenOpen(() => {
+		if (!asked) {
+			asked = true;
+			outer.whenOpen(() => {
+				runs++;
+				return () => void cleanups++;
+			});
+		}
+	});
+	outer.appendInitial(inner);
+	outer.materialize();
+	expect(runs).toBe(1);
+	outer.close();
+	expect(cleanups).toBe(1);
+	outer.forgetTree();
+	outer.dispose();
+});
+
+test("a window disposed by a child as it opens deletes the children still waiting", () => {
+	const outer = WindowInstance.create(WINDOW);
+	const inner = WindowInstance.create(WINDOW);
+	const box = WidgetInstance.create("VBox", { Name: "waiting" });
+	let opened = 0;
+	inner.whenOpen(() => {
+		opened++;
+		if (opened === 2) {
+			outer.dispose();
+		}
+	});
+	outer.appendInitial(inner);
+	outer.appendInitial(box);
+	outer.materialize();
+	const widget = box.widget;
+	expect(r.Rwidget_is_valid(widget)).toBe(1);
+	// (closed, it keeps both, alive; opened again, the first disposes it)
+	outer.close();
+	outer.materialize();
+	expect(r.Rwidget_is_valid(widget)).toBe(0);
+});
+
+test("a widget released by a cleanup while its parent is disposed is not deleted with it", () => {
+	const window = WindowInstance.create(WINDOW);
+	window.materialize();
+	const box = WidgetInstance.create("VBox", { Name: "box" });
+	const sibling = WidgetInstance.create("Label", { Name: "sibling", Text: "sibling" });
+	window.append(box);
+	box.append(sibling);
+	const inner = WindowInstance.create(WINDOW);
+	inner.whenOpen(() => () => box.release(sibling));
+	box.append(inner);
+	const widget = sibling.widget;
+	box.dispose();
+	expect(r.Rwidget_is_valid(widget)).toBe(1);
+	r.Rwidget_destroy(widget);
+	window.forgetTree();
+	window.dispose();
+});
+
+test("a sibling added as a child opens its windows goes after it, as in the tree", () => {
+	const window = WindowInstance.create(WINDOW);
+	const parent = WidgetInstance.create("VBox", { Name: "parent" });
+	const child = WidgetInstance.create("VBox", { Name: "child" });
+	const sibling = WidgetInstance.create("Label", { Name: "sibling", Text: "sibling" });
+	const inner = WindowInstance.create(WINDOW);
+	let added = false;
+	inner.whenOpen(() => {
+		if (!added) {
+			added = true;
+			parent.append(sibling);
+		}
+	});
+	child.append(inner);
+	parent.append(child);
+	window.appendInitial(parent);
+	window.materialize();
+	const box = r.Rwidget_find(window.window, "parent");
+	expect(Array.from({ length: r.Rwidget_get_child_count(box) }, (_, index) => r.Rwidget_get_name(r.Rwidget_get_child(box, index)))).toEqual(["child", "sibling"]);
+	window.forgetTree();
+	window.dispose();
+});
+
+test("a widget not placed deletes what it holds that is", () => {
+	const button = WidgetInstance.create("Button", { Name: "made", OnClicked: () => {} });
+	button.materialize();
+	const before = eventStats().handlers;
+	const box = WidgetInstance.create("VBox", {});
+	box.append(button);
+	box.forgetTree();
+	box.dispose();
+	expect(r.Rwidget_is_valid(button.widget)).toBe(0);
+	expect(eventStats().handlers).toBeLessThan(before);
+});
+
 test("a function that throws as soon as whenOpen runs it is not kept", () => {
 	const window = WindowInstance.create(WINDOW);
 	window.materialize();

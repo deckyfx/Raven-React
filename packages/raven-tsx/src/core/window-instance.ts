@@ -120,6 +120,8 @@ export class WindowInstance implements HostNode {
 	private readonly opening = new Set<Opening>();
 	/** How many times it opened: a cleanup returned for an opening that is over runs at once. */
 	private openings = 0;
+	/** While it opens, before its opening pass: a function `whenOpen` gets then runs in that pass, once. */
+	private draining = false;
 	/** What the application put in its content itself, kept alive while it is closed. */
 	private readonly keptNative: r.Rid[] = [];
 	/** The widgets of its content when it closed, in order: what the application put there goes back to its place. */
@@ -150,6 +152,7 @@ export class WindowInstance implements HostNode {
 		// (user code run by a child may close the window, and open it again: that is another window,
 		// whose opening is done; this one is over)
 		const current = (): boolean => this.state === "live" && this.id === window;
+		this.draining = true;
 		try {
 			closeEvents.set(window, this.resolved.handlers.get("OnClose"));
 			setWindowEvents(window, this.resolved.handlers);
@@ -177,6 +180,7 @@ export class WindowInstance implements HostNode {
 		if (!current()) {
 			return;
 		}
+		this.draining = false;
 		this.openings++;
 		this.runOpening();
 	}
@@ -276,8 +280,8 @@ export class WindowInstance implements HostNode {
 		}
 		const opening: Opening = { run, cleanup: null };
 		this.opening.add(opening);
-		// (a window the user closed, or Raven destroyed, does not open again)
-		if (this.state === "live" && this.isOpen) {
+		// (a window the user closed, or Raven destroyed, does not open again. One that opens runs it with the rest)
+		if (this.state === "live" && this.isOpen && !this.draining) {
 			try {
 				this.runOpeningOf(opening);
 			} catch (error) {
@@ -549,14 +553,15 @@ export class WindowInstance implements HostNode {
 		this.state = "gone";
 		this.opening.clear();
 		const failures: unknown[] = [];
+		// (what waited to go in: what a framework placed in it and took back, alive, goes with it. Also
+		// while it opens: a child that disposed it stopped the others going in)
+		for (const child of this.initial.splice(0)) {
+			attempt(failures, () => {
+				child.forgetTree();
+				child.dispose();
+			});
+		}
 		if (state !== "live") {
-			// (what waited to go in: what a framework placed in it and took back, alive, goes with it)
-			for (const child of this.initial.splice(0)) {
-				attempt(failures, () => {
-					child.forgetTree();
-					child.dispose();
-				});
-			}
 			this.destroyKeptNative();
 			throwFirst(failures);
 			return;

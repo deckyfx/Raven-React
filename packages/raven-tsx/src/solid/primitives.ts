@@ -25,17 +25,10 @@ export function createAction(name: string, handler: (sender: r.Rid) => void): vo
 export function createShortcut(window: () => WindowInstance | null | undefined, keys: string, handler: () => void): void {
 	createEffect(() => {
 		const owner = window();
-		if (!owner) {
-			return;
+		if (owner) {
+			// (each time the window opens: a window taken out of the tree closes, and opens when shown again)
+			onCleanup(owner.whenOpen(() => onShortcut(owner.window, keys, handler)));
 		}
-		let stop: (() => void) | null = null;
-		const cancel = owner.whenOpen(() => {
-			stop = onShortcut(owner.window, keys, handler);
-		});
-		onCleanup(() => {
-			cancel();
-			stop?.();
-		});
 	});
 }
 

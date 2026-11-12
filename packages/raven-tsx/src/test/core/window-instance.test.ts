@@ -2,7 +2,7 @@ import { afterAll, beforeAll, expect, test } from "bun:test";
 import * as r from "../../core/raven";
 import { eventStats } from "../../core/events";
 import { WidgetInstance } from "../../core/widget-instance";
-import { WindowInstance } from "../../core/window-instance";
+import { CONTENT_NAME, WindowInstance } from "../../core/window-instance";
 
 beforeAll(() => {
 	const desc = new r.RInitDesc();
@@ -15,50 +15,66 @@ afterAll(() => {
 	r.Rshutdown();
 });
 
+const WINDOW = { Title: "window", Width: 100, Height: 100 } as const;
+
 test("whenOpen runs what waits once the window opens, skips what was cancelled, and goes on past a failure", () => {
-	const window = WindowInstance.create({ Title: "open", Width: 100, Height: 100 });
+	const window = WindowInstance.create(WINDOW);
 	const ran: string[] = [];
 	let cancelB = (): void => {};
 	window.whenOpen(() => {
 		ran.push("a");
 		cancelB();
 	});
-	cancelB = window.whenOpen(() => ran.push("b"));
+	cancelB = window.whenOpen(() => {
+		ran.push("b");
+	});
 	window.whenOpen(() => {
 		throw new Error("from c");
 	});
-	window.whenOpen(() => ran.push("d"));
+	window.whenOpen(() => {
+		ran.push("d");
+	});
 	expect(() => window.materialize()).toThrow("from c");
 	expect(ran).toEqual(["a", "d"]);
 	expect(window.isOpen).toBe(true);
-	window.whenOpen(() => ran.push("now"));
+	window.whenOpen(() => {
+		ran.push("now");
+	});
 	expect(ran).toEqual(["a", "d", "now"]);
 	window.dispose();
 	expect(window.isOpen).toBe(false);
 });
 
 test("nothing runs once a callback has closed the window", () => {
-	const window = WindowInstance.create({ Title: "open", Width: 100, Height: 100 });
+	const window = WindowInstance.create(WINDOW);
 	const ran: string[] = [];
 	window.whenOpen(() => window.dispose());
-	window.whenOpen(() => ran.push("after"));
+	window.whenOpen(() => {
+		ran.push("after");
+	});
 	window.materialize();
 	expect(ran).toEqual([]);
 });
 
 test("a window destroyed in Raven runs nothing more, queued or asked later", () => {
-	const window = WindowInstance.create({ Title: "open", Width: 100, Height: 100 });
+	const window = WindowInstance.create(WINDOW);
 	const ran: string[] = [];
-	window.whenOpen(() => r.Rwindow_destroy(window.window));
-	window.whenOpen(() => ran.push("queued"));
+	window.whenOpen(() => {
+		r.Rwindow_destroy(window.window);
+	});
+	window.whenOpen(() => {
+		ran.push("queued");
+	});
 	window.materialize();
-	window.whenOpen(() => ran.push("later"));
+	window.whenOpen(() => {
+		ran.push("later");
+	});
 	expect(ran).toEqual([]);
 	window.dispose();
 });
 
 test("a live widget taken out of a window not open yet leaves no handler", () => {
-	const window = WindowInstance.create({ Title: "pending", Width: 100, Height: 100 });
+	const window = WindowInstance.create(WINDOW);
 	const handlers = eventStats().handlers;
 	const button = WidgetInstance.create("Button", { OnClicked: () => {} });
 	button.materialize();
@@ -68,4 +84,247 @@ test("a live widget taken out of a window not open yet leaves no handler", () =>
 	expect(eventStats().handlers).toBe(handlers);
 	expect(r.Rwidget_is_valid(button.widget)).toBe(0);
 	window.dispose();
+});
+
+test("a window closed opens again with what it held, alive, and runs whenOpen at each opening", () => {
+	const window = WindowInstance.create(WINDOW);
+	const log: string[] = [];
+	let clicks = 0;
+	const button = WidgetInstance.create("Button", { Name: "kept", OnClicked: () => clicks++ });
+	window.append(button);
+	window.whenOpen(() => {
+		log.push(`open ${window.window}`);
+		return () => log.push("closed");
+	});
+	window.materialize();
+	const first = window.window;
+	const widget = r.Rwidget_find(first, "kept");
+	expect(widget).toBe(button.widget);
+	window.close();
+	expect(r.Rwindow_is_valid(first)).toBe(0);
+	expect(window.isOpen).toBe(false);
+	expect(r.Rwidget_is_valid(widget)).toBe(1);
+	window.materialize();
+	const second = window.window;
+	expect(second).not.toBe(first);
+	expect(r.Rwidget_find(second, "kept")).toBe(widget);
+	expect(log).toEqual([`open ${first}`, "closed", `open ${second}`]);
+	r.Raction_fire(r.Rwidget_get_action(widget) ?? "", widget);
+	expect(clicks).toBe(1);
+	window.forgetTree();
+	window.dispose();
+	expect(log).toEqual([`open ${first}`, "closed", `open ${second}`, "closed"]);
+	expect(r.Rwidget_is_valid(widget)).toBe(0);
+});
+
+test("a window closed and never opened again deletes what it kept", () => {
+	const window = WindowInstance.create(WINDOW);
+	const handlers = eventStats().handlers;
+	const button = WidgetInstance.create("Button", { OnClicked: () => {} });
+	window.append(button);
+	window.materialize();
+	const widget = button.widget;
+	window.close();
+	window.dispose();
+	expect(r.Rwidget_is_valid(widget)).toBe(0);
+	expect(eventStats().handlers).toBe(handlers);
+});
+
+test("a cleanup returned by a function that closed its window runs at once", () => {
+	const window = WindowInstance.create(WINDOW);
+	const log: string[] = [];
+	window.whenOpen(() => {
+		window.close();
+		return () => log.push("cleanup");
+	});
+	window.materialize();
+	expect(log).toEqual(["cleanup"]);
+	expect(window.isOpen).toBe(false);
+	window.dispose();
+});
+
+test("a cleanup that throws: the others run, the window closes, and the failure is said", () => {
+	const window = WindowInstance.create(WINDOW);
+	const log: string[] = [];
+	window.whenOpen(() => () => {
+		throw new Error("from a cleanup");
+	});
+	window.whenOpen(() => () => log.push("second"));
+	window.materialize();
+	const first = window.window;
+	expect(() => window.close()).toThrow("from a cleanup");
+	expect(log).toEqual(["second"]);
+	expect(r.Rwindow_is_valid(first)).toBe(0);
+	window.materialize();
+	expect(window.isOpen).toBe(true);
+	expect(() => window.dispose()).toThrow("from a cleanup");
+	expect(window.isOpen).toBe(false);
+});
+
+test("a cleanup that disposes the window while it closes leaves it gone", () => {
+	const window = WindowInstance.create(WINDOW);
+	const button = WidgetInstance.create("Button", { OnClicked: () => {} });
+	const handlers = eventStats().handlers;
+	window.append(button);
+	window.whenOpen(() => () => window.dispose());
+	window.materialize();
+	const widget = button.widget;
+	window.close();
+	window.materialize();
+	expect(window.isOpen).toBe(false);
+	expect(window.window).toBe(r.R_INVALID_ID);
+	expect(r.Rwidget_is_valid(widget)).toBe(0);
+	expect(eventStats().handlers).toBe(handlers);
+});
+
+test("a window destroyed in Raven, then closed, does not open again with dead widgets", () => {
+	const window = WindowInstance.create(WINDOW);
+	const handlers = eventStats().handlers;
+	const button = WidgetInstance.create("Button", { OnClicked: () => {} });
+	window.append(button);
+	window.materialize();
+	r.Rwindow_destroy(window.window);
+	window.close();
+	window.materialize();
+	expect(window.isOpen).toBe(false);
+	expect(r.Rwindow_is_valid(window.window)).toBe(0);
+	expect(eventStats().handlers).toBe(handlers);
+});
+
+test("the windows in a window close with it, and open again with it, directly or deeper", () => {
+	const outer = WindowInstance.create(WINDOW);
+	const direct = WindowInstance.create(WINDOW);
+	const box = WidgetInstance.create("VBox", {});
+	const deeper = WindowInstance.create(WINDOW);
+	outer.append(direct);
+	box.append(deeper);
+	outer.append(box);
+	outer.materialize();
+	expect([outer.isOpen, direct.isOpen, deeper.isOpen]).toEqual([true, true, true]);
+	outer.close();
+	expect([outer.isOpen, direct.isOpen, deeper.isOpen]).toEqual([false, false, false]);
+	outer.materialize();
+	expect([outer.isOpen, direct.isOpen, deeper.isOpen]).toEqual([true, true, true]);
+	outer.forgetTree();
+	outer.dispose();
+	expect([outer.isOpen, direct.isOpen, deeper.isOpen]).toEqual([false, false, false]);
+});
+
+test("a widget the application put in the content itself is kept while the window is closed", () => {
+	const window = WindowInstance.create(WINDOW);
+	window.materialize();
+	const own = r.Rwidget_create_from_xml('<Label Name="own" Text="own"/>');
+	r.Rwidget_add_child(r.Rwidget_find(window.window, CONTENT_NAME), own);
+	window.close();
+	expect(r.Rwidget_is_valid(own)).toBe(1);
+	window.materialize();
+	expect(r.Rwidget_find(window.window, "own")).toBe(own);
+	window.dispose();
+});
+
+test("a function that throws as soon as whenOpen runs it is not kept", () => {
+	const window = WindowInstance.create(WINDOW);
+	window.materialize();
+	expect(() => window.whenOpen(() => {
+		throw new Error("at once");
+	})).toThrow("at once");
+	window.close();
+	expect(() => window.materialize()).not.toThrow();
+	window.dispose();
+});
+
+test("a function that closes and opens the window again stops the pass it was in", () => {
+	const window = WindowInstance.create(WINDOW);
+	let reopened = false;
+	let runs = 0;
+	let cleanups = 0;
+	window.whenOpen(() => {
+		if (!reopened) {
+			reopened = true;
+			window.close();
+			window.materialize();
+		}
+	});
+	window.whenOpen(() => {
+		runs++;
+		return () => void cleanups++;
+	});
+	window.materialize();
+	expect(runs).toBe(1);
+	window.dispose();
+	expect(cleanups).toBe(1);
+});
+
+/** An outer window holding an inner one, open. */
+function nested(): { readonly outer: WindowInstance; readonly inner: WindowInstance } {
+	const outer = WindowInstance.create(WINDOW);
+	const inner = WindowInstance.create(WINDOW);
+	outer.append(inner);
+	outer.materialize();
+	return { outer, inner };
+}
+
+test("an inner cleanup that disposes the outer window while it closes leaves it gone", () => {
+	const { outer, inner } = nested();
+	inner.whenOpen(() => () => outer.dispose());
+	outer.close();
+	outer.materialize();
+	expect(outer.isOpen).toBe(false);
+	expect(inner.isOpen).toBe(false);
+	expect(r.Rwindow_is_valid(outer.window)).toBe(0);
+});
+
+test("an inner cleanup that throws: the outer window still closes, its cleanups run, and the failure is said", () => {
+	const { outer, inner } = nested();
+	const log: string[] = [];
+	inner.whenOpen(() => () => {
+		throw new Error("from an inner cleanup");
+	});
+	outer.whenOpen(() => () => log.push("outer"));
+	const first = outer.window;
+	expect(() => outer.close()).toThrow("from an inner cleanup");
+	expect(r.Rwindow_is_valid(first)).toBe(0);
+	expect(inner.isOpen).toBe(false);
+	expect(log).toEqual(["outer"]);
+	outer.materialize();
+	expect(outer.isOpen).toBe(true);
+	expect(inner.isOpen).toBe(true);
+	outer.forgetTree();
+	expect(() => outer.dispose()).toThrow("from an inner cleanup");
+});
+
+test("an inner cleanup that asks the outer window to run something waits for its next opening", () => {
+	const { outer, inner } = nested();
+	const log: string[] = [];
+	inner.whenOpen(() => () => {
+		outer.whenOpen(() => {
+			log.push("ran");
+			return () => log.push("cleaned");
+		});
+	});
+	outer.close();
+	expect(log).toEqual([]);
+	outer.materialize();
+	expect(log).toEqual(["ran"]);
+	outer.forgetTree();
+	outer.dispose();
+	expect(log).toEqual(["ran", "cleaned"]);
+});
+
+test("a window its own function closes as it is placed stays closed", () => {
+	const outer = WindowInstance.create(WINDOW);
+	const inner = WindowInstance.create(WINDOW);
+	let closed = false;
+	inner.whenOpen(() => {
+		// (once: opened again, it would stay open)
+		if (!closed) {
+			closed = true;
+			inner.close();
+		}
+	});
+	outer.append(inner);
+	outer.materialize();
+	expect(inner.isOpen).toBe(false);
+	outer.forgetTree();
+	outer.dispose();
 });

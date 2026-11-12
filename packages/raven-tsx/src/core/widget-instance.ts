@@ -53,6 +53,10 @@ export interface HostNode {
 	forgetTree(): void;
 	/** Deletes it, after its parent let it go. */
 	dispose(): void;
+	/** Closes the windows in this tree, keeping them to open again: what holds them left the tree, alive. */
+	closeWindows(): void;
+	/** Opens the windows in this tree that are closed: what holds them is placed again. */
+	openWindows(): void;
 }
 
 /** How to read the value a widget holds by itself, for the attribute that sets it. */
@@ -309,6 +313,7 @@ export class WidgetInstance implements HostNode {
 			this.applyAll(resolved);
 			for (const child of this.children) {
 				child.materialize();
+				child.openWindows();
 				// (an adopted widget Raven moves here from where it is shown; one its element destroyed is left out)
 				const widget = child.nativeWidget;
 				if (this.holds(child) && widget !== null && r.Rwidget_is_valid(widget)) {
@@ -652,6 +657,7 @@ export class WidgetInstance implements HostNode {
 		}
 		this.checkHolds(child);
 		child.materialize();
+		child.openWindows();
 		this.detach(child);
 		this.children.push(child);
 		child.setParent(this);
@@ -666,6 +672,7 @@ export class WidgetInstance implements HostNode {
 		if (!pending) {
 			this.checkHolds(child);
 			child.materialize();
+			child.openWindows();
 		}
 		this.detach(child);
 		const index = this.children.indexOf(before);
@@ -697,6 +704,27 @@ export class WidgetInstance implements HostNode {
 			this.detach(child);
 			child.setParent(null);
 		}
+	}
+
+	closeWindows(): void {
+		for (const child of this.children) {
+			child.closeWindows();
+		}
+	}
+
+	openWindows(): void {
+		for (const child of this.children) {
+			child.openWindows();
+		}
+	}
+
+	/** Takes every child out, alive, and gives them: a window that closes keeps what it holds. */
+	releaseChildren(): HostNode[] {
+		const children = [...this.children];
+		for (const child of children) {
+			this.release(child);
+		}
+		return children;
 	}
 
 	/** Removes a child and deletes it with everything under it. */

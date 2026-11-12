@@ -743,3 +743,95 @@ test("text refused beside widgets leaves the text node as it was", () => {
 	expect(() => empty.setText("x")).toThrow('text must be alone in a widget: "x"');
 	expect(empty.text).toBe("");
 });
+
+test("a window kept in a variable closes when hidden, and opens again with the same ref, children and shortcut", async () => {
+	let fired = 0;
+	const [shown, setShown] = createSignal(true);
+	let owner: WindowInstance | undefined;
+	function Kept(): JSX.Element {
+		const kept = (
+			<Window ref={owner} Title="kept" Width={200} Height={100}>
+				<Label Name="inside">inside</Label>
+			</Window>
+		);
+		createShortcut(() => owner, "Ctrl+L", () => fired++);
+		return <Show when={shown()}>{kept}</Show>;
+	}
+	const windows = new RavenRoot();
+	windows.render(() => <Kept />);
+	await settle();
+	const instance = owner;
+	const first = owner?.window ?? r.R_INVALID_ID;
+	const label = r.Rwidget_find(first, "inside");
+	expect(label).not.toBe(r.R_INVALID_ID);
+	setShown(false);
+	expect(r.Rwindow_is_valid(first)).toBe(0);
+	expect(r.Rwidget_is_valid(label)).toBe(1);
+	setShown(true);
+	await settle();
+	expect(owner).toBe(instance);
+	const second = owner?.window ?? r.R_INVALID_ID;
+	expect(r.Rwindow_is_valid(second)).toBe(1);
+	expect(r.Rwindow_get_title(second)).toBe("kept");
+	expect(r.Rwidget_find(second, "inside")).toBe(label);
+	r.Rwindow_inject_key(second, r.R_KEY_L, 1, r.R_MOD_CTRL);
+	r.Rwindow_inject_key(second, r.R_KEY_L, 0, r.R_MOD_CTRL);
+	expect(fired).toBe(1);
+	windows.unmount();
+	expect(r.Rwidget_is_valid(label)).toBe(0);
+	expect(eventStats().handlers).toBe(0);
+});
+
+test("a node placed before itself stays where it is", () => {
+	const box = SolidNode.element("VBox");
+	const [a, b, c, d] = ["a", "b", "c", "d"].map(() => SolidNode.element("Label"));
+	for (const node of [a, b, c, d]) {
+		box.insert(node!, null);
+	}
+	box.insert(c!, c!);
+	// (by identity: the four are alike)
+	expect(box.children.map((node) => [a, b, c, d].indexOf(node))).toEqual([0, 1, 2, 3]);
+});
+
+test("a window inside a box a condition hides closes with it, and opens again when shown", async () => {
+	const [shown, setShown] = createSignal(true);
+	let inner: WindowInstance | undefined;
+	function Nested(): JSX.Element {
+		const box = (
+			<VBox Name="holder">
+				<Window ref={inner} Title="inner" Width={120} Height={80}>
+					<Label>inner</Label>
+				</Window>
+			</VBox>
+		);
+		return <VBox Name="outer"><Show when={shown()}>{box}</Show></VBox>;
+	}
+	await mount(() => <Nested />);
+	expect(inner?.isOpen).toBe(true);
+	setShown(false);
+	expect(inner?.isOpen).toBe(false);
+	setShown(true);
+	expect(inner?.isOpen).toBe(true);
+	expect(r.Rwindow_get_title(inner?.window ?? r.R_INVALID_ID)).toBe("inner");
+});
+
+test("a window taken out of the tree goes, when its owner is gone, even if a cleanup of it throws", () => {
+	const top = SolidNode.container(r.R_INVALID_ID);
+	const node = SolidNode.element("Window");
+	top.insert(node, null);
+	let instance: WindowInstance | undefined;
+	node.withInstance((host) => {
+		instance = host as WindowInstance;
+	});
+	instance?.whenOpen(() => () => {
+		throw new Error("from a cleanup");
+	});
+	expect(instance?.isOpen).toBe(true);
+	expect(() => top.release(node)).toThrow("from a cleanup");
+	expect(top.children).toEqual([]);
+	expect(instance?.isOpen).toBe(false);
+	expect(r.Rwindow_is_valid(instance?.window ?? r.R_INVALID_ID)).toBe(0);
+	// (gone, not only closed: it does not open again)
+	instance?.materialize();
+	expect(instance?.isOpen).toBe(false);
+});

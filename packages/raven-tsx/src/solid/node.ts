@@ -150,6 +150,9 @@ export class SolidNode {
 
 	/** Places a child before another one, or at the end. A child already in a tree moves. */
 	insert(child: SolidNode, before: SolidNode | null): void {
+		if (child === before) {
+			return;
+		}
 		this.checkMixed(child);
 		if (child.parent && child.parent !== this) {
 			// (a move: the child stays alive on the way, whatever its owner)
@@ -189,13 +192,20 @@ export class SolidNode {
 			this.refresh();
 		} else if (child.host) {
 			this.instance.release(child.host);
+			// (a window is no widget of its parent: out of the tree, it closes, and those it holds, to open when placed again)
+			child.host.closeWindows();
 		}
 	}
 
 	/** Takes a child out of the tree. It stays alive while what made it in Solid is there, and goes after. */
 	release(child: SolidNode): void {
-		if (this.children.includes(child)) {
+		if (!this.children.includes(child)) {
+			return;
+		}
+		try {
 			this.detach(child);
+		} finally {
+			// (also when closing its windows threw: it is out of the tree)
 			if (child.ownerGone) {
 				child.destroy();
 			}
@@ -204,16 +214,29 @@ export class SolidNode {
 
 	/** Takes every child out, each going or staying as its owner says: a portal that goes. */
 	releaseAll(): void {
-		for (const child of [...this.children]) {
-			this.release(child);
-		}
+		this.releaseEach(false);
 	}
 
 	/** Takes every child out and deletes them: the end of a tree, after its owners are gone. */
 	clear(): void {
+		this.releaseEach(true);
+	}
+
+	/** Takes every child out, all of them, and then says the first failure. */
+	private releaseEach(deleting: boolean): void {
+		const failures: unknown[] = [];
 		for (const child of [...this.children]) {
-			child.ownerGone = true;
-			this.release(child);
+			try {
+				if (deleting) {
+					child.ownerGone = true;
+				}
+				this.release(child);
+			} catch (error) {
+				failures.push(error);
+			}
+		}
+		if (failures.length > 0) {
+			throw failures[0];
 		}
 	}
 
@@ -232,9 +255,13 @@ export class SolidNode {
 			return;
 		}
 		this.destroyed = true;
-		// (a child whose owner is still there leaves alive: it may be shown again; the others go)
-		this.releaseAll();
-		this.host.forgetTree();
-		this.host.dispose();
+		const host = this.host;
+		try {
+			// (a child whose owner is still there leaves alive: it may be shown again; the others go)
+			this.releaseAll();
+		} finally {
+			host.forgetTree();
+			host.dispose();
+		}
 	}
 }

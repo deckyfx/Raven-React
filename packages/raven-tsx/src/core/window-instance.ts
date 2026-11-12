@@ -183,6 +183,10 @@ export class WindowInstance implements HostNode {
 	}
 
 	append(child: HostNode): void {
+		if (this.state === "pending") {
+			this.appendInitial(child);
+			return;
+		}
 		if (child !== this.island && !this.takeIsland(child)) {
 			this.open.append(child);
 		}
@@ -192,11 +196,39 @@ export class WindowInstance implements HostNode {
 		if (this.state === "live") {
 			this.append(child);
 		} else {
+			this.releaseInitial(child);
 			this.initial.push(child);
 		}
 	}
 
+	/** Takes a child out of those that go in when the window opens. */
+	private releaseInitial(child: HostNode): void {
+		const index = this.initial.indexOf(child);
+		if (index >= 0) {
+			this.initial.splice(index, 1);
+		}
+	}
+
+	release(child: HostNode): void {
+		if (this.state !== "live") {
+			this.releaseInitial(child);
+			return;
+		}
+		if (child !== this.island) {
+			this.open.release(child);
+			return;
+		}
+		// (Raven deletes the island it replaces: one cannot leave its window alive)
+		this.remove(child);
+	}
+
 	insertBefore(child: HostNode, before: HostNode): void {
+		if (this.state === "pending") {
+			this.releaseInitial(child);
+			const index = this.initial.indexOf(before);
+			this.initial.splice(index < 0 ? this.initial.length : index, 0, child);
+			return;
+		}
 		if (child === this.island || this.takeIsland(child)) {
 			return;
 		}
@@ -209,6 +241,11 @@ export class WindowInstance implements HostNode {
 	}
 
 	remove(child: HostNode): void {
+		if (this.state === "pending") {
+			this.releaseInitial(child);
+			child.dispose();
+			return;
+		}
 		if (child !== this.island) {
 			this.open.remove(child);
 			return;

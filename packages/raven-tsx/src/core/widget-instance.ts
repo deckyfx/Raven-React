@@ -46,6 +46,8 @@ export interface HostNode {
 	/** Adds a child while this new node is rendered, in its props only: Raven gets it at `materialize`. */
 	appendInitial(child: HostNode): void;
 	insertBefore(child: HostNode, before: HostNode): void;
+	/** Takes a child out without deleting it: a framework may place it again, here or elsewhere. */
+	release(child: HostNode): void;
 	remove(child: HostNode): void;
 	/** Forgets the handlers of this node and of everything under it. */
 	forgetTree(): void;
@@ -274,6 +276,11 @@ export class WidgetInstance implements HostNode {
 
 	/** A new widget of a tag, as a framework renders it: Raven makes it once it is placed, at `materialize`. */
 	static create<Child>(tag: string, props: RavenProps<Child>): WidgetInstance {
+		return new WidgetInstance(r.R_INVALID_ID, tag, WidgetInstance.resolveChecked(tag, props));
+	}
+
+	/** The props of a tag, checked for what can be found wrong with them without Raven. */
+	private static resolveChecked<Child>(tag: string, props: RavenProps<Child>): ResolvedProps {
 		const resolved = resolveProps(props, DATA_PROPS[tag]?.names);
 		DATA_PROPS[tag]?.check(resolved.data);
 		for (const [name, check] of Object.entries(CHECKED_AT_RENDER[tag] ?? {})) {
@@ -282,7 +289,7 @@ export class WidgetInstance implements HostNode {
 				check(value);
 			}
 		}
-		return new WidgetInstance(r.R_INVALID_ID, tag, resolved);
+		return resolved;
 	}
 
 	/**
@@ -509,6 +516,11 @@ export class WidgetInstance implements HostNode {
 
 	/** Goes from the last props to new ones, setting only what changed. */
 	update<Child>(props: RavenProps<Child>): void {
+		// (a framework that gives props one by one, Solid, gives some before the node is placed: Raven gets them at `materialize`)
+		if (this.state === "pending") {
+			this.pending = WidgetInstance.resolveChecked(this.tag, props);
+			return;
+		}
 		// (its window can be gone already: closed by the user, with no OnClose to ask first. An adopted widget has no props of the framework)
 		if (this.state !== "live" || !r.Rwidget_is_valid(this.id) || this.tag === ADOPTED_TAG) {
 			return;
@@ -633,6 +645,11 @@ export class WidgetInstance implements HostNode {
 
 	/** Adds a child at the end, making it in Raven if it was only pending. A child already here moves to the end. */
 	append(child: HostNode): void {
+		if (this.state === "pending") {
+			this.detach(child);
+			this.appendInitial(child);
+			return;
+		}
 		this.checkHolds(child);
 		child.materialize();
 		this.detach(child);
@@ -645,8 +662,11 @@ export class WidgetInstance implements HostNode {
 
 	/** Puts a child before another one. A child already here moves. */
 	insertBefore(child: HostNode, before: HostNode): void {
-		this.checkHolds(child);
-		child.materialize();
+		const pending = this.state === "pending";
+		if (!pending) {
+			this.checkHolds(child);
+			child.materialize();
+		}
 		this.detach(child);
 		const index = this.children.indexOf(before);
 		if (index < 0) {
@@ -654,7 +674,7 @@ export class WidgetInstance implements HostNode {
 		}
 		this.children.splice(index, 0, child);
 		child.setParent(this);
-		if (this.holds(child)) {
+		if (!pending && this.holds(child)) {
 			r.Rwidget_insert_child(this.id, child.nativeWidget as r.Rid, this.nativeIndexOf(child, false));
 		}
 	}
@@ -664,9 +684,18 @@ export class WidgetInstance implements HostNode {
 		const index = this.children.indexOf(child);
 		if (index >= 0) {
 			this.children.splice(index, 1);
-			if (this.holds(child)) {
-				r.Rwidget_remove_child(this.id, child.nativeWidget as r.Rid);
+			const widget = child.nativeWidget;
+			// (a node not placed yet has no widget, and neither has a child that was not placed with it)
+			if (this.state === "live" && this.holds(child) && widget !== null && r.Rwidget_is_valid(widget) && r.Rwidget_get_parent(widget) === this.id) {
+				r.Rwidget_remove_child(this.id, widget);
 			}
+		}
+	}
+
+	release(child: HostNode): void {
+		if (this.children.includes(child)) {
+			this.detach(child);
+			child.setParent(null);
 		}
 	}
 

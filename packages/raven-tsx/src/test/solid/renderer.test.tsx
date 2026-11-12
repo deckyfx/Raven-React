@@ -6,7 +6,7 @@ import { createSignal, ErrorBoundary, For, onCleanup, onMount, Show, type JSX } 
 import * as r from "../../core/raven";
 import { eventStats } from "../../core/events";
 import {
-	Border, Button, Checkbox, createAction, createFrame, createShortcut, createWindow, HBox, Label, Menu, MenuBar, MenuItem, Portal, RavenRoot, Separator, TextInput, VBox, Window,
+	Border, Button, Checkbox, createAction, createFrame, createShortcut, createWindow, HBox, Island, Label, Menu, MenuBar, MenuItem, Portal, RavenRoot, Separator, TextInput, VBox, Window,
 	type WidgetInstance, type WindowInstance,
 } from "../../solid/index";
 
@@ -564,4 +564,103 @@ test("createFrame runs at each frame while its component lives", async () => {
 	const stopped = frames;
 	await settle(30);
 	expect(frames).toBe(stopped);
+});
+
+test("a widget after text goes to the nearest ErrorBoundary too, the text being first", async () => {
+	const [more, setMore] = createSignal(false);
+	await mount(() => (
+		<VBox Name="box">
+			<ErrorBoundary fallback={(error: Error) => <Label Name="error">{error.message}</Label>}>
+				<HBox>
+					{"words"}
+					<Show when={more()}>
+						<Label>a widget</Label>
+					</Show>
+				</HBox>
+			</ErrorBoundary>
+		</VBox>
+	));
+	expect(find("error")).toBe(r.R_INVALID_ID);
+	setMore(true);
+	expect(text("error")).toContain('text must be alone in a widget: "words"');
+});
+
+test("the ref of a Separator in a Menu gives its line of the menu", async () => {
+	let line: WidgetInstance | undefined;
+	await mount(() => (
+		<VBox>
+			<MenuBar>
+				<Menu Name="m" Title="File">
+					<MenuItem Text="Open" />
+					<Separator ref={line} Name="line" />
+				</Menu>
+			</MenuBar>
+		</VBox>
+	));
+	expect(line?.widget).toBe(find("line"));
+	expect(r.Rwidget_get_type(find("line"))).toBe(r.R_WIDGET_MENU_ITEM);
+});
+
+test("an element kept in a variable, shown in a Portal, keeps its widget when the Portal comes back", async () => {
+	const [shown, setShown] = createSignal(true);
+	const box = r.Rwidget_create_from_xml('<VBox Name="by-hand"/>');
+	function Kept(): JSX.Element {
+		const kept = <Label Name="kept">kept</Label>;
+		return (
+			<VBox Name="outer">
+				<Show when={shown()}>
+					<Portal widget={box}>{kept}</Portal>
+				</Show>
+			</VBox>
+		);
+	}
+	await mount(() => <Kept />);
+	r.Rwidget_add_child(find("outer"), box);
+	const widget = find("kept");
+	setShown(false);
+	expect(namesUnder("by-hand")).toEqual([]);
+	expect(r.Rwidget_is_valid(widget)).toBe(1);
+	setShown(true);
+	expect(find("kept")).toBe(widget);
+});
+
+test("an island kept in a variable leaves its window alive, and comes back", async () => {
+	const [shown, setShown] = createSignal(true);
+	let owner: WindowInstance | undefined;
+	function Islands(): JSX.Element {
+		const kept = <Island Name="island"><Label>island</Label></Island>;
+		return (
+			<Window ref={owner} Width={300} Height={200}>
+				<VBox Name="content" />
+				<Show when={shown()}>{kept}</Show>
+			</Window>
+		);
+	}
+	const windows = new RavenRoot();
+	windows.render(() => <Islands />);
+	const id = owner?.window ?? r.R_INVALID_ID;
+	const island = r.Rwindow_get_island(id);
+	expect(island).not.toBe(r.R_INVALID_ID);
+	setShown(false);
+	expect(r.Rwindow_get_island(id)).toBe(r.R_INVALID_ID);
+	expect(r.Rwidget_is_valid(island)).toBe(1);
+	setShown(true);
+	expect(r.Rwindow_get_island(id)).toBe(island);
+	windows.unmount();
+	expect(r.Rwidget_is_valid(island)).toBe(0);
+	expect(eventStats().handlers).toBe(0);
+});
+
+test("unmount takes the widgets away even when a cleanup throws", async () => {
+	function Throws(): JSX.Element {
+		onCleanup(() => {
+			throw new Error("from a cleanup");
+		});
+		return <Label Name="throws">throws</Label>;
+	}
+	await mount(() => <VBox Name="box"><Throws /></VBox>);
+	const box = find("box");
+	expect(() => root?.unmount()).toThrow("from a cleanup");
+	root = null;
+	expect(r.Rwidget_is_valid(box)).toBe(0);
 });

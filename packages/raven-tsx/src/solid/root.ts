@@ -30,8 +30,12 @@ export class RavenRoot {
 	unmount(): void {
 		const dispose = this.dispose;
 		this.dispose = null;
-		dispose?.();
-		this.node.clear();
+		try {
+			dispose?.();
+		} finally {
+			// (the widgets and windows go, also when a cleanup threw)
+			this.node.clear();
+		}
 	}
 }
 

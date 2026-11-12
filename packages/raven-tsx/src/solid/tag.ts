@@ -24,7 +24,7 @@ export function tag<P extends object, R = WidgetInstance>(name: string): (props:
 		// (Solid compiles `ref={variable}` to a function that sets the variable)
 		const ref = local.ref;
 		if (typeof ref === "function") {
-			(ref as (instance: R) => void)(node.instance as R);
+			node.withInstance((instance) => (ref as (instance: R) => void)(instance as R));
 		}
 		// (a node of Raven: Solid's JSX types know only the nodes of the DOM)
 		return node as unknown as JSX.Element;

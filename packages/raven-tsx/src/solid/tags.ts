@@ -4,7 +4,7 @@
  * element, whose props follow what the element in XML gives.
  */
 
-import { createComponent, createSignal, type Component, type JSX } from "solid-js";
+import { $PROXY, createComponent, createSignal, type Component, type JSX } from "solid-js";
 import type * as r from "../core/raven";
 import { registerTagWith, type TagAdapter, type TagContent, type TagOptions as CoreTagOptions } from "../core/tags";
 import { SolidNode } from "./node";
@@ -41,9 +41,10 @@ function propsOf(content: () => TagContent): TagProps {
 		const places = Object.fromEntries(Object.entries(slots).map(([name, widgets]) => [name, adopted(widgets)]));
 		return { ...attributes, ...places, children: adopted(children) };
 	};
+	// (`$PROXY` says to Solid that the keys can change: `splitProps` then reads through, and sees a key added later)
 	return new Proxy({} as TagProps, {
-		get: (_, key) => (typeof key === "string" ? read()[key] : undefined),
-		has: (_, key) => typeof key === "string" && key in read(),
+		get: (_, key, receiver) => (key === $PROXY ? receiver : typeof key === "string" ? read()[key] : undefined),
+		has: (_, key) => key === $PROXY || (typeof key === "string" && key in read()),
 		ownKeys: () => Object.keys(read()),
 		getOwnPropertyDescriptor: (_, key) => (typeof key === "string" && key in read() ? { configurable: true, enumerable: true, get: () => read()[key] } : undefined),
 	});

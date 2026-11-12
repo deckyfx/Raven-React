@@ -54,4 +54,5 @@ test("the tree is cleaned up before Raven stops when the run of runApp ends with
 	await expect(runApp(() => <App />, { Title: "app", Width: 200, Height: 100 })).rejects.toThrow("in the loop");
 	loop.mockRestore();
 	expect(runningAtCleanup).toBe(true);
+	expect(r.Ris_running()).toBe(r.R_FALSE);
 });

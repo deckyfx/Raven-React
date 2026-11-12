@@ -218,8 +218,16 @@ export class WindowInstance implements HostNode {
 			this.open.release(child);
 			return;
 		}
-		// (Raven deletes the island it replaces: one cannot leave its window alive)
-		this.remove(child);
+		this.island = null;
+		(child as WidgetInstance).setHolder(null);
+		const widget = child.nativeWidget;
+		if (this.isOpen && widget !== null && r.Rwidget_is_valid(widget)) {
+			// (Rwindow_set_island would delete it: a widget added elsewhere leaves its window alive)
+			const holder = r.Rwidget_create_from_xml("<VBox/>");
+			r.Rwidget_add_child(holder, widget);
+			r.Rwidget_remove_child(holder, widget);
+			r.Rwidget_destroy(holder);
+		}
 	}
 
 	insertBefore(child: HostNode, before: HostNode): void {

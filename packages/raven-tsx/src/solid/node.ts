@@ -27,6 +27,8 @@ export class SolidNode {
 	 */
 	private ownerGone: boolean;
 	private destroyed = false;
+	/** What waits for the node of the core: the `ref` of a `<Separator>` not placed yet. */
+	private readonly waiting: ((instance: HostNode) => void)[] = [];
 
 	private constructor(
 		readonly tag: string,
@@ -67,13 +69,26 @@ export class SolidNode {
 		return this.text !== null;
 	}
 
-	/** The node of the core, made now for a `<Separator>` that has not been placed. */
-	get instance(): HostNode {
+	/** The node of the core. A `<Separator>` gets it when it is placed: in a `<Menu>`, a line of the menu. */
+	private get instance(): HostNode {
 		if (!this.host) {
 			const inMenu = this.parent?.tag === "Menu";
-			this.host = inMenu ? WidgetInstance.create("MenuItem", menuSeparator(this.props)) : WidgetInstance.create(this.tag, this.props);
+			const host = inMenu ? WidgetInstance.create("MenuItem", menuSeparator(this.props)) : WidgetInstance.create(this.tag, this.props);
+			this.host = host;
+			for (const run of this.waiting.splice(0)) {
+				run(host);
+			}
 		}
 		return this.host;
+	}
+
+	/** Gives the node of the core to a function: now, or once it exists (a `<Separator>`, when it is placed). */
+	withInstance(run: (instance: HostNode) => void): void {
+		if (this.host) {
+			run(this.host);
+		} else {
+			this.waiting.push(run);
+		}
 	}
 
 	/** Sets a prop, or takes it away with `undefined`. */
@@ -114,10 +129,21 @@ export class SolidNode {
 		return { children: texts.map((child) => child.text ?? "") };
 	}
 
+	/** Text beside widgets is an error, as with React: said before anything changes, whichever comes first. */
+	private checkMixed(child: SolidNode): void {
+		const others = this.children.filter((node) => node !== child);
+		const text = child.isText ? (child.text !== "" && others.some((node) => !node.isText) ? child.text : null) : (others.find((node) => node.isText && node.text !== "")?.text ?? null);
+		if (text !== null) {
+			RavenError.throw(`raven-tsx: text must be alone in a widget: "${text}"`);
+		}
+	}
+
 	/** Places a child before another one, or at the end. A child already in a tree moves. */
 	insert(child: SolidNode, before: SolidNode | null): void {
+		this.checkMixed(child);
 		if (child.parent && child.parent !== this) {
-			child.parent.release(child);
+			// (a move: the child stays alive on the way, whatever its owner)
+			child.parent.detach(child);
 		}
 		const current = this.children.indexOf(child);
 		if (current >= 0) {
@@ -141,8 +167,8 @@ export class SolidNode {
 		finishPlacing();
 	}
 
-	/** Takes a child out, alive. It goes if what made it in Solid is gone. */
-	release(child: SolidNode): void {
+	/** Takes a child out, alive, wherever it goes next. */
+	private detach(child: SolidNode): void {
 		const index = this.children.indexOf(child);
 		if (index < 0) {
 			return;
@@ -154,12 +180,26 @@ export class SolidNode {
 		} else if (child.host) {
 			this.instance.release(child.host);
 		}
-		if (child.ownerGone) {
-			child.destroy();
+	}
+
+	/** Takes a child out of the tree. It stays alive while what made it in Solid is there, and goes after. */
+	release(child: SolidNode): void {
+		if (this.children.includes(child)) {
+			this.detach(child);
+			if (child.ownerGone) {
+				child.destroy();
+			}
 		}
 	}
 
-	/** Takes every child out and deletes them: the end of a tree. */
+	/** Takes every child out, each going or staying as its owner says: a portal that goes. */
+	releaseAll(): void {
+		for (const child of [...this.children]) {
+			this.release(child);
+		}
+	}
+
+	/** Takes every child out and deletes them: the end of a tree, after its owners are gone. */
 	clear(): void {
 		for (const child of [...this.children]) {
 			child.ownerGone = true;

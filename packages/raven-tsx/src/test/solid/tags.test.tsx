@@ -2,7 +2,7 @@
 /** Solid components as tags of Raven: built by Raven from XML, as `<Button>` is, with no declaration in XML. */
 
 import { afterAll, afterEach, beforeAll, expect, test } from "bun:test";
-import { onCleanup, onMount, type JSX } from "solid-js";
+import { onCleanup, onMount, splitProps, type JSX } from "solid-js";
 import * as r from "../../core/raven";
 import { Border, createWindow, HBox, Label, RavenRoot, registerTag, VBox } from "../../solid/index";
 
@@ -31,6 +31,7 @@ afterEach(() => {
 		done();
 	}
 	r.Rdraw_frame();
+	expect(errors).toEqual([]);
 	errors.length = 0;
 });
 
@@ -143,4 +144,18 @@ test("destroying the widget unmounts the component, and runs its cleanups", asyn
 	await settle();
 	expect(mounted).toBe(0);
 	expect(errors).toEqual([]);
+});
+
+test("an attribute set later reaches the props that splitProps gave out", async () => {
+	function Split(props: BadgeProps): JSX.Element {
+		const [count, rest] = splitProps(props, ["Count"]);
+		return <Label Name="split">{`${rest.Text ?? "none"} ${count.Count ?? 0}`}</Label>;
+	}
+	unregister.push(registerTag("Split", Split, { attributes: { Text: "string", Count: "number" } }));
+	await build('<VBox><Split Name="s"/></VBox>');
+	expect(r.Rlabel_get_text(r.Rwidget_find(find("s"), "split"))).toBe("none 0");
+	expect(r.Rwidget_set_attribute(find("s"), "Count", "5")).toBeTruthy();
+	expect(r.Rwidget_set_attribute(find("s"), "Text", "late")).toBeTruthy();
+	await settle();
+	expect(r.Rlabel_get_text(r.Rwidget_find(find("s"), "split"))).toBe("late 5");
 });

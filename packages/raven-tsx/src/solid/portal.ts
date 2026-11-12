@@ -18,6 +18,7 @@ import { insert } from "./renderer";
 export function Portal(props: { readonly widget: r.Rid; readonly children?: JSX.Element | undefined }): JSX.Element {
 	const container = SolidNode.container(untrack(() => props.widget));
 	insert(container, () => props.children);
-	onCleanup(() => container.clear());
+	// (what it showed goes with its own owner: an element kept in a variable can be shown again)
+	onCleanup(() => container.releaseAll());
 	return undefined;
 }

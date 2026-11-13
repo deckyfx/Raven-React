@@ -6,9 +6,21 @@
   "type": "module",
   "module": "src/core/index.ts",
   "exports": {
-    ".": "./src/core/index.ts",
-    "./react": "./src/react/index.ts",
-    "./solid": "./src/solid/index.ts",
+    ".": {
+      "bun": "./src/core/index.ts",
+      "node": "./dist/node/core/index.js",
+      "default": "./src/core/index.ts"
+    },
+    "./react": {
+      "bun": "./src/react/index.ts",
+      "node": "./dist/node/react/index.js",
+      "default": "./src/react/index.ts"
+    },
+    "./solid": {
+      "bun": "./src/solid/index.ts",
+      "node": "./dist/node/solid/index.js",
+      "default": "./src/solid/index.ts"
+    },
     "./solid/renderer": "./src/solid/renderer.ts",
     "./solid/plugin": "./src/solid/plugin.ts",
     "./solid/preload": "./src/solid/preload.ts"
@@ -63,7 +75,8 @@
     "prepare:publish": "bun run src/tools/prepare-publish.ts",
     "check:consumer": "bun run src/tools/check-consumer.ts",
     "test": "bun test",
-    "typecheck": "bun check"
+    "typecheck": "bun check",
+    "build:node": "bun run src/tools/build-node.ts"
   },
   "dependencies": {
     "@types/babel__core": "^7.20",

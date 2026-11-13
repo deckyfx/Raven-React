@@ -8,7 +8,7 @@ import { existsSync, readdirSync } from "node:fs";
 import { isAbsolute, relative, resolve, sep } from "node:path";
 import { functionsOfBinding, missingFunctions, readStamp, shortCommit, STAMP_FILE, type LibraryStamp } from "../core/library-check";
 import { parseApi, type RavenApi } from "./raven-api";
-import { TARGETS, targetOf, writePlatformPackage } from "./targets";
+import { ADDON_FILE, TARGETS, targetOf, writePlatformPackage } from "./targets";
 
 /** The folder of this package. */
 export const PACKAGE_ROOT = resolve(import.meta.dir, "../..");
@@ -167,6 +167,30 @@ export async function buildLibrary(build: string): Promise<void> {
 	}
 }
 
+/**
+ * Builds the addon of Raven's Node.js binding from a checkout, in its folder `build-node`, and
+ * says where it is. None on Windows, which Raven's CMake leaves out, nor without the headers of
+ * Node.js: the package of the platform then works on Bun only, which is said.
+ */
+export async function buildAddon(checkout: string): Promise<string | undefined> {
+	const build = `${checkout}/build-node`;
+	for (const command of [
+		["cmake", "-S", `${checkout}/bindings/node`, "-B", build, "-DCMAKE_BUILD_TYPE=Release"],
+		["cmake", "--build", build, "--config", "Release", "--parallel"],
+	]) {
+		const result = Bun.spawn(command, { stdout: "pipe", stderr: "pipe" });
+		const [output, errors, code] = await Promise.all([new Response(result.stdout).text(), new Response(result.stderr).text(), result.exited]);
+		if (code !== 0) {
+			fail(`building the addon of the Node.js binding failed:\n${output}${errors}`);
+		}
+	}
+	const addon = [`${build}/${ADDON_FILE}`, `${build}/Release/${ADDON_FILE}`].find((path) => existsSync(path));
+	if (!addon) {
+		console.warn(`no ${ADDON_FILE} built (Windows, or no node_api.h): the package of this platform works on Bun only`);
+	}
+	return addon;
+}
+
 /** Says what is wrong with a library for a binding, or stops. */
 export async function requireFunctions(library: string, binding: string, what: string): Promise<void> {
 	const missing = missingFunctions(functionsOfBinding(binding), Buffer.from(await Bun.file(library).arrayBuffer()));
@@ -287,6 +311,8 @@ export async function packageHostLibrary(options: { readonly build: string; read
 	}
 	const stamp = await makeStamp({ library: libraryPath, checkout, pin, verified, canOpen: true });
 	const manifest = (await Bun.file(`${PACKAGE_ROOT}/package.json`).json()) as { readonly name: string; readonly version: string };
-	await writePlatformPackage({ mainName: manifest.name, version: manifest.version, target, libraryPath, directory: `${PACKAGE_ROOT}/native/${target}`, stamp });
+	// (from the checkout the library was verified against: the same Raven)
+	const addonPath = checkout && verified ? await buildAddon(checkout) : undefined;
+	await writePlatformPackage({ mainName: manifest.name, version: manifest.version, target, libraryPath, addonPath, directory: `${PACKAGE_ROOT}/native/${target}`, stamp });
 	console.log(`native/${target} from ${libraryPath}: ${shortCommit(stamp.commit) || "unknown commit"}, Rget_version ${stamp.version}${verified ? "" : ", NOT checked against the pin"}. Run bun install if it is new.`);
 }

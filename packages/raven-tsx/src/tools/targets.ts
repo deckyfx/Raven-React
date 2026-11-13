@@ -46,6 +46,12 @@ export function argument(name: string): string {
 	return value;
 }
 
+/** The value after a `--name` argument, if it was given. */
+export function optionalArgument(name: string): string | undefined {
+	const index = process.argv.indexOf(`--${name}`);
+	return index >= 0 ? process.argv[index + 1] : undefined;
+}
+
 /**
  * Writes a file beside its place and moves it there: a program running from the old library
  * keeps it, and a program starting now finds a whole one.
@@ -56,26 +62,41 @@ async function replaceFile(path: string, content: Blob | string): Promise<void> 
 	renameSync(beside, path);
 }
 
-/** Writes the package of a platform: the library, its stamp, and the module that says where it is. */
+/** The addon of Raven's Node.js binding, in the package of a platform beside the library. */
+export const ADDON_FILE = "raven_napi.node";
+
+/**
+ * Writes the package of a platform: the library, its stamp, the addon of Raven's Node.js binding
+ * when there is one, and the module that says where the library is (for Bun, which embeds it in an
+ * executable, and for Node.js).
+ */
 export async function writePlatformPackage(options: {
 	readonly mainName: string;
 	readonly version: string;
 	readonly target: string;
 	readonly libraryPath: string;
+	/** The addon of Raven's Node.js binding, built for this platform: none on Windows yet. */
+	readonly addonPath?: string | undefined;
 	readonly directory: string;
 	readonly licensesFrom?: string;
 	/** What the library is, for `raven.json`. */
 	readonly stamp: LibraryStamp;
 }): Promise<void> {
-	const { mainName, version, target, libraryPath, licensesFrom, stamp } = options;
+	const { mainName, version, target, libraryPath, addonPath, licensesFrom, stamp } = options;
 	const { os, cpu, library } = targetOf(target);
-	const files = ["index.ts", library, STAMP_FILE];
+	const files = ["index.ts", "index.js", library, STAMP_FILE];
 	// (absolute: removing a path that holds ".." fails on Windows, in Bun.$ and in rmSync)
 	const directory = resolve(options.directory);
 	mkdirSync(directory, { recursive: true });
 	await replaceFile(`${directory}/${library}`, Bun.file(libraryPath));
 	await replaceFile(`${directory}/${STAMP_FILE}`, `${JSON.stringify(stamp, null, 2)}\n`);
 	await replaceFile(`${directory}/index.ts`, `import path from "./${library}" with { type: "file" };\n\nexport default path;\n`);
+	// (Node.js has no import of a file: the path is beside this module)
+	await replaceFile(`${directory}/index.js`, `import { fileURLToPath } from "node:url";\n\nexport default fileURLToPath(new URL("./${library}", import.meta.url));\n`);
+	if (addonPath) {
+		await replaceFile(`${directory}/${ADDON_FILE}`, Bun.file(addonPath));
+		files.push(ADDON_FILE);
+	}
 	for (const name of ["LICENSE", "NOTICE", "THIRD_PARTY.md"]) {
 		if (licensesFrom && (await Bun.file(`${licensesFrom}/${name}`).exists())) {
 			await replaceFile(`${directory}/${name}`, Bun.file(`${licensesFrom}/${name}`));
@@ -90,7 +111,7 @@ export async function writePlatformPackage(options: {
 		type: "module",
 		os: [os],
 		cpu: [cpu],
-		exports: { ".": "./index.ts" },
+		exports: { ".": { bun: "./index.ts", node: "./index.js", default: "./index.ts" } },
 		files,
 		repository: mainManifest.repository,
 	};

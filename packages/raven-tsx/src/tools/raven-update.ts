@@ -14,7 +14,7 @@ import { shortCommit } from "../core/library-check";
 import { existsSync } from "node:fs";
 import { countOf, diffApi, formatDiff, newCallbackSetters } from "./raven-api";
 import { driftCountAt } from "./raven-drift";
-import { apiAt, checkoutPath, commitOf, fail, fileAt, flag, git, nameOf, packageHostLibrary, PACKAGE_ROOT, readPin, writePin } from "./raven-pin";
+import { apiAt, checkoutPath, commitOf, fail, fileAt, flag, git, nameOf, packageHostLibrary, PACKAGE_ROOT, readPin, VENDORED_BINDINGS, writePin } from "./raven-pin";
 
 const checkout = checkoutPath();
 const remote = git(checkout, "remote", "get-url", "upstream") ? "upstream" : "origin";
@@ -80,9 +80,11 @@ if (!dryRun) {
 }
 await run("link it", ["bun", "install"], `${PACKAGE_ROOT}/../..`);
 
-console.log("- take the binding of the new pin");
+console.log("- take the bindings of the new pin");
 if (!dryRun) {
-	await Bun.write(`${PACKAGE_ROOT}/src/vendor/raven.ts`, fileAt(checkout, commit, "bindings/bun/src/raven.ts") ?? fail(`${shortCommit(commit)} has no binding`));
+	for (const { inRaven, copy } of VENDORED_BINDINGS) {
+		await Bun.write(copy, fileAt(checkout, commit, inRaven) ?? fail(`${shortCommit(commit)} has no ${inRaven}`));
+	}
 }
 console.log("- write RAVEN_VERSION");
 if (!dryRun) {

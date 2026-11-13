@@ -24,7 +24,7 @@ test("the check sees every way of importing a framework", () => {
 		'import type { ReactNode } from "react";',
 		'export type { ReactNode } from "react";',
 		'import ReactReconciler from "react-reconciler";',
-		'import { DefaultEventPriority } from "react-reconciler/constants";',
+		'import { DefaultEventPriority } from "react-reconciler/constants.js";',
 		'import { createSignal } from "solid-js";',
 		'import "react";',
 		'const dynamic = await import("solid-js/universal");',

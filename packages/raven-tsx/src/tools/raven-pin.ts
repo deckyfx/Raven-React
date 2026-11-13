@@ -15,6 +15,15 @@ export const PACKAGE_ROOT = resolve(import.meta.dir, "../..");
 const PIN_FILE = `${PACKAGE_ROOT}/RAVEN_VERSION`;
 const BINDING_FILE = `${PACKAGE_ROOT}/src/vendor/raven.ts`;
 const BINDING_IN_RAVEN = "bindings/bun/src/raven.ts";
+/**
+ * The bindings this package carries, as Raven has them at a commit: the Bun one, and the Node.js
+ * one (its module and its types; its addon is built per platform, see `native:local`).
+ */
+export const VENDORED_BINDINGS: readonly { readonly inRaven: string; readonly copy: string }[] = [
+	{ inRaven: BINDING_IN_RAVEN, copy: BINDING_FILE },
+	{ inRaven: "bindings/node/src/raven.js", copy: `${PACKAGE_ROOT}/src/vendor/node/raven.js` },
+	{ inRaven: "bindings/node/src/raven.d.ts", copy: `${PACKAGE_ROOT}/src/vendor/node/raven.d.ts` },
+];
 /** What decides what a library holds. A change anywhere else does not make it another library. */
 const BUILD_PATHS = ["src", "include", "third_party", "cmake", "CMakeLists.txt", "bindings/bun"];
 
@@ -186,14 +195,17 @@ export const hostTarget = (): string => `${process.platform}-${process.arch}`;
 
 /** The checks of the binding against the pin. */
 export async function checkBinding(checkout: string, pinCommit: string): Promise<Finding> {
-	const wanted = fileAt(checkout, pinCommit, BINDING_IN_RAVEN);
-	if (wanted === null) {
-		return { name: "binding", ok: false, detail: `${shortCommit(pinCommit)} has no ${BINDING_IN_RAVEN}` };
+	for (const { inRaven, copy } of VENDORED_BINDINGS) {
+		const wanted = fileAt(checkout, pinCommit, inRaven);
+		if (wanted === null) {
+			return { name: "binding", ok: false, detail: `${shortCommit(pinCommit)} has no ${inRaven}` };
+		}
+		const file = Bun.file(copy);
+		if (!(await file.exists()) || sameLines(await file.text()) !== sameLines(wanted)) {
+			return { name: "binding", ok: false, detail: `${relative(PACKAGE_ROOT, copy)} is not the one of the pin: bun run sync-binding` };
+		}
 	}
-	const same = sameLines(await Bun.file(BINDING_FILE).text()) === sameLines(wanted);
-	return same
-		? { name: "binding", ok: true, detail: "src/vendor/raven.ts is the one of the pin" }
-		: { name: "binding", ok: false, detail: "src/vendor/raven.ts is not the one of the pin: bun run sync-binding" };
+	return { name: "binding", ok: true, detail: "the bindings in src/vendor are those of the pin" };
 }
 
 /** The check of a packaged library against the pin. */

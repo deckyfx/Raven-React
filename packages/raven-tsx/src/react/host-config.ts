@@ -1,6 +1,6 @@
 import { createContext, type ReactNode } from "react";
 import ReactReconciler from "react-reconciler";
-import { DefaultEventPriority, DiscreteEventPriority } from "react-reconciler/constants";
+import { DefaultEventPriority, DiscreteEventPriority } from "react-reconciler/constants.js";
 import { RavenError } from "../core/errors";
 import * as r from "../core/raven";
 import { eventScope } from "../core/events";

@@ -5,11 +5,11 @@
  * would keep every function it was given alive for ever.
  */
 
-import "./native";
+import "#native";
 import type { Pointer } from "bun:ffi";
 import { addressOf, callFunction, nativeCallback } from "#backend";
 import type { NativeCallback } from "./backend/types";
-import { Rset_frame_callback as connectNative, type RFrameCallback, type RPointer } from "../vendor/raven";
+import { Rset_frame_callback as connectNative, type RFrameCallback, type RPointer } from "#raven";
 
 /** What is called at each frame, with the seconds since the last one. */
 export type FrameHandler = (deltaSeconds: number) => void;

@@ -18,6 +18,16 @@
       "bun": "./src/core/backend/bun.ts",
       "node": "./src/core/backend/node.ts",
       "default": "./src/core/backend/bun.ts"
+    },
+    "#native": {
+      "bun": "./src/core/native.ts",
+      "node": "./src/core/native-node.ts",
+      "default": "./src/core/native.ts"
+    },
+    "#raven": {
+      "bun": "./src/vendor/raven.ts",
+      "node": "./src/vendor/node/raven.js",
+      "default": "./src/vendor/raven.ts"
     }
   },
   "engines": {

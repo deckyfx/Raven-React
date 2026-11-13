@@ -944,7 +944,8 @@ test("a Window and a widget take what is dropped", async () => {
 	const windows = new RavenRoot();
 	windows.render(<Window ref={owner} OnDrop={() => true}><VBox OnDrop={() => true} /></Window>);
 	await settle();
-	expect(eventStats().handlers).toBe(2);
+	// (the OnDrop of each, and what an open window is told when the user closes it)
+	expect(eventStats().handlers).toBe(3);
 	windows.unmount();
 	expect(eventStats().handlers).toBe(0);
 });

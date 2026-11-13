@@ -165,6 +165,8 @@ export class WindowInstance implements HostNode {
 		this.draining = true;
 		try {
 			closeEvents.set(window, this.resolved.handlers.get("OnClose"));
+			// (with no OnClose, the user closes it at any time: what its openings gave runs then)
+			closeEvents.notice(window, () => this.closedByUser());
 			setWindowEvents(window, this.resolved.handlers);
 			// (each child goes in, also past one that fails: then the window goes, with all of them)
 			// (one at a time: one that user code released meanwhile is no longer waiting here. And not
@@ -367,6 +369,7 @@ export class WindowInstance implements HostNode {
 			this.keptNative.push(widget);
 		}
 		closeEvents.set(this.id, undefined, false);
+		closeEvents.notice(this.id, undefined, false);
 		for (const event of Object.values(WINDOW_EVENTS)) {
 			event.off(this.id, false);
 		}
@@ -376,8 +379,9 @@ export class WindowInstance implements HostNode {
 		this.id = r.R_INVALID_ID;
 		this.content = null;
 		this.state = "pending";
-		// (before those that still waited: closed while it opened, it had placed these first)
-		this.initial.unshift(...children, ...(island ? [island] : []));
+		// (before those that still waited: closed while it opened, it had placed these first. The island
+		// first: another Island among the children would take its place)
+		this.initial.unshift(...(island ? [island] : []), ...children);
 		// (last: a cleanup sees the window closed)
 		for (const cleanup of cleanups) {
 			attempt(failures, cleanup);
@@ -406,7 +410,17 @@ export class WindowInstance implements HostNode {
 		this.content?.rememberTree();
 		this.island?.rememberTree();
 		closeEvents.set(this.id, this.resolved.handlers.get("OnClose"));
+		closeEvents.notice(this.id, () => this.closedByUser());
 		setWindowEvents(this.id, this.resolved.handlers);
+	}
+
+	/** The user closed it, with no OnClose to ask: Raven destroys it now. What its openings gave runs. */
+	private closedByUser(): void {
+		const failures: unknown[] = [];
+		for (const cleanup of this.takeClosing()) {
+			attempt(failures, cleanup);
+		}
+		throwFirst(failures);
 	}
 
 	/** What holds it in the tree, to know whether that is shown: a window opens only then. */
@@ -544,6 +558,12 @@ export class WindowInstance implements HostNode {
 	}
 
 	insertBefore(child: HostNode, before: HostNode): void {
+		// (while it closes, its children are still in its content, to wait for the next opening in
+		// their order: one put before one of them goes there, and waits with them)
+		if (this.state === "closing" && this.content && before !== this.island && this.content.has(before)) {
+			this.content.insertBefore(child, before);
+			return;
+		}
 		if (this.state !== "live") {
 			this.releaseInitial(child);
 			const index = this.initial.indexOf(before);
@@ -593,6 +613,7 @@ export class WindowInstance implements HostNode {
 		this.content?.forgetTree();
 		this.island?.forgetTree();
 		closeEvents.set(this.id, undefined, false);
+		closeEvents.notice(this.id, undefined, false);
 		for (const event of Object.values(WINDOW_EVENTS)) {
 			event.off(this.id, false);
 		}
@@ -633,6 +654,9 @@ export class WindowInstance implements HostNode {
 		}
 		attempt(failures, () => this.content?.disposeDetached());
 		attempt(failures, () => this.island?.disposeDetached());
+		// (what it asked of Raven goes: a window forgotten first has none, one disposed directly still does)
+		closeEvents.set(this.id, undefined, false);
+		closeEvents.notice(this.id, undefined, false);
 		if (this.isOpen) {
 			r.Rwindow_destroy(this.id);
 		}

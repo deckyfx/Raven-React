@@ -492,6 +492,11 @@ export class WidgetInstance implements HostNode {
 		return top.shown && (top.tag === "" || top.holder !== null);
 	}
 
+	/** Whether a node is one of its children. */
+	has(child: HostNode): boolean {
+		return this.children.includes(child);
+	}
+
 	/** Says whether the tree it is the top of is shown: the content of a window that closes is not. */
 	setShown(shown: boolean): void {
 		this.shown = shown;

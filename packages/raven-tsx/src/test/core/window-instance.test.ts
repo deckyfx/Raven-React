@@ -857,6 +857,59 @@ test("a window a cleanup adds while the window that holds it is disposed does no
 	expect([inner.isOpen, added.isOpen]).toEqual([false, false]);
 });
 
+test("a window the user closes runs what its openings gave, once", () => {
+	const window = WindowInstance.create(WINDOW);
+	window.materialize();
+	let cleanups = 0;
+	window.whenOpen(() => () => void cleanups++);
+	// (as the close button of its title bar: with no OnClose, Raven closes it)
+	r.Rwindow_close(window.window);
+	expect([window.isOpen, cleanups]).toEqual([false, 1]);
+	window.close();
+	window.dispose();
+	expect(cleanups).toBe(1);
+});
+
+test("the island of a window is still its island when it opens again, beside another Island", () => {
+	const window = WindowInstance.create(WINDOW);
+	const first = WidgetInstance.create("Island", { Name: "first" });
+	const second = WidgetInstance.create("Island", { Name: "second" });
+	window.appendInitial(first);
+	window.appendInitial(second);
+	window.materialize();
+	expect(r.Rwindow_get_island(window.window)).toBe(first.widget);
+	window.close();
+	window.materialize();
+	expect(r.Rwindow_get_island(window.window)).toBe(first.widget);
+	window.forgetTree();
+	window.dispose();
+});
+
+test("a child put before another while the window closes keeps that place when it opens again", () => {
+	const window = WindowInstance.create(WINDOW);
+	const first = WidgetInstance.create("Label", { Name: "a", Text: "a" });
+	const box = WidgetInstance.create("VBox", { Name: "b" });
+	const added = WidgetInstance.create("Label", { Name: "c", Text: "c" });
+	const inner = WindowInstance.create(WINDOW);
+	let once = true;
+	inner.whenOpen(() => () => {
+		if (once) {
+			once = false;
+			window.insertBefore(added, box);
+		}
+	});
+	box.append(inner);
+	window.appendInitial(first);
+	window.appendInitial(box);
+	window.materialize();
+	window.close();
+	window.materialize();
+	const content = r.Rwidget_find(window.window, CONTENT_NAME);
+	expect(Array.from({ length: r.Rwidget_get_child_count(content) }, (_, index) => r.Rwidget_get_name(r.Rwidget_get_child(content, index)))).toEqual(["a", "c", "b"]);
+	window.forgetTree();
+	window.dispose();
+});
+
 test("a function that throws as soon as whenOpen runs it is not kept", () => {
 	const window = WindowInstance.create(WINDOW);
 	window.materialize();

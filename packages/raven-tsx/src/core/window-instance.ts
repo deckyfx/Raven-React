@@ -474,7 +474,9 @@ export class WindowInstance implements HostNode {
 		this.island = child;
 		child.setHolder(set);
 		set(child.widget);
-		// (an island kept while the window was closed opens the windows in it again)
+		// (an island kept while the window was closed opens the windows in it again; one a deleted
+		// tree let go, alive, gets back its handlers first)
+		child.rememberTree();
 		child.openWindows();
 		return true;
 	}

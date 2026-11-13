@@ -306,6 +306,8 @@ export class WidgetInstance implements HostNode {
 	private placing = false;
 	/** Its handlers were forgotten (`forgetTree`): placed again alive, it gets them back. */
 	private forgotten = false;
+	/** Counts the passes that close or open the windows in it: a newer one ends the one under way. */
+	private windowsPass = 0;
 
 	private constructor(
 		private id: r.Rid,
@@ -889,8 +891,13 @@ export class WidgetInstance implements HostNode {
 	closeWindows(): void {
 		// (all of them, also past one that throws)
 		const failures: unknown[] = [];
+		const pass = ++this.windowsPass;
 		for (const child of [...this.children]) {
-			// (a cleanup of one may have moved another away: it is no longer this one's to close)
+			// (a cleanup of one may have shown this tree again, opening its windows: this pass is over)
+			if (this.windowsPass !== pass) {
+				break;
+			}
+			// (or moved another away: it is no longer this one's to close)
 			if (this.children.includes(child)) {
 				attempt(failures, () => child.closeWindows());
 			}
@@ -900,7 +907,12 @@ export class WidgetInstance implements HostNode {
 
 	openWindows(): void {
 		const failures: unknown[] = [];
+		const pass = ++this.windowsPass;
 		for (const child of [...this.children]) {
+			// (and one that closes them again ends this one)
+			if (this.windowsPass !== pass) {
+				break;
+			}
 			if (this.children.includes(child)) {
 				attempt(failures, () => child.openWindows());
 			}

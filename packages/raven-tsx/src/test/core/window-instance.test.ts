@@ -737,6 +737,53 @@ test("a function that opens its window again and then throws has what it gave th
 	window.dispose();
 });
 
+test("windows that a cleanup shows again while they close stay open", () => {
+	const window = WindowInstance.create(WINDOW);
+	window.materialize();
+	const other = WidgetInstance.create("VBox", { Name: "other" });
+	const box = WidgetInstance.create("VBox", { Name: "box" });
+	window.append(other);
+	window.append(box);
+	const first = WindowInstance.create(WINDOW);
+	const second = WindowInstance.create(WINDOW);
+	box.append(first);
+	box.append(second);
+	let once = true;
+	first.whenOpen(() => () => {
+		if (once) {
+			once = false;
+			other.append(box);
+		}
+	});
+	window.release(box);
+	box.closeWindows();
+	expect([first.isOpen, second.isOpen]).toEqual([true, true]);
+	window.forgetTree();
+	window.dispose();
+});
+
+test("an island whose handlers were forgotten gets them back in the window that takes it", () => {
+	const first = WindowInstance.create(WINDOW);
+	const second = WindowInstance.create(WINDOW);
+	first.materialize();
+	second.materialize();
+	const island = WidgetInstance.create("Island", {});
+	let clicks = 0;
+	const button = WidgetInstance.create("Button", { Name: "button", OnClicked: () => void clicks++ });
+	island.append(button);
+	first.append(island);
+	expect(island.placed).toBe(true);
+	// (as a tree being deleted does, before a cleanup takes the island elsewhere)
+	first.release(island);
+	island.forgetTree();
+	second.append(island);
+	r.Raction_fire(r.Rwidget_get_action(button.widget) ?? "", button.widget);
+	expect(clicks).toBe(1);
+	first.dispose();
+	second.forgetTree();
+	second.dispose();
+});
+
 test("a function that throws as soon as whenOpen runs it is not kept", () => {
 	const window = WindowInstance.create(WINDOW);
 	window.materialize();

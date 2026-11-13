@@ -1,6 +1,7 @@
-import { onCleanup, untrack, type JSX } from "solid-js";
+import { untrack, type JSX } from "solid-js";
 import type * as r from "../core/raven";
 import { SolidNode } from "./node";
+import { onTeardown } from "./teardown";
 import { insert } from "./renderer";
 
 /**
@@ -18,8 +19,9 @@ import { insert } from "./renderer";
 export function Portal(props: { readonly widget: r.Rid; readonly children?: JSX.Element | undefined }): JSX.Element {
 	const container = SolidNode.container(untrack(() => props.widget));
 	// (what it showed goes with its own owner: an element kept in a variable can be shown again. Set
-	// first: children that fail after some were placed take those away too)
-	onCleanup(() => container.releaseAll());
+	// first: children that fail after some were placed take those away too. With the root as well:
+	// a cleanup beside it that throws stops Solid's others)
+	onTeardown(() => container.releaseAll());
 	insert(container, () => props.children);
 	return undefined;
 }

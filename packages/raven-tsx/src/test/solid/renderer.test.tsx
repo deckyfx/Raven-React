@@ -1036,6 +1036,61 @@ test("a widget put before the text of a widget, the text staying, is refused at 
 	expect(button.children).toEqual([text]);
 });
 
+test("a Portal takes its children away when a cleanup beside it throws", async () => {
+	const box = r.Rwidget_create_from_xml('<VBox Name="by-hand"/>');
+	function Shown(): JSX.Element {
+		// (the portal first: Solid runs cleanups last first, so the one that throws runs before its own)
+		const portal = (
+			<Portal widget={box}>
+				<Label Name="in-portal">in</Label>
+			</Portal>
+		);
+		onCleanup(() => {
+			throw new Error("from a cleanup");
+		});
+		return portal;
+	}
+	await mount(() => <Shown />);
+	expect(r.Rwidget_get_child_count(box)).toBe(1);
+	expect(() => root?.unmount()).toThrow("from a cleanup");
+	expect(r.Rwidget_get_child_count(box)).toBe(0);
+	r.Rwidget_destroy(box);
+});
+
+test("the ref of a widget runs under the owner of its element: what it makes goes with it", async () => {
+	const [shown, setShown] = createSignal(true);
+	let ticks = 0;
+	await mount(() => (
+		<VBox>
+			<Show when={shown()}>
+				<Label ref={() => createFrame(() => void ticks++)}>ticking</Label>
+			</Show>
+		</VBox>
+	));
+	expect(ticks).toBeGreaterThan(0);
+	setShown(false);
+	const before = ticks;
+	await settle();
+	expect(ticks).toBe(before);
+});
+
+test("a ref of a widget that throws reaches the ErrorBoundary around it", async () => {
+	await mount(() => (
+		<VBox>
+			<ErrorBoundary fallback={(error: Error) => <Label Name="caught">{error.message}</Label>}>
+				<Label
+					ref={() => {
+						throw new Error("from a ref");
+					}}
+				>
+					inside
+				</Label>
+			</ErrorBoundary>
+		</VBox>
+	));
+	expect(text("caught")).toBe("from a ref");
+});
+
 test("a component whose cleanup throws still stops its actions", async () => {
 	let fired = 0;
 	function Stale(): JSX.Element {

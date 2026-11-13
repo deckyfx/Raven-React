@@ -46,6 +46,24 @@ test("nothing in the core imports a framework or an adapter", async () => {
 	expect(found).toEqual([]);
 });
 
+test("only the backend of Bun imports bun:ffi to run: the rest runs on Node.js too", async () => {
+	// (a type is erased: `import type` and `type` names are allowed anywhere)
+	const runtimeImport = /^\s*import\s+(?!type\b)(?:[^"';]*\bfrom\s*)?["']bun:ffi["']/m;
+	const found: string[] = [];
+	for (const folder of ["core", "react", "solid"]) {
+		const base = `${import.meta.dir}/../../${folder}`;
+		for (const file of await Array.fromAsync(new Bun.Glob("**/*.ts").scan({ cwd: base }))) {
+			const source = await Bun.file(`${base}/${file}`).text();
+			if (runtimeImport.test(source) && `${folder}/${file}` !== "core/backend/bun.ts") {
+				found.push(`${folder}/${file}`);
+			}
+		}
+	}
+	expect(found).toEqual([]);
+	expect(runtimeImport.test('import { dlopen } from "bun:ffi";')).toBe(true);
+	expect(runtimeImport.test('import type { Pointer } from "bun:ffi";')).toBe(false);
+});
+
 test("importing the core loads no framework", () => {
 	const script = `await import(${JSON.stringify(`${CORE}/index.ts`)}); const loaded = Object.keys(require.cache); console.log(loaded.some((path) => /core[\\\\/]index\\.ts$/.test(path))); console.log(loaded.filter((path) => /node_modules[\\\\/](react|react-reconciler|solid-js)[\\\\/]/.test(path)).join(","));`;
 	const run = Bun.spawnSync(["bun", "-e", script], { stdout: "pipe", stderr: "pipe" });

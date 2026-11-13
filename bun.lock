@@ -229,7 +229,7 @@
     },
     "packages/raven-tsx": {
       "name": "@decky.fx/raven-tsx",
-      "version": "0.1.1",
+      "version": "0.1.2",
       "dependencies": {
         "@types/babel__core": "^7.20",
         "@types/react": "^19",
@@ -261,7 +261,7 @@
     },
     "packages/raven-tsx/native/linux-x64": {
       "name": "@decky.fx/raven-tsx-linux-x64",
-      "version": "0.1.0",
+      "version": "0.1.2",
     },
     "packages/raven-tsx/native/win32-x64": {
       "name": "@decky.fx/raven-tsx-win32-x64",

@@ -732,6 +732,96 @@ test("a NodeGraph is filled by Markup, and says what the user does", async () =>
 	expect(contexts[0]?.[0]).toBe(a);
 });
 
+test("a NodeGraph says a double click on its empty canvas, where, in place of framing its nodes", async () => {
+	const activated: number[][] = [];
+	await mount(
+		<VBox>
+			<NodeGraph Name="g" Height={300} Markup={'<Node Name="a" Title="A" X="40" Y="40"/>'} OnCanvasActivated={(x, y) => activated.push([x, y])} />
+		</VBox>,
+	);
+	await settle();
+	const graph = find("g");
+	const [x, y, width, height] = r.Rwidget_get_rect(graph);
+	// (far from the node: the empty canvas. The point comes in the units of the canvas)
+	const [canvasX, canvasY] = r.Rnode_graph_to_canvas(graph, width - 40, height - 40);
+	clickAt(x + width - 40, y + height - 40, r.R_MOUSE_LEFT, 2);
+	expect(activated.length).toBe(1);
+	expect(activated[0]?.[0]).toBeCloseTo(canvasX, 1);
+	expect(activated[0]?.[1]).toBeCloseTo(canvasY, 1);
+});
+
+test("a NodeGraph says a pin clicked, and a wire dropped on no pin, with where", async () => {
+	const clicked: number[][] = [];
+	const dropped: number[][] = [];
+	await mount(
+		<VBox>
+			<NodeGraph
+				Name="g"
+				Height={300}
+				Markup={'<Node Name="a" Title="A" X="40" Y="40"><Output Name="o" Label="O"/></Node>'}
+				OnPinClicked={(pin, x, y) => clicked.push([pin, x, y])}
+				OnWireDropped={(pin, x, y) => dropped.push([pin, x, y])}
+			/>
+		</VBox>,
+	);
+	await settle();
+	const graph = find("g");
+	const pin = r.Rnode_graph_find_pin(graph, r.Rnode_graph_find_node(graph, "a"), "o");
+	const [pinX, pinY] = r.Rnode_graph_get_pin_position(graph, pin);
+	// (the canvas starts with its corner at the corner of the widget)
+	const [x, y] = r.Rwidget_get_rect(graph);
+	// (the points come in the units of the canvas)
+	const [pressX, pressY] = r.Rnode_graph_to_canvas(graph, pinX, pinY);
+	clickAt(x + pinX, y + pinY);
+	expect(clicked.length).toBe(1);
+	expect(clicked[0]?.[0]).toBe(pin);
+	expect(clicked[0]?.[1]).toBeCloseTo(pressX, 1);
+	expect(clicked[0]?.[2]).toBeCloseTo(pressY, 1);
+	// (a wire from the pin, dropped on the empty canvas)
+	r.Rwindow_inject_mouse_move(window, x + pinX, y + pinY);
+	r.Rwindow_inject_mouse_button(window, r.R_MOUSE_LEFT, 1);
+	r.Rdraw_frame();
+	r.Rwindow_inject_mouse_move(window, x + pinX + 120, y + pinY + 140);
+	r.Rdraw_frame();
+	r.Rwindow_inject_mouse_button(window, r.R_MOUSE_LEFT, 0);
+	const [dropX, dropY] = r.Rnode_graph_to_canvas(graph, pinX + 120, pinY + 140);
+	expect(dropped.length).toBe(1);
+	expect(dropped[0]?.[0]).toBe(pin);
+	expect(dropped[0]?.[1]).toBeCloseTo(dropX, 1);
+	expect(dropped[0]?.[2]).toBeCloseTo(dropY, 1);
+});
+
+test("a TextEditor gives the tooltip of the text under the pointer, at its line and column", async () => {
+	const asked: number[][] = [];
+	await mount(
+		<VBox>
+			<TextEditor
+				Name="e"
+				Height={200}
+				Text={"alpha beta"}
+				OnHover={(line, column) => {
+					asked.push([line, column]);
+					return `at ${line}:${column}`;
+				}}
+			/>
+		</VBox>,
+	);
+	await settle();
+	const editor = find("e");
+	const [x, y] = r.Rwidget_get_rect(editor);
+	// (over the first word: Raven asks the function, and shows what it gives)
+	for (const dx of [24, 30, 36, 42, 48, 54, 60, 66, 72, 78]) {
+		r.Rwindow_inject_mouse_move(window, x + dx, y + 10);
+		r.Rdraw_frame();
+		if (asked.length > 0) {
+			break;
+		}
+	}
+	expect(asked.length).toBeGreaterThan(0);
+	const [line, column] = asked.at(-1) ?? [];
+	expect(r.Rwidget_get_tooltip(editor)).toBe(`at ${line}:${column}`);
+});
+
 test("a BlockEditor gives the block that changed", async () => {
 	const changed: number[] = [];
 	const editor = createRef<WidgetInstance>();

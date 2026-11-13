@@ -84,7 +84,7 @@ f2ac3611c2ad9958a95bfed67ed5b102add36cea 32722ad src/widget/style.c
 5b373204d376db643688a8d5fe59e3d5f518676a 899a268 src/widget/touch.c
 d8f57ce502598cc92dc8fc71f36ab7c6c5b38fb7 8c6770a src/widget/widget.c
 d0e807750fe546e8f9af739d1da0ecff3b2dd346 32722ad src/widget/widget.h
-bfdcc08637e93b211379f0baf06dfaae91a99aef 8c6770a src/widget/window.c
+6de6119e8a1439d8a98d7516615cc12250316617 1b769ee src/widget/window.c
 6c521f32f01969f23096858c6d823105d3e0f9f3 1092a82 src/widgets/background_blur.c
 2ff2d3f5ade2315cd1293c0dd06e44b9dda16f80 1092a82 src/widgets/block_editor.c
 04be0253a84ef3535f78486ff5594956893b0c4d a472444 src/widgets/border.c
@@ -99,7 +99,7 @@ d985dea4ae5e6192ecba534e8049df137bb875d1 1092a82 src/widgets/button.c
 ee31f07d75be458eae127dc98ed0157df85cbaee 1092a82 src/widgets/common.c
 07845fcf61d7e60f677672964be86289f88e4ac7 32722ad src/widgets/common.h
 a08393bb59f33901937c3c2a69bdfe7e6e82071a ede33eb src/widgets/date_picker.c
-8d2d1f2eda5d92bc267da6f8cacef4a789a50f21 1092a82 src/widgets/dialogs.c
+310aceab2a4198c8104aaca3818c65f420fae4c0 1b769ee src/widgets/dialogs.c
 894135ae1700abdbb2db762a211350e54f59d4e1 1092a82 src/widgets/dock_area.c
 2af38f229014b75943fe6d22f19bf2c882ec6dc1 1092a82 src/widgets/expander.c
 63f13f58ac6d86688e85b453aae3382e0f0edb82 1092a82 src/widgets/file_browser.c
@@ -111,7 +111,7 @@ d152de046588f200d15edf5ab14605b91527987f 1092a82 src/widgets/header_bar.c
 1d4f6202c7662caf0e95905f967d0dfd90145ec6 1092a82 src/widgets/list_view.c
 ae51f9e41c2a48e538f450a1013923a57fe08aa8 1092a82 src/widgets/markdown.c
 ae46bac0c6932abf1c082ffe1d817acc10b78f37 0ec1fa5 src/widgets/menu.c
-db59baef1810e2261d03ca3c994fd8d289100687 ede33eb src/widgets/node_graph.c
+568146d5ffa37079018f7e5eb56abbf955518848 1b769ee src/widgets/node_graph.c
 c439f4ccb03f11ebf3f31f1ee88837e2558c7ea2 1092a82 src/widgets/overlay.c
 8354b382ce7981103fabda78b0d2a425b6b0c253 1092a82 src/widgets/pagination.c
 0881813fcd70a46f85d4b6618201229d2079d14c 1092a82 src/widgets/platform_looks.c
@@ -124,10 +124,10 @@ aea21cb55e35d639c2d45ec7c84687504bd3c61e 1092a82 src/widgets/slider.c
 dfe3c57e3ca4448782adf4fafb574db6f5dfb31e 1092a82 src/widgets/spin_box.c
 22503048c048cc8944a83f9518e5eb4bb3924657 1092a82 src/widgets/splitter.c
 c7f4dbab6282a537210517e6117ae4cfc9895639 1092a82 src/widgets/switcher.c
-8b206df31b7ff440acf770593dbe77628f73d40d 1092a82 src/widgets/syntax.c
+2d1dd2abd51af56f8fbf1087c6efee61291d610f 1b769ee src/widgets/syntax.c
 f99fda0cdaf5bbf1b99aa5d71a4e295c2e6fd50c 1092a82 src/widgets/tab_view.c
 f917ab1068aa2eb4582930fdbbc0a15909d5c1ef 1092a82 src/widgets/table.c
-ffc143721a362b1276c7a1e5ab36aa59ff0c655c 7f4411c src/widgets/text_editor.c
+280b8da8404ae17d8b02c84c0d2aa4fcecee9f57 1b769ee src/widgets/text_editor.c
 ac46ceffaa032fb6774438173641089a46b473c8 1092a82 src/widgets/text_input.c
 099804f6674bcef70a2cc7b2ffbd139dce6a2c2a 1092a82 src/widgets/textedit.c
 012bfccbd9edb4d14db645605b5888468ec09e40 1092a82 src/widgets/tile_view.c

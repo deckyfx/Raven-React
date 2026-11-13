@@ -1,9 +1,8 @@
-import { CString, JSCallback, ptr, toArrayBuffer, type FFITypeOrString, type Pointer } from "bun:ffi";
+import type { Pointer } from "bun:ffi";
+import { nativeCallback } from "#backend";
+import type { NativeArg, NativeCallback, NativeValue, StructType } from "./backend/types";
 import * as r from "./raven";
 import type { EventHandler } from "./props";
-
-/** The second argument of a native callback, before it is decoded. */
-type RawValue = number | Pointer | null;
 
 /** Connects a native callback to a widget. Each kind of widget has its own function in the C API. */
 type Connect = (widget: r.Rid, callback: Pointer | null) => void;
@@ -138,16 +137,16 @@ export const controlledSync = new ControlledSync();
 
 /**
  * One event of one kind of widget, such as the change of a TextInput. It owns one native
- * callback, shared by all the widgets: a JSCallback per handler would stay alive for
+ * callback, shared by all the widgets: on Bun, a JSCallback per handler would stay alive for
  * ever, and an interface that changes would make many.
  */
 class NativeEvent {
 	private readonly handlers = new Map<r.Rid, EventHandler>();
-	private callback: JSCallback | null = null;
+	private callback: NativeCallback | null = null;
 
 	constructor(
 		private readonly connect: Connect,
-		private readonly make: (handlerOf: (widget: r.Rid) => EventHandler | undefined) => JSCallback,
+		private readonly make: (handlerOf: (widget: r.Rid) => EventHandler | undefined) => NativeCallback,
 	) {}
 
 	/** Sets the function of a widget. */
@@ -156,7 +155,7 @@ class NativeEvent {
 		this.handlers.set(widget, handler);
 		if (!known) {
 			this.callback ??= this.make((id) => this.handlers.get(id));
-			this.connect(widget, this.callback.ptr);
+			this.connect(widget, this.callback);
 		}
 	}
 
@@ -183,140 +182,122 @@ class NativeEvent {
 	}
 }
 
+/** The widget a native callback was called for: its first argument. */
+const widgetOf = (value: NativeValue | undefined): r.Rid => Number(value);
+/** A number C gave, as the function receives it. */
+const numberOf = (value: NativeValue | undefined): number => Number(value);
+
 /** An event that gives one value to its function. */
-function valueEvent<V>(connect: Connect, rawType: FFITypeOrString, decode: (raw: RawValue) => V): NativeEvent {
-	return new NativeEvent(connect, (handlerOf) => new JSCallback(
-		(widget: number, raw: RawValue): void => {
-			const handler = handlerOf(widget) as ((value: V) => void) | undefined;
-			if (handler) {
-				eventScope.run(() => handler(decode(raw)), () => controlledSync.run(widget));
-			}
-		},
-		{ args: ["u32", rawType, "ptr"], returns: "void" },
-	));
+function valueEvent<V>(connect: Connect, arg: NativeArg, convert: (value: NativeValue) => V): NativeEvent {
+	return new NativeEvent(connect, (handlerOf) => nativeCallback(["u32", arg], "void", (id, value = null) => {
+		const widget = widgetOf(id);
+		const handler = handlerOf(widget) as ((value: V) => void) | undefined;
+		if (handler) {
+			eventScope.run(() => handler(convert(value)), () => controlledSync.run(widget));
+		}
+	}));
 }
 
-const textOf = (raw: RawValue): string => (raw ? new CString(raw as Pointer).toString() : "");
-const textEvent = (connect: Connect): NativeEvent => valueEvent<string>(connect, "ptr", textOf);
-const flagEvent = (connect: Connect): NativeEvent => valueEvent<boolean>(connect, "i32", (raw) => raw !== 0);
-const indexEvent = (connect: Connect): NativeEvent => valueEvent<number>(connect, "i32", Number);
-const idEvent = (connect: Connect): NativeEvent => valueEvent<r.Rid>(connect, "u32", Number);
-const floatEvent = (connect: Connect): NativeEvent => valueEvent<number>(connect, "f32", Number);
-const doubleEvent = (connect: Connect): NativeEvent => valueEvent<number>(connect, "f64", Number);
+const textOf = (value: NativeValue): string => (typeof value === "string" ? value : "");
+const textEvent = (connect: Connect): NativeEvent => valueEvent<string>(connect, "text", textOf);
+const flagEvent = (connect: Connect): NativeEvent => valueEvent<boolean>(connect, "i32", (value) => value !== 0);
+const indexEvent = (connect: Connect): NativeEvent => valueEvent<number>(connect, "i32", numberOf);
+const idEvent = (connect: Connect): NativeEvent => valueEvent<r.Rid>(connect, "u32", numberOf);
+const floatEvent = (connect: Connect): NativeEvent => valueEvent<number>(connect, "f32", numberOf);
+const doubleEvent = (connect: Connect): NativeEvent => valueEvent<number>(connect, "f64", numberOf);
 
 /** An event that gives what C gives as it is. `args` are the types after the widget. */
-function directEvent(connect: Connect, args: readonly FFITypeOrString[]): NativeEvent {
-	return new NativeEvent(connect, (handlerOf) => new JSCallback(
-		(widget: number, ...values: number[]): void => {
-			const handler = handlerOf(widget) as ((...values: number[]) => void) | undefined;
-			if (handler) {
-				eventScope.run(() => handler(...values.slice(0, args.length)), () => controlledSync.run(widget));
-			}
-		},
-		{ args: ["u32", ...args, "ptr"], returns: "void" },
-	));
+function directEvent(connect: Connect, args: readonly NativeArg[]): NativeEvent {
+	return new NativeEvent(connect, (handlerOf) => nativeCallback(["u32", ...args], "void", (id, ...values) => {
+		const widget = widgetOf(id);
+		const handler = handlerOf(widget) as ((...values: NativeValue[]) => void) | undefined;
+		if (handler) {
+			eventScope.run(() => handler(...values.slice(0, args.length)), () => controlledSync.run(widget));
+		}
+	}));
 }
 
 /** An event whose value is read from the widget, as C gives none of it, or not as its attribute is written. */
-function readEvent<V>(connect: Connect, args: readonly FFITypeOrString[], read: (widget: r.Rid) => V): NativeEvent {
-	return new NativeEvent(connect, (handlerOf) => new JSCallback(
-		(widget: number): void => {
-			const handler = handlerOf(widget) as ((value: V) => void) | undefined;
-			if (handler) {
-				eventScope.run(() => handler(read(widget)), () => controlledSync.run(widget));
-			}
-		},
-		{ args: ["u32", ...args, "ptr"], returns: "void" },
-	));
+function readEvent<V>(connect: Connect, args: readonly NativeArg[], read: (widget: r.Rid) => V): NativeEvent {
+	return new NativeEvent(connect, (handlerOf) => nativeCallback(["u32", ...args], "void", (id) => {
+		const widget = widgetOf(id);
+		const handler = handlerOf(widget) as ((value: V) => void) | undefined;
+		if (handler) {
+			eventScope.run(() => handler(read(widget)), () => controlledSync.run(widget));
+		}
+	}));
 }
 
 /**
  * An event that asks: the function says yes by returning true, and anything else is no, an
  * exception included. A change made by the renderer is not asked about.
  */
-function requestEvent(connect: Connect, args: readonly FFITypeOrString[]): NativeEvent {
-	return new NativeEvent(connect, (handlerOf) => new JSCallback(
-		(widget: number, ...values: number[]): number => {
-			const handler = handlerOf(widget) as ((...values: number[]) => boolean | void) | undefined;
-			let answer = 1;
-			if (handler) {
-				eventScope.run(() => {
-					answer = 0;
-					answer = handler(...values.slice(0, args.length)) === true ? 1 : 0;
-				});
-			}
-			return answer;
-		},
-		{ args: ["u32", ...args, "ptr"], returns: "i32" },
-	));
+function requestEvent(connect: Connect, args: readonly NativeArg[]): NativeEvent {
+	return new NativeEvent(connect, (handlerOf) => nativeCallback(["u32", ...args], "i32", (id, ...values) => {
+		const handler = handlerOf(widgetOf(id)) as ((...values: NativeValue[]) => boolean | void) | undefined;
+		let answer = 1;
+		if (handler) {
+			eventScope.run(() => {
+				answer = 0;
+				answer = handler(...values.slice(0, args.length)) === true ? 1 : 0;
+			});
+		}
+		return answer;
+	}));
 }
 
 /** A right click: what is under the pointer, and where. */
-const contextEvent = (connect: Connect, item: FFITypeOrString): NativeEvent => directEvent(connect, [item, "f32", "f32"]);
+const contextEvent = (connect: Connect, item: NativeArg): NativeEvent => directEvent(connect, [item, "f32", "f32"]);
 
 /** A point of a NodeGraph, with what is there: a pin. Or only the point, for the empty canvas. */
 function pointEvent(connect: Connect, withItem: boolean): NativeEvent {
-	return new NativeEvent(connect, (handlerOf) => new JSCallback(
-		(widget: number, item: number, x: number, y: number): void => {
-			const handler = handlerOf(widget) as ((...values: number[]) => void) | undefined;
-			if (handler) {
-				eventScope.run(() => (withItem ? handler(item, x, y) : handler(x, y)));
-			}
-		},
-		{ args: ["u32", "i32", "f32", "f32", "ptr"], returns: "void" },
-	));
+	return new NativeEvent(connect, (handlerOf) => nativeCallback(["u32", "i32", "f32", "f32"], "void", (id, item, x, y) => {
+		const handler = handlerOf(widgetOf(id)) as ((...values: number[]) => void) | undefined;
+		if (handler) {
+			eventScope.run(() => (withItem ? handler(numberOf(item), numberOf(x), numberOf(y)) : handler(numberOf(x), numberOf(y))));
+		}
+	}));
 }
 
 /**
  * An event whose function answers with a text, which C copies before it calls again: the
  * tooltip of a TextEditor. Nothing, or "", is no text.
  */
-function textAnswerEvent(connect: Connect, args: readonly FFITypeOrString[]): NativeEvent {
-	return new NativeEvent(connect, (handlerOf) => {
-		// (valid until the next call, as C asks: it copies the text at once)
-		let answer = Buffer.from([0]);
-		return new JSCallback(
-			(widget: number, ...values: number[]): Pointer | null => {
-				const handler = handlerOf(widget) as ((...values: number[]) => string | null | void) | undefined;
-				let text = "";
-				if (handler) {
-					eventScope.run(() => {
-						text = handler(...values.slice(0, args.length)) ?? "";
-					});
-				}
-				answer = Buffer.from(`${text}\0`);
-				return ptr(answer);
-			},
-			{ args: ["u32", ...args, "ptr"], returns: "ptr" },
-		);
-	});
+function textAnswerEvent(connect: Connect, args: readonly NativeArg[]): NativeEvent {
+	// (the backend keeps the text valid until the next call, as C asks: it copies it at once)
+	return new NativeEvent(connect, (handlerOf) => nativeCallback(["u32", ...args], "text", (id, ...values) => {
+		const handler = handlerOf(widgetOf(id)) as ((...values: NativeValue[]) => string | null | void) | undefined;
+		let text = "";
+		if (handler) {
+			eventScope.run(() => {
+				text = handler(...values.slice(0, args.length)) ?? "";
+			});
+		}
+		return text;
+	}));
 }
 
 /**
  * An event that gives a structure, valid during the call, and consumes what it receives when
  * the function returns true.
  */
-function structEvent<S>(connect: Connect, read: (raw: Pointer | null) => S | null): NativeEvent {
-	return new NativeEvent(connect, (handlerOf) => new JSCallback(
-		(widget: number, raw: Pointer | null): number => {
-			const handler = handlerOf(widget) as ((event: S) => boolean | void) | undefined;
-			const event = read(raw);
-			let consumed = 0;
-			if (handler && event) {
-				eventScope.run(() => {
-					consumed = handler(event) === true ? 1 : 0;
-				});
-			}
-			return consumed;
-		},
-		{ args: ["u32", "ptr", "ptr"], returns: "i32" },
-	));
+function structEvent(connect: Connect, struct: StructType): NativeEvent {
+	return new NativeEvent(connect, (handlerOf) => nativeCallback(["u32", struct], "i32", (id, event) => {
+		const handler = handlerOf(widgetOf(id)) as ((event: NativeValue) => boolean | void) | undefined;
+		let consumed = 0;
+		if (handler && event) {
+			eventScope.run(() => {
+				consumed = handler(event) === true ? 1 : 0;
+			});
+		}
+		return consumed;
+	}));
 }
 
 /** The events of a window, which are not widgets. `OnClose` is apart: without it, Raven closes. */
 export const WINDOW_EVENTS: Readonly<Record<string, NativeEvent>> = {
 	OnResize: directEvent(r.Rwindow_set_resize_callback, ["i32", "i32"]),
-	OnDrop: structEvent(r.Rwindow_set_drop_callback, (raw) => r.RDropEvent.from(raw)),
+	OnDrop: structEvent(r.Rwindow_set_drop_callback, r.RDropEvent),
 };
 
 /**
@@ -324,8 +305,8 @@ export const WINDOW_EVENTS: Readonly<Record<string, NativeEvent>> = {
  * prop of its own, as the pointer over a `Custom`. `OnDrop` is what is dropped on it.
  */
 const COMMON_EVENTS: Readonly<Record<string, NativeEvent>> = {
-	OnEvent: structEvent(r.Rwidget_set_event_callback, (raw) => r.REvent.from(raw)),
-	OnDrop: structEvent(r.Rwidget_set_drop_callback, (raw) => r.RDropEvent.from(raw)),
+	OnEvent: structEvent(r.Rwidget_set_event_callback, r.REvent),
+	OnDrop: structEvent(r.Rwidget_set_drop_callback, r.RDropEvent),
 };
 
 /** Two digits, for a date or a time. */
@@ -333,64 +314,51 @@ const two = (value: number): string => String(value).padStart(2, "0");
 
 /** An event that gives three numbers from C as one text: a date or a time, as its attribute is written. */
 function threeNumbersEvent(connect: Connect, write: (a: number, b: number, c: number) => string): NativeEvent {
-	return new NativeEvent(connect, (handlerOf) => new JSCallback(
-		(widget: number, a: number, b: number, c: number): void => {
-			const handler = handlerOf(widget) as ((value: string) => void) | undefined;
-			if (handler) {
-				eventScope.run(() => handler(write(a, b, c)), () => controlledSync.run(widget));
-			}
-		},
-		{ args: ["u32", "i32", "i32", "i32", "ptr"], returns: "void" },
-	));
+	return new NativeEvent(connect, (handlerOf) => nativeCallback(["u32", "i32", "i32", "i32"], "void", (id, a, b, c) => {
+		const widget = widgetOf(id);
+		const handler = handlerOf(widget) as ((value: string) => void) | undefined;
+		if (handler) {
+			eventScope.run(() => handler(write(numberOf(a), numberOf(b), numberOf(c))), () => controlledSync.run(widget));
+		}
+	}));
 }
 
 /** An event that gives an index and a flag: the column of a Table and its direction, a series of a Plot and whether it shows. */
-const indexAndFlagEvent = (connect: Connect): NativeEvent => new NativeEvent(connect, (handlerOf) => new JSCallback(
-	(widget: number, index: number, flag: number): void => {
-		const handler = handlerOf(widget) as IndexAndFlagHandler | undefined;
-		if (handler) {
-			eventScope.run(() => handler(index, flag !== 0), () => controlledSync.run(widget));
-		}
-	},
-	{ args: ["u32", "i32", "i32", "ptr"], returns: "void" },
-));
+const indexAndFlagEvent = (connect: Connect): NativeEvent => new NativeEvent(connect, (handlerOf) => nativeCallback(["u32", "i32", "i32"], "void", (id, index, flag) => {
+	const widget = widgetOf(id);
+	const handler = handlerOf(widget) as IndexAndFlagHandler | undefined;
+	if (handler) {
+		eventScope.run(() => handler(numberOf(index), flag !== 0), () => controlledSync.run(widget));
+	}
+}));
 
 /** `OnClicked` of a Toast: the button of its message. */
-const toastActionEvent = new NativeEvent(r.Rtoast_set_action_callback, (handlerOf) => new JSCallback(
-	(widget: number): void => {
-		const handler = handlerOf(widget) as (() => void) | undefined;
-		if (handler) {
-			eventScope.run(handler);
-		}
-	},
-	{ args: ["u32", "ptr"], returns: "void" },
-));
+const toastActionEvent = new NativeEvent(r.Rtoast_set_action_callback, (handlerOf) => nativeCallback(["u32"], "void", (id) => {
+	const handler = handlerOf(widgetOf(id)) as (() => void) | undefined;
+	if (handler) {
+		eventScope.run(handler);
+	}
+}));
 
 /** `OnPaint`: runs while a frame is drawn, so nothing is committed after it. */
-const paintEvent = new NativeEvent(r.Rcustom_set_paint_callback, (handlerOf) => new JSCallback(
-	(widget: number, painter: Pointer | null, width: number, height: number): void => {
-		const handler = handlerOf(widget) as PaintHandler | undefined;
-		if (handler) {
-			eventScope.guard(() => handler(painter, width, height));
-		}
-	},
-	{ args: ["u32", "ptr", "f32", "f32", "ptr"], returns: "void" },
-));
+const paintEvent = new NativeEvent(r.Rcustom_set_paint_callback, (handlerOf) => nativeCallback(["u32", "pointer", "f32", "f32"], "void", (id, painter, width, height) => {
+	const handler = handlerOf(widgetOf(id)) as PaintHandler | undefined;
+	if (handler) {
+		eventScope.guard(() => handler((painter ?? null) as Painter, numberOf(width), numberOf(height)));
+	}
+}));
 
 /** `OnMeasure`: says the size a `Custom` wants, through the two floats C gives. */
-const measureEvent = new NativeEvent(r.Rcustom_set_measure_callback, (handlerOf) => new JSCallback(
-	(widget: number, width: Pointer | null, height: Pointer | null): void => {
-		const handler = handlerOf(widget) as MeasureHandler | undefined;
-		if (handler && width && height) {
-			eventScope.guard(() => {
-				const size = handler();
-				new Float32Array(toArrayBuffer(width, 0, 4))[0] = size.Width;
-				new Float32Array(toArrayBuffer(height, 0, 4))[0] = size.Height;
-			});
-		}
-	},
-	{ args: ["u32", "ptr", "ptr", "ptr"], returns: "void" },
-));
+const measureEvent = new NativeEvent(r.Rcustom_set_measure_callback, (handlerOf) => nativeCallback(["u32", "float", "float"], "void", (id, width, height) => {
+	const handler = handlerOf(widgetOf(id)) as MeasureHandler | undefined;
+	if (handler && width instanceof Float32Array && height instanceof Float32Array) {
+		eventScope.guard(() => {
+			const size = handler();
+			width[0] = size.Width;
+			height[0] = size.Height;
+		});
+	}
+}));
 
 /**
  * The events with a value, by tag. `OnClicked`, `OnChanged`, `OnCommitted` and `OnActivated`
@@ -500,18 +468,18 @@ const WIDGET_EVENTS: Readonly<Record<string, Readonly<Record<string, NativeEvent
 /** The items of a list asked for as they are shown: `ItemCount`, and a function for one item. */
 class VirtualItems {
 	private readonly handlers = new Map<r.Rid, EventHandler>();
-	private callback: JSCallback | null = null;
+	private callback: NativeCallback | null = null;
 
 	constructor(
 		private readonly connect: (widget: r.Rid, count: number, callback: Pointer | null) => void,
-		private readonly make: (handlerOf: (widget: r.Rid) => EventHandler | undefined) => JSCallback,
+		private readonly make: (handlerOf: (widget: r.Rid) => EventHandler | undefined) => NativeCallback,
 	) {}
 
 	/** Sets the items of a widget. */
 	set(widget: r.Rid, count: number, handler: EventHandler): void {
 		this.handlers.set(widget, handler);
 		this.callback ??= this.make((id) => this.handlers.get(id));
-		this.connect(widget, count, this.callback.ptr);
+		this.connect(widget, count, this.callback);
 	}
 
 	/** Takes the function of a widget away. */
@@ -532,8 +500,6 @@ class VirtualItems {
 	}
 }
 
-/** The text C reads when the callback returns: it lives until the next call. */
-let listText: Buffer = Buffer.from([0]);
 /** The structure C reads when the callback returns, with the texts it points to. */
 let tileItem: r.RTileItem | null = null;
 
@@ -547,45 +513,38 @@ const VIRTUAL_ITEMS: Readonly<Record<string, VirtualItemsProps & { readonly item
 	ListView: {
 		count: "ItemCount",
 		prop: "ItemText",
-		items: new VirtualItems(r.Rlist_view_set_virtual_items, (handlerOf) => new JSCallback(
-			(widget: number, index: number): Pointer | null => {
-				const handler = handlerOf(widget) as ListTextHandler | undefined;
-				eventScope.guard(() => {
-					listText = Buffer.from(`${handler?.(index) ?? ""}\0`);
-				});
-				return ptr(listText);
-			},
-			{ args: ["u32", "i32", "ptr"], returns: "ptr" },
-		)),
+		items: new VirtualItems(r.Rlist_view_set_virtual_items, (handlerOf) => nativeCallback(["u32", "i32"], "text", (id, index) => {
+			const handler = handlerOf(widgetOf(id)) as ListTextHandler | undefined;
+			let text = "";
+			eventScope.guard(() => {
+				text = handler?.(numberOf(index)) ?? "";
+			});
+			return text;
+		})),
 	},
 	TileView: {
 		count: "ItemCount",
 		prop: "ItemFill",
-		items: new VirtualItems(r.Rtile_view_set_items, (handlerOf) => new JSCallback(
-			(widget: number, index: number, item: Pointer | null): void => {
-				const handler = handlerOf(widget) as TileFillHandler | undefined;
-				tileItem = r.RTileItem.from(item);
-				if (handler && tileItem) {
-					const filled = tileItem;
-					eventScope.guard(() => handler(index, filled));
-				}
-			},
-			{ args: ["u32", "i32", "ptr", "ptr"], returns: "void" },
-		)),
+		items: new VirtualItems(r.Rtile_view_set_items, (handlerOf) => nativeCallback(["u32", "i32", r.RTileItem], "void", (id, index, item) => {
+			const handler = handlerOf(widgetOf(id)) as TileFillHandler | undefined;
+			tileItem = item instanceof r.RTileItem ? item : null;
+			if (handler && tileItem) {
+				const filled = tileItem;
+				eventScope.guard(() => handler(numberOf(index), filled));
+			}
+		})),
 	},
 	Table: {
 		count: "RowCount",
 		prop: "CellText",
-		items: new VirtualItems(r.Rtable_set_virtual_rows, (handlerOf) => new JSCallback(
-			(widget: number, row: number, column: number): Pointer | null => {
-				const handler = handlerOf(widget) as CellTextHandler | undefined;
-				eventScope.guard(() => {
-					listText = Buffer.from(`${handler?.(row, column) ?? ""}\0`);
-				});
-				return ptr(listText);
-			},
-			{ args: ["u32", "i32", "i32", "ptr"], returns: "ptr" },
-		)),
+		items: new VirtualItems(r.Rtable_set_virtual_rows, (handlerOf) => nativeCallback(["u32", "i32", "i32"], "text", (id, row, column) => {
+			const handler = handlerOf(widgetOf(id)) as CellTextHandler | undefined;
+			let text = "";
+			eventScope.guard(() => {
+				text = handler?.(numberOf(row), numberOf(column)) ?? "";
+			});
+			return text;
+		})),
 	},
 };
 
@@ -746,21 +705,18 @@ class ActionEvents {
 	private readonly nameOf = new Map<r.Rid, string>();
 	/** The functions given to each name the application chose, in order: the last one has the name. */
 	private readonly named = new Map<string, ((sender: r.Rid) => void)[]>();
-	private callback: JSCallback | null = null;
+	private callback: NativeCallback | null = null;
 	private next = 0;
 
 	/** The callback of every action, made the first time it is needed. */
-	private pointer(): Pointer | null {
-		this.callback ??= new JSCallback(
-			(sender: number, action: Pointer | null): void => {
-				const handler = action ? this.handlers.get(new CString(action).toString()) : undefined;
-				if (handler) {
-					eventScope.run(() => handler(sender));
-				}
-			},
-			{ args: ["u32", "ptr", "ptr"], returns: "void" },
-		);
-		return this.callback.ptr;
+	private pointer(): NativeCallback {
+		this.callback ??= nativeCallback(["u32", "text"], "void", (sender, action) => {
+			const handler = typeof action === "string" ? this.handlers.get(action) : undefined;
+			if (handler) {
+				eventScope.run(() => handler(widgetOf(sender)));
+			}
+		});
+		return this.callback;
 	}
 
 	/** Sets the function of a widget. */
@@ -840,7 +796,7 @@ class CloseEvents {
 	private readonly handlers = new Map<r.Rid, () => void>();
 	/** What is told that a window with no `OnClose` closes, as Raven closes it: its cleanups. */
 	private readonly notices = new Map<r.Rid, () => void>();
-	private callback: JSCallback | null = null;
+	private callback: NativeCallback | null = null;
 
 	/** Sets, changes or removes the function of a window. */
 	set(window: r.Rid, handler: EventHandler | undefined, alive = true): void {
@@ -872,23 +828,21 @@ class CloseEvents {
 
 	/** Asks Raven for the requests to close a window. */
 	private listen(window: r.Rid): void {
-		this.callback ??= new JSCallback(
-			(id: number): number => {
-				const close = this.handlers.get(id);
-				if (close) {
-					eventScope.run(close);
-					return 0;
-				}
-				// (no OnClose: Raven closes it, once what is told of it has run)
-				const notice = this.notices.get(id);
-				if (notice) {
-					eventScope.run(notice);
-				}
-				return 1;
-			},
-			{ args: ["u32", "ptr"], returns: "i32" },
-		);
-		r.Rwindow_set_close_callback(window, this.callback.ptr);
+		this.callback ??= nativeCallback(["u32"], "i32", (value) => {
+			const id = widgetOf(value);
+			const close = this.handlers.get(id);
+			if (close) {
+				eventScope.run(close);
+				return 0;
+			}
+			// (no OnClose: Raven closes it, once what is told of it has run)
+			const notice = this.notices.get(id);
+			if (notice) {
+				eventScope.run(notice);
+			}
+			return 1;
+		});
+		r.Rwindow_set_close_callback(window, this.callback);
 	}
 
 	/** Stops asking Raven once a window has neither. */

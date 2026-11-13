@@ -3,9 +3,8 @@
 #
 # Every run makes all the packages and rehearses with npm pack --dry-run. Publishing is off until
 # the repository variable NPM_PUBLISH is set to "true", and then happens on a version tag, in the
-# environment "npm". A package with a trusted publisher on npm needs no secret. One that has none
-# yet, which npm requires for its first version, needs the secret NPM_TOKEN, with the right to
-# publish in the @decky.fx scope.
+# environment "npm", through the trusted publisher each package has on npm: OIDC, with
+# provenance, and no secret.
 name: release
 
 on:
@@ -197,11 +196,8 @@ jobs:
         with:
           path: dist/artifacts
 
-      # the platforms first: the main package depends on them. npm tries the trusted publisher
-      # first and falls back on the token
+      # the platforms first: the main package depends on them. Each through its trusted publisher
       - name: Publish
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
         run: |
           for directory in dist/artifacts/npm-* dist/artifacts/main-package; do
             name="$(node -p "require('./$directory/package.json').name")"

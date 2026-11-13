@@ -136,7 +136,7 @@ TSX works through any compiler that turns it into JavaScript for Node.js, as wit
 - Windows: Raven's build leaves the addon of its Node.js binding out there.
 - Solid: its TSX is compiled by the plugin of this package, which is one for Bun.
 - `WebView`: Raven's Node.js binding has no `raven_web.h` yet. It says so when asked.
-- The types: the sources are TypeScript for Bun, and the types of a few raw values come from `bun:ffi`.
+- The types: they are the sources, TypeScript, and a few raw values have their types from `bun:ffi`. A project of Node.js type-checks with `@types/bun` among its development dependencies and `"moduleResolution": "bundler"`, as with tsx, esbuild or Vite. `"NodeNext"` needs declarations of their own, which are not made yet.
 
 ## How props work
 

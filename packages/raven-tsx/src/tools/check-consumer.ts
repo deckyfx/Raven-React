@@ -196,8 +196,29 @@ try {
 			private: true,
 			type: "module",
 			dependencies: { [manifest.name]: `file:${main}`, react: manifest.devDependencies.react, "react-reconciler": manifest.devDependencies["react-reconciler"] },
+			// (the types of a few raw values come from bun:ffi: see the README)
+			devDependencies: { "@types/bun": manifest.devDependencies["@types/bun"], "@types/react": manifest.dependencies["@types/react"], typescript: manifest.devDependencies.typescript },
 			overrides: { [nativeName]: `file:${native}` },
 		};
+		// (resolved as a bundler would, as tsx, esbuild or Vite do: the condition "types" gives the
+		// sources. "NodeNext" needs declarations of their own, which are not made yet: see the README)
+		await Bun.write(`${node}/tsconfig.json`, JSON.stringify({
+			compilerOptions: { target: "ESNext", module: "ESNext", moduleResolution: "Bundler", types: ["bun"], noEmit: true, skipLibCheck: true, ...strictOptions() },
+			include: ["types.ts"],
+		}, null, 2));
+		await Bun.write(`${node}/types.ts`, [
+			'import { createElement } from "react";',
+			'import { raven as r } from "@decky.fx/raven-tsx";',
+			'import { Button, createWindow, type WidgetInstance } from "@decky.fx/raven-tsx/react";',
+			"",
+			"/** What an application of Node.js writes, typed. */",
+			"export function open(onPress: () => void): r.Rid {",
+			'	const { window, root } = createWindow({ Title: "typed", Width: 200, Height: 100 });',
+			'	root.render(createElement(Button, { OnClicked: onPress, ref: (made: WidgetInstance | null) => void made?.focus() }, "ok"));',
+			"	return window;",
+			"}",
+			"",
+		].join("\n"));
 		await Bun.write(`${node}/package.json`, JSON.stringify(nodeManifest, null, 2));
 		await Bun.write(`${node}/check.mjs`, [
 			'import { createElement as h, useState } from "react";',
@@ -237,6 +258,8 @@ try {
 			"",
 		].join("\n"));
 		await run(["npm", "install", "--no-audit", "--no-fund"], node);
+		await run(["npx", "tsc", "-p", "."], node);
+		console.log("its TypeScript compiles, resolved as a bundler does, with " + Object.keys(strictOptions()).join(", "));
 		const clicked = await run(["node", "check.mjs"], node);
 		console.log(`installed by npm, React runs under Node.js, and a click reaches its state: Raven ${clicked.trim()}`);
 	} else {

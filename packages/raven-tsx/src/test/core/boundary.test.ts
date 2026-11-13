@@ -54,8 +54,10 @@ test("only the backend of Bun imports bun:ffi to run: the rest runs on Node.js t
 		const base = `${import.meta.dir}/../../${folder}`;
 		for (const file of await Array.fromAsync(new Bun.Glob("**/*.ts").scan({ cwd: base }))) {
 			const source = await Bun.file(`${base}/${file}`).text();
-			if (runtimeImport.test(source) && `${folder}/${file}` !== "core/backend/bun.ts") {
-				found.push(`${folder}/${file}`);
+			// (with the separators of every system: Windows gives backend\bun.ts)
+			const path = `${folder}/${file.replaceAll("\\", "/")}`;
+			if (runtimeImport.test(source) && path !== "core/backend/bun.ts") {
+				found.push(path);
 			}
 		}
 	}

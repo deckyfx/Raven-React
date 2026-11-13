@@ -25,7 +25,7 @@ export const VENDORED_BINDINGS: readonly { readonly inRaven: string; readonly co
 	{ inRaven: "bindings/node/src/raven.d.ts", copy: `${PACKAGE_ROOT}/src/vendor/node/raven.d.ts` },
 ];
 /** What decides what a library holds. A change anywhere else does not make it another library. */
-const BUILD_PATHS = ["src", "include", "third_party", "cmake", "CMakeLists.txt", "bindings/bun"];
+const BUILD_PATHS = ["src", "include", "third_party", "cmake", "CMakeLists.txt", "bindings/bun", "bindings/node"];
 
 /** The value after `--name`. */
 export function option(name: string): string | undefined {

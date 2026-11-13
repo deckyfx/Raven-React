@@ -1,7 +1,7 @@
 import { afterAll, beforeAll, expect, test } from "bun:test";
 import * as r from "../../core/raven";
 import { eventStats } from "../../core/events";
-import { WidgetInstance } from "../../core/widget-instance";
+import { finishPlacing, WidgetInstance } from "../../core/widget-instance";
 import { CONTENT_NAME, WindowInstance } from "../../core/window-instance";
 
 beforeAll(() => {
@@ -567,6 +567,70 @@ test("a window a cleanup adds while the window that holds it closes opens with i
 	expect([inner.isOpen, added.isOpen]).toEqual([true, true]);
 	outer.forgetTree();
 	outer.dispose();
+});
+
+test("what waits for a widget to be placed stops once one of it deleted the widget", () => {
+	const window = WindowInstance.create(WINDOW);
+	window.materialize();
+	const widget = WidgetInstance.create("Label", { Name: "placed", Text: "placed" });
+	let after = false;
+	widget.whenPlaced(() => window.remove(widget));
+	widget.whenPlaced(() => {
+		after = true;
+	});
+	window.append(widget);
+	finishPlacing();
+	expect([widget.placed, after]).toEqual([false, false]);
+	window.forgetTree();
+	window.dispose();
+});
+
+test("a child moved elsewhere while it is made, its parent then deleted, stays where it went", () => {
+	const window = WindowInstance.create(WINDOW);
+	window.materialize();
+	const elsewhere = WidgetInstance.create("VBox", { Name: "elsewhere" });
+	const parent = WidgetInstance.create("VBox", { Name: "parent" });
+	window.append(elsewhere);
+	window.append(parent);
+	const child = WidgetInstance.create("VBox", { Name: "child" });
+	const inner = WindowInstance.create(WINDOW);
+	let once = true;
+	inner.whenOpen(() => {
+		if (once) {
+			once = false;
+			parent.release(child);
+			elsewhere.append(child);
+			window.remove(parent);
+		}
+	});
+	child.append(inner);
+	parent.append(child);
+	expect(r.Rwidget_get_parent(child.widget)).toBe(elsewhere.widget);
+	expect(inner.isOpen).toBe(true);
+	window.forgetTree();
+	window.dispose();
+});
+
+test("a child waiting in a window that is disposed can be taken elsewhere by a cleanup, and stays there", () => {
+	const host = WindowInstance.create(WINDOW);
+	host.materialize();
+	const elsewhere = WidgetInstance.create("VBox", { Name: "elsewhere" });
+	host.append(elsewhere);
+	const outer = WindowInstance.create(WINDOW);
+	const open = WindowInstance.create(WINDOW);
+	open.materialize();
+	const waiting = WidgetInstance.create("Label", { Name: "waiting", Text: "waiting" });
+	waiting.materialize();
+	outer.appendInitial(open);
+	outer.appendInitial(waiting);
+	open.whenOpen(() => () => {
+		outer.release(waiting);
+		elsewhere.append(waiting);
+	});
+	outer.dispose();
+	expect(r.Rwidget_find(host.window, "waiting")).toBe(waiting.widget);
+	host.forgetTree();
+	host.dispose();
 });
 
 test("a function that throws as soon as whenOpen runs it is not kept", () => {

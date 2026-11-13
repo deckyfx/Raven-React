@@ -31,8 +31,9 @@ afterEach(() => {
 		window = r.R_INVALID_ID;
 	}
 	r.Rdraw_frame();
-	expect(errors.filter((detail) => !detail.includes("invalid widget handle 0xFFFFFFFF"))).toEqual([]);
-	errors.length = 0;
+	// (emptied first: a failure here must not fail every test after)
+	const reported = errors.splice(0);
+	expect(reported.filter((detail) => !detail.includes("invalid widget handle 0xFFFFFFFF"))).toEqual([]);
 });
 
 afterAll(() => {

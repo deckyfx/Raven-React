@@ -31,8 +31,9 @@ afterEach(() => {
 		done();
 	}
 	r.Rdraw_frame();
-	expect(errors).toEqual([]);
-	errors.length = 0;
+	// (emptied first: a failure here must not fail every test after)
+	const reported = errors.splice(0);
+	expect(reported).toEqual([]);
 });
 
 afterAll(() => {

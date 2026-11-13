@@ -501,6 +501,10 @@ export class WidgetInstance implements HostNode {
 		}
 		const failures: unknown[] = [];
 		for (const run of waiting) {
+			// (one of them may have deleted it: the others get nothing)
+			if (this.state !== "live") {
+				break;
+			}
 			attempt(failures, () => run(this));
 		}
 		throwFirst(failures);
@@ -791,6 +795,11 @@ export class WidgetInstance implements HostNode {
 		attempt(failures, () => child.materialize());
 		// (one that failed and that Raven does not have is not kept. Nor one whose making ran user code
 		// that deleted this: deleting this widget did not reach it, not placed yet)
+		// (making it ran user code, which may have placed it elsewhere: that parent has it, as it is)
+		if (!this.children.includes(child)) {
+			throwFirst(failures);
+			return;
+		}
 		if ((failures.length > 0 && !child.placed) || this.state !== "live") {
 			const index = this.children.indexOf(child);
 			if (index >= 0) {

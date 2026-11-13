@@ -572,10 +572,12 @@ export class WindowInstance implements HostNode {
 		const failures: unknown[] = [];
 		// (what waited to go in: what a framework placed in it and took back, alive, goes with it. Also
 		// while it opens: a child that disposed it stopped the others going in)
-		for (const child of this.initial.splice(0)) {
+		// (one at a time: a cleanup of one may take another away first, which then is no longer here)
+		for (let child = this.initial.shift(); child; child = this.initial.shift()) {
+			const next = child;
 			attempt(failures, () => {
-				child.forgetTree();
-				child.dispose();
+				next.forgetTree();
+				next.dispose();
 			});
 		}
 		if (state !== "live") {

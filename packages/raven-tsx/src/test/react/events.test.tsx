@@ -742,10 +742,12 @@ test("a NodeGraph says a double click on its empty canvas, where, in place of fr
 	await settle();
 	const graph = find("g");
 	const [x, y, width, height] = r.Rwidget_get_rect(graph);
-	// (far from the node: the empty canvas)
+	// (far from the node: the empty canvas. The point comes in the units of the canvas)
+	const [canvasX, canvasY] = r.Rnode_graph_to_canvas(graph, width - 40, height - 40);
 	clickAt(x + width - 40, y + height - 40, r.R_MOUSE_LEFT, 2);
 	expect(activated.length).toBe(1);
-	expect(activated[0]?.every((value) => Number.isFinite(value))).toBe(true);
+	expect(activated[0]?.[0]).toBeCloseTo(canvasX, 1);
+	expect(activated[0]?.[1]).toBeCloseTo(canvasY, 1);
 });
 
 test("a NodeGraph says a pin clicked, and a wire dropped on no pin, with where", async () => {
@@ -768,8 +770,13 @@ test("a NodeGraph says a pin clicked, and a wire dropped on no pin, with where",
 	const [pinX, pinY] = r.Rnode_graph_get_pin_position(graph, pin);
 	// (the canvas starts with its corner at the corner of the widget)
 	const [x, y] = r.Rwidget_get_rect(graph);
+	// (the points come in the units of the canvas)
+	const [pressX, pressY] = r.Rnode_graph_to_canvas(graph, pinX, pinY);
 	clickAt(x + pinX, y + pinY);
+	expect(clicked.length).toBe(1);
 	expect(clicked[0]?.[0]).toBe(pin);
+	expect(clicked[0]?.[1]).toBeCloseTo(pressX, 1);
+	expect(clicked[0]?.[2]).toBeCloseTo(pressY, 1);
 	// (a wire from the pin, dropped on the empty canvas)
 	r.Rwindow_inject_mouse_move(window, x + pinX, y + pinY);
 	r.Rwindow_inject_mouse_button(window, r.R_MOUSE_LEFT, 1);
@@ -777,7 +784,11 @@ test("a NodeGraph says a pin clicked, and a wire dropped on no pin, with where",
 	r.Rwindow_inject_mouse_move(window, x + pinX + 120, y + pinY + 140);
 	r.Rdraw_frame();
 	r.Rwindow_inject_mouse_button(window, r.R_MOUSE_LEFT, 0);
+	const [dropX, dropY] = r.Rnode_graph_to_canvas(graph, pinX + 120, pinY + 140);
+	expect(dropped.length).toBe(1);
 	expect(dropped[0]?.[0]).toBe(pin);
+	expect(dropped[0]?.[1]).toBeCloseTo(dropX, 1);
+	expect(dropped[0]?.[2]).toBeCloseTo(dropY, 1);
 });
 
 test("a TextEditor gives the tooltip of the text under the pointer, at its line and column", async () => {

@@ -604,23 +604,17 @@ test("the ref of a Separator in a Menu gives its line of the menu", async () => 
 	expect(r.Rwidget_get_type(find("line"))).toBe(r.R_WIDGET_MENU_ITEM);
 });
 
-test("a Separator whose ref disposes the root of its Menu leaves nothing in the tree", async () => {
-	let menu: WidgetInstance | undefined;
-	await mount(() => (
-		<VBox>
-			<MenuBar Name="bar">
-				{createRoot((dispose) => (
-					<Menu ref={menu} Name="m" Title="File">
-						<Separator ref={() => dispose()} Name="line" />
-					</Menu>
-				))}
-			</MenuBar>
-		</VBox>
-	));
-	// (the Menu went with its root, before it was placed: neither it nor its line is anywhere)
-	expect(namesUnder("bar")).toEqual([]);
-	expect(find("line")).toBe(r.R_INVALID_ID);
-	expect(menu?.placed).toBe(false);
+test("a Separator whose node, made when placed, disposes the root of its Menu leaves nothing in the tree", async () => {
+	await mount(() => <VBox />);
+	// (what waits for the node of a Separator runs as it is made, when placed: a ref waits longer, see below)
+	createRoot((dispose) => {
+		const menu = SolidNode.element("Menu");
+		const line = SolidNode.element("Separator");
+		line.withInstance(() => dispose());
+		// (the Menu went with its root, before it was placed: the line is not added to it)
+		expect(() => menu.insert(line, null)).not.toThrow();
+		expect(menu.children).toEqual([]);
+	});
 });
 
 test("a window that moves to another parent stays open, the same window", async () => {
@@ -983,6 +977,25 @@ test("an empty text beside a widget that goes is the Text again", async () => {
 	setShown(true);
 	// (beside a widget, it is no Text: the prop is)
 	expect(given.at(-1)).toBe("prop");
+});
+
+test("the ref of a widget comes once Raven has it, placed, as React's does", async () => {
+	let given = r.R_INVALID_ID;
+	let parent = r.R_INVALID_ID;
+	await mount(() => (
+		<VBox Name="box">
+			<Button
+				Name="focused"
+				ref={(instance: WidgetInstance) => {
+					given = instance.widget;
+					parent = r.Rwidget_get_parent(instance.widget);
+					instance.focus();
+				}}
+			/>
+		</VBox>
+	));
+	expect(given).toBe(find("focused"));
+	expect(parent).toBe(find("box"));
 });
 
 test("an element kept in a variable, shown in a Portal, keeps its widget when the Portal comes back", async () => {

@@ -38,9 +38,16 @@ const placedInThisBatch: WidgetInstance[] = [];
  * commit. The nodes made during the batch get their attributes that need a parent, as they have one now.
  */
 export function finishPlacing(): void {
-	for (const instance of placedInThisBatch.splice(0)) {
+	const placed = placedInThisBatch.splice(0);
+	for (const instance of placed) {
 		instance.applyParentAttributes();
 	}
+	// (then what waited for them to be placed, user code: a ref. All of it, then the first failure)
+	const failures: unknown[] = [];
+	for (const instance of placed) {
+		attempt(failures, () => instance.runPlaced());
+	}
+	throwFirst(failures);
 }
 
 /** What a framework's tree is made of: a widget, or a window, which is no widget of its parent. */
@@ -286,6 +293,10 @@ export class WidgetInstance implements HostNode {
 	/** How many children the widget had when it was made: those of its markup come first. */
 	private madeChildren = 0;
 	private state: NodeState;
+	/** Whether the tree it is the top of is shown: a window that closes says no before its windows close. */
+	private shown = true;
+	/** What waits for it to be placed, at the end of the batch that placed it: a ref of a framework. */
+	private readonly placedWaiting: ((instance: WidgetInstance) => void)[] = [];
 
 	private constructor(
 		private id: r.Rid,
@@ -362,8 +373,9 @@ export class WidgetInstance implements HostNode {
 	}
 
 	/**
-	 * Where a child goes while this one is made: at the end, unless user code run meanwhile placed
-	 * a sibling that comes after it. Then it goes just before that one.
+	 * Where a child goes among the widgets Raven holds here: just before the first one that comes
+	 * after it, or at the end. Only those placed count: user code run while a sibling is made may
+	 * place a child while that sibling waits. (and those of its markup come first)
 	 */
 	private placeAmongPlaced(child: HostNode): number {
 		const count = r.Rwidget_get_child_count(this.id);
@@ -458,7 +470,40 @@ export class WidgetInstance implements HostNode {
 		while (top.parent) {
 			top = top.parent;
 		}
-		return top.tag === "" || top.holder !== null;
+		return top.shown && (top.tag === "" || top.holder !== null);
+	}
+
+	/** Says whether the tree it is the top of is shown: the content of a window that closes is not. */
+	setShown(shown: boolean): void {
+		this.shown = shown;
+	}
+
+	/**
+	 * Gives it to a function once Raven has it, placed: now if it is, or at the end of the batch
+	 * that places it (`finishPlacing`), as React gives a ref after its commit.
+	 */
+	whenPlaced(run: (instance: WidgetInstance) => void): void {
+		if (this.state === "gone") {
+			return;
+		}
+		if (this.state === "live" && !placedInThisBatch.includes(this)) {
+			run(this);
+			return;
+		}
+		this.placedWaiting.push(run);
+	}
+
+	/** Runs what waited for it to be placed: see `whenPlaced`. */
+	runPlaced(): void {
+		const waiting = this.placedWaiting.splice(0);
+		if (this.state !== "live") {
+			return;
+		}
+		const failures: unknown[] = [];
+		for (const run of waiting) {
+			attempt(failures, () => run(this));
+		}
+		throwFirst(failures);
 	}
 
 	/** Says who to tell of a new handle, when what holds this widget is not a parent. */
@@ -731,7 +776,7 @@ export class WidgetInstance implements HostNode {
 		this.make(child, () => {
 			// (at its place, not at the end: making it ran user code, which may have added others after it)
 			if (this.holds(child)) {
-				r.Rwidget_insert_child(this.id, child.nativeWidget as r.Rid, this.nativeIndexOf(child, false));
+				r.Rwidget_insert_child(this.id, child.nativeWidget as r.Rid, this.placeAmongPlaced(child));
 			}
 		});
 	}
@@ -744,7 +789,9 @@ export class WidgetInstance implements HostNode {
 	private make(child: HostNode, place: () => void): void {
 		const failures: unknown[] = [];
 		attempt(failures, () => child.materialize());
-		if (failures.length > 0 && !child.placed) {
+		// (one that failed and that Raven does not have is not kept. Nor one whose making ran user code
+		// that deleted this: deleting this widget did not reach it, not placed yet)
+		if ((failures.length > 0 && !child.placed) || this.state !== "live") {
 			const index = this.children.indexOf(child);
 			if (index >= 0) {
 				this.children.splice(index, 1);
@@ -756,6 +803,7 @@ export class WidgetInstance implements HostNode {
 				child.dispose();
 			});
 			throwFirst(failures);
+			return;
 		}
 		// (making it ran user code, which may have taken it away from here)
 		if (this.children.includes(child)) {
@@ -782,7 +830,7 @@ export class WidgetInstance implements HostNode {
 		if (!pending) {
 			this.make(child, () => {
 				if (this.holds(child)) {
-					r.Rwidget_insert_child(this.id, child.nativeWidget as r.Rid, this.nativeIndexOf(child, false));
+					r.Rwidget_insert_child(this.id, child.nativeWidget as r.Rid, this.placeAmongPlaced(child));
 				}
 			});
 		}
@@ -915,7 +963,10 @@ export class WidgetInstance implements HostNode {
 			// (what it holds may be made, added to it while it waited: deleting no widget deletes those)
 			const failures: unknown[] = [];
 			for (const child of [...this.children]) {
-				attempt(failures, () => child.dispose());
+				// (a cleanup of one may have taken another away: it is no longer this one's)
+				if (this.children.includes(child)) {
+					attempt(failures, () => child.dispose());
+				}
 			}
 			throwFirst(failures);
 			return;

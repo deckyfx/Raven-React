@@ -324,6 +324,9 @@ export class WindowInstance implements HostNode {
 		this.state = "closing";
 		const failures: unknown[] = [];
 		const cleanups = this.takeClosing();
+		// (what it holds is not shown from now: a window a cleanup adds in it opens at the next opening)
+		this.content?.setShown(false);
+		this.island?.setShown(false);
 		const content = this.content?.widget ?? r.R_INVALID_ID;
 		// (the order of the content, before the children of the framework leave it)
 		const order = r.Rwidget_is_valid(content) ? Array.from({ length: r.Rwidget_get_child_count(content) }, (_, index) => r.Rwidget_get_child(content, index)) : [];
@@ -436,6 +439,8 @@ export class WindowInstance implements HostNode {
 		if (child.tag !== "Island" || this.island || !(child instanceof WidgetInstance)) {
 			return false;
 		}
+		// (shown again: closing the window said it was not)
+		child.setShown(true);
 		child.materialize();
 		const set = (widget: r.Rid): void => r.Rwindow_set_island(this.id, widget);
 		this.island = child;

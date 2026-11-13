@@ -107,7 +107,7 @@ The components, their props, events, windows, themes and tags are the same as wi
 
 - `runApp`, `RavenRoot.render` and `createWindow().root.render` take a function that returns the tree, as Solid's `render` does.
 - A component runs once, and a signal changes only the widgets that read it. A handler's change is on the widgets when the handler returns, so a controlled `TextInput` or `Checkbox` works as with React.
-- `ref` receives the `WidgetInstance` (or the `WindowInstance` of a `<Window>`) when the element is made; its `widget` is set once it is placed, by `onMount`.
+- `ref` receives the `WidgetInstance` once Raven has the widget, placed, as React's does: `ref={(input) => input.focus()}` works. An element never placed gives no ref. The `WindowInstance` of a `<Window>` comes when the element is made; the window opens once it is placed.
 - `createAction(name, handler)`, `createShortcut(() => window, keys, handler)` and `createFrame(handler)` are the hooks of React, and last as long as the component that calls them.
 - `<Portal widget={handle}>` renders into a widget made by hand, as `createPortal` does with React.
 - `registerTag` takes a Solid component, whose props follow the attributes of its element.

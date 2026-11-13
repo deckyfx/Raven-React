@@ -483,6 +483,92 @@ test("children placed before the window closed as it opened keep their place bef
 	outer.dispose();
 });
 
+test("a child a cleanup moved elsewhere while its parent, not placed, is disposed stays where it went", () => {
+	const window = WindowInstance.create(WINDOW);
+	window.materialize();
+	const elsewhere = WidgetInstance.create("VBox", { Name: "elsewhere" });
+	window.append(elsewhere);
+	const parent = WidgetInstance.create("VBox", {});
+	const open = WindowInstance.create(WINDOW);
+	open.materialize();
+	const moved = WidgetInstance.create("Label", { Name: "moved", Text: "moved" });
+	parent.append(open);
+	parent.append(moved);
+	open.whenOpen(() => () => {
+		parent.release(moved);
+		elsewhere.append(moved);
+	});
+	parent.dispose();
+	expect(r.Rwidget_find(window.window, "moved")).not.toBe(r.R_INVALID_ID);
+	window.forgetTree();
+	window.dispose();
+});
+
+test("a sibling put in while a child is made goes at its place among those Raven holds", () => {
+	const window = WindowInstance.create(WINDOW);
+	window.materialize();
+	const parent = WidgetInstance.create("VBox", { Name: "parent" });
+	window.append(parent);
+	parent.append(WidgetInstance.create("Label", { Name: "a", Text: "a" }));
+	const last = WidgetInstance.create("Label", { Name: "c", Text: "c" });
+	parent.append(last);
+	const made = WidgetInstance.create("VBox", { Name: "b" });
+	const sibling = WidgetInstance.create("Label", { Name: "s", Text: "s" });
+	const inner = WindowInstance.create(WINDOW);
+	let once = true;
+	// (while b is made, before c: s goes after b, which Raven does not hold yet, and before c)
+	inner.whenOpen(() => {
+		if (once) {
+			once = false;
+			parent.insertBefore(sibling, last);
+		}
+	});
+	made.append(inner);
+	parent.insertBefore(made, last);
+	const box = r.Rwidget_find(window.window, "parent");
+	expect(Array.from({ length: r.Rwidget_get_child_count(box) }, (_, index) => r.Rwidget_get_name(r.Rwidget_get_child(box, index)))).toEqual(["a", "b", "s", "c"]);
+	window.forgetTree();
+	window.dispose();
+});
+
+test("a child made while its parent is disposed goes with it", () => {
+	const window = WindowInstance.create(WINDOW);
+	window.materialize();
+	const parent = WidgetInstance.create("VBox", { Name: "parent" });
+	window.append(parent);
+	const child = WidgetInstance.create("VBox", { Name: "child" });
+	const inner = WindowInstance.create(WINDOW);
+	inner.whenOpen(() => window.remove(parent));
+	child.append(inner);
+	parent.append(child);
+	expect([r.Rwidget_is_valid(child.widget), inner.isOpen]).toEqual([0, false]);
+	window.forgetTree();
+	window.dispose();
+});
+
+test("a window a cleanup adds while the window that holds it closes opens with it, not before", () => {
+	const outer = WindowInstance.create(WINDOW);
+	outer.materialize();
+	const box = WidgetInstance.create("VBox", { Name: "box" });
+	outer.append(box);
+	const inner = WindowInstance.create(WINDOW);
+	const added = WindowInstance.create(WINDOW);
+	let once = true;
+	inner.whenOpen(() => () => {
+		if (once) {
+			once = false;
+			box.append(added);
+		}
+	});
+	box.append(inner);
+	outer.close();
+	expect([inner.isOpen, added.isOpen]).toEqual([false, false]);
+	outer.materialize();
+	expect([inner.isOpen, added.isOpen]).toEqual([true, true]);
+	outer.forgetTree();
+	outer.dispose();
+});
+
 test("a function that throws as soon as whenOpen runs it is not kept", () => {
 	const window = WindowInstance.create(WINDOW);
 	window.materialize();

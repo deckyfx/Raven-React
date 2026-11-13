@@ -1,7 +1,7 @@
 /** How a tag of Raven becomes a Solid component: what the generated components are made with. */
 
 import { splitProps, type JSX } from "solid-js";
-import type { WidgetInstance } from "../core/widget-instance";
+import { WidgetInstance, type HostNode } from "../core/widget-instance";
 import { SolidNode } from "./node";
 import { spread } from "./renderer";
 
@@ -21,10 +21,12 @@ export function tag<P extends object, R = WidgetInstance>(name: string): (props:
 		const node = SolidNode.element(name);
 		const [local, others] = splitProps(props, ["ref"]);
 		spread(node, others);
-		// (Solid compiles `ref={variable}` to a function that sets the variable)
+		// (Solid compiles `ref={variable}` to a function that sets the variable. As React's, it comes
+		// once Raven has the widget, placed: a window comes at once, as it opens only when placed)
 		const ref = local.ref;
 		if (typeof ref === "function") {
-			node.withInstance((instance) => (ref as (instance: R) => void)(instance as R));
+			const give = (instance: HostNode): void => (ref as (instance: R) => void)(instance as R);
+			node.withInstance((instance) => (instance instanceof WidgetInstance ? instance.whenPlaced(give) : give(instance)));
 		}
 		// (a node of Raven: Solid's JSX types know only the nodes of the DOM)
 		return node as unknown as JSX.Element;

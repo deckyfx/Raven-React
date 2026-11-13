@@ -40,13 +40,13 @@ jobs:
       run:
         shell: bash
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - name: Read the version of Raven
         # (a full commit or a tag; on Windows the line can end in a carriage return)
         run: echo "RAVEN_REF=$(tr -d '\r\n' < packages/raven-tsx/RAVEN_VERSION)" >> "$GITHUB_ENV"
 
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           repository: oscar-soirey/Raven
           ref: ${{ env.RAVEN_REF }}
@@ -96,10 +96,13 @@ jobs:
           RAVEN_CHECKOUT: ${{ github.workspace }}/raven-source
         run: bun test
 
-      - name: Compile the example
+      - name: Compile the examples
         if: matrix.test
         run: |
           cd examples/helloworld
+          bun run typecheck
+          bun run ./build.ts
+          cd ../solid-helloworld
           bun run typecheck
           bun run ./build.ts
 
@@ -115,7 +118,7 @@ jobs:
         working-directory: packages/raven-tsx
         run: bun run check:consumer --platform ../../dist/npm/${{ matrix.target }}
 
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: npm-${{ matrix.target }}
           path: dist/npm/${{ matrix.target }}
@@ -125,9 +128,10 @@ jobs:
   package:
     name: package
     needs: native
-    runs-on: ubuntu-latest
+    # (named, not ubuntu-latest, which moves to a new Ubuntu by itself: these jobs only pack and publish)
+    runs-on: ubuntu-24.04
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           persist-credentials: false
 
@@ -141,11 +145,13 @@ jobs:
         with:
           bun-version: 1.4.4
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v7
         with:
           node-version: 24
+          # (no cache in a release: setup-node caches npm's by itself from v5)
+          package-manager-cache: false
 
-      - uses: actions/download-artifact@v4
+      - uses: actions/download-artifact@v8
         with:
           pattern: npm-*
           path: dist/artifacts
@@ -163,7 +169,7 @@ jobs:
             (cd "$directory" && npm pack --dry-run)
           done
 
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: main-package
           path: dist/npm/main
@@ -175,18 +181,19 @@ jobs:
     name: publish
     if: vars.NPM_PUBLISH == 'true' && startsWith(github.ref, 'refs/tags/v')
     needs: package
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     environment: npm
     permissions:
       id-token: write
     steps:
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v7
         with:
           # (trusted publishing needs npm 11.5.1 or newer: the npm of Node 22 is 10)
           node-version: 24
           registry-url: https://registry.npmjs.org
+          package-manager-cache: false
 
-      - uses: actions/download-artifact@v4
+      - uses: actions/download-artifact@v8
         with:
           path: dist/artifacts
 

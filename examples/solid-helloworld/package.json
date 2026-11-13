@@ -1,0 +1,28 @@
+{
+  "name": "solid-helloworld",
+  "description": "Hello World of raven-tsx with Solid",
+  "module": "src/index.tsx",
+  "type": "module",
+  "private": true,
+  "engines": {
+    "bun": ">=1.4.4"
+  },
+  "scripts": {
+    "dev": "bun run src/index.tsx",
+    "build": "bun run typecheck && bun run ./build.ts",
+    "build:windows": "bun run typecheck && bun run ./build.ts --windows",
+    "typecheck": "bun check"
+  },
+  "dependencies": {
+    "@decky.fx/raven-tsx": "workspace:*",
+    "solid-js": "^1.9.19"
+  },
+  "devDependencies": {
+    "@babel/core": "^7.29.13",
+    "@types/bun": "latest",
+    "babel-preset-solid": "^1.9.19"
+  },
+  "peerDependencies": {
+    "typescript": "^6"
+  }
+}

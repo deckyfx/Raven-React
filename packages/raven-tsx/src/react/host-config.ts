@@ -125,7 +125,7 @@ const hostConfig: RavenHostConfig = {
 	bindToConsole: (_method, args) => console.log.bind(console, ...args),
 	getSuspendedCommitReason: () => null,
 	resetFormInstance: () => {},
-	rendererVersion: "0.1.0",
+	rendererVersion: "0.1.1",
 	rendererPackageName: "raven-tsx-react",
 	extraDevToolsConfig: null,
 };

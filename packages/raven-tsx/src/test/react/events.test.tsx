@@ -33,8 +33,9 @@ afterEach(() => {
 		window = r.R_INVALID_ID;
 	}
 	r.Rdraw_frame();
-	expect(errors.filter((detail) => !detail.includes("invalid widget handle 0xFFFFFFFF"))).toEqual([]);
-	errors.length = 0;
+	// (emptied first: a failure here must not fail every test after)
+	const reported = errors.splice(0);
+	expect(reported.filter((detail) => !detail.includes("invalid widget handle 0xFFFFFFFF"))).toEqual([]);
 	expect(eventStats().handlers).toBe(0);
 });
 
@@ -45,10 +46,14 @@ afterAll(() => {
 
 async function settle(ms = 20): Promise<void> {
 	const end = performance.now() + ms;
+	// (and some turns of the event loop at least: on a slow machine, a runner of CI, a few frames
+	// take all the time, and React's scheduler, which runs at those turns, would get none)
+	let turns = 0;
 	do {
 		r.Rdraw_frame();
 		await new Promise<void>((resolve) => setImmediate(resolve));
-	} while (performance.now() < end);
+		turns++;
+	} while (performance.now() < end || turns < 10);
 }
 
 async function mount(element: ReactNode): Promise<void> {
@@ -939,7 +944,8 @@ test("a Window and a widget take what is dropped", async () => {
 	const windows = new RavenRoot();
 	windows.render(<Window ref={owner} OnDrop={() => true}><VBox OnDrop={() => true} /></Window>);
 	await settle();
-	expect(eventStats().handlers).toBe(2);
+	// (the OnDrop of each, and what an open window is told when the user closes it)
+	expect(eventStats().handlers).toBe(3);
 	windows.unmount();
 	expect(eventStats().handlers).toBe(0);
 });

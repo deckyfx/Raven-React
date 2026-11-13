@@ -692,6 +692,8 @@ export const COMMON_PROPS: readonly string[] = [
 class ActionEvents {
 	private readonly handlers = new Map<string, (sender: r.Rid) => void>();
 	private readonly nameOf = new Map<r.Rid, string>();
+	/** The functions given to each name the application chose, in order: the last one has the name. */
+	private readonly named = new Map<string, ((sender: r.Rid) => void)[]>();
 	private callback: JSCallback | null = null;
 	private next = 0;
 
@@ -722,14 +724,35 @@ class ActionEvents {
 		this.handlers.set(name, () => (handler as () => void)());
 	}
 
-	/** Gives a function to an action of a name chosen by the application. It receives the sender. */
+	/**
+	 * Gives a function to an action of a name chosen by the application. It receives the sender.
+	 * A name given again belongs to the last one, until it stops: then to the one before.
+	 */
 	bind(name: string, handler: (sender: r.Rid) => void): void {
+		const registrations = this.named.get(name) ?? [];
+		registrations.push(handler);
+		this.named.set(name, registrations);
 		this.handlers.set(name, handler);
 		r.Raction_bind(name, this.pointer());
 	}
 
-	/** Takes the function of such an action away. */
-	unbind(name: string): void {
+	/** Takes such a function away: the one given, or all of the name. */
+	unbind(name: string, handler?: (sender: r.Rid) => void): void {
+		const registrations = this.named.get(name) ?? [];
+		if (handler !== undefined) {
+			const index = registrations.indexOf(handler);
+			if (index < 0) {
+				return;
+			}
+			registrations.splice(index, 1);
+			// (the last one still there has the name again)
+			const active = registrations.at(-1);
+			if (active) {
+				this.handlers.set(name, active);
+				return;
+			}
+		}
+		this.named.delete(name);
 		this.handlers.delete(name);
 		r.Raction_unbind(name);
 	}
@@ -761,38 +784,71 @@ export const actionEvents = new ActionEvents();
  * the application takes the element out when it agrees. One native callback for all windows.
  */
 class CloseEvents {
+	/** The `OnClose` of each window: it decides, and the window stays open. */
 	private readonly handlers = new Map<r.Rid, () => void>();
+	/** What is told that a window with no `OnClose` closes, as Raven closes it: its cleanups. */
+	private readonly notices = new Map<r.Rid, () => void>();
 	private callback: JSCallback | null = null;
 
 	/** Sets, changes or removes the function of a window. */
 	set(window: r.Rid, handler: EventHandler | undefined, alive = true): void {
+		const known = this.handlers.has(window) || this.notices.has(window);
 		if (!handler) {
-			if (this.handlers.delete(window) && alive) {
-				r.Rwindow_set_close_callback(window, null);
-			}
+			this.handlers.delete(window);
+			this.release(window, known, alive);
 			return;
 		}
-		const known = this.handlers.has(window);
 		this.handlers.set(window, handler as () => void);
 		if (!known) {
-			this.callback ??= new JSCallback(
-				(id: number): number => {
-					const close = this.handlers.get(id);
-					if (!close) {
-						return 1;
-					}
+			this.listen(window);
+		}
+	}
+
+	/** Sets or removes what is told that a window closes when it has no `OnClose`: the user closed it. */
+	notice(window: r.Rid, run: (() => void) | undefined, alive = true): void {
+		const known = this.handlers.has(window) || this.notices.has(window);
+		if (!run) {
+			this.notices.delete(window);
+			this.release(window, known, alive);
+			return;
+		}
+		this.notices.set(window, run);
+		if (!known) {
+			this.listen(window);
+		}
+	}
+
+	/** Asks Raven for the requests to close a window. */
+	private listen(window: r.Rid): void {
+		this.callback ??= new JSCallback(
+			(id: number): number => {
+				const close = this.handlers.get(id);
+				if (close) {
 					eventScope.run(close);
 					return 0;
-				},
-				{ args: ["u32", "ptr"], returns: "i32" },
-			);
-			r.Rwindow_set_close_callback(window, this.callback.ptr);
+				}
+				// (no OnClose: Raven closes it, once what is told of it has run)
+				const notice = this.notices.get(id);
+				if (notice) {
+					eventScope.run(notice);
+				}
+				return 1;
+			},
+			{ args: ["u32", "ptr"], returns: "i32" },
+		);
+		r.Rwindow_set_close_callback(window, this.callback.ptr);
+	}
+
+	/** Stops asking Raven once a window has neither. */
+	private release(window: r.Rid, known: boolean, alive: boolean): void {
+		if (known && alive && !this.handlers.has(window) && !this.notices.has(window)) {
+			r.Rwindow_set_close_callback(window, null);
 		}
 	}
 
 	/** How many windows have a function, for the tests. */
 	get size(): number {
-		return this.handlers.size;
+		return this.handlers.size + this.notices.size;
 	}
 }
 

@@ -80,3 +80,38 @@ test("finishPlacing gives the nodes of the batch what needs a parent, once", () 
 	parent.forgetTree();
 	parent.dispose();
 });
+
+test("a name given again belongs to the last one: the first one stopping leaves it", () => {
+	const fired: string[] = [];
+	const stopFirst = onAction("test.shared", () => fired.push("first"));
+	const stopSecond = onAction("test.shared", () => fired.push("second"));
+	stopFirst();
+	r.Raction_fire("test.shared", r.R_INVALID_ID);
+	expect(fired).toEqual(["second"]);
+	stopSecond();
+	r.Raction_fire("test.shared", r.R_INVALID_ID);
+	expect(fired).toEqual(["second"]);
+});
+
+test("the last one of a name stopping first gives the name back to the one before", () => {
+	const fired: string[] = [];
+	const stopFirst = onAction("test.stacked", () => fired.push("first"));
+	const stopSecond = onAction("test.stacked", () => fired.push("second"));
+	stopSecond();
+	r.Raction_fire("test.stacked", r.R_INVALID_ID);
+	expect(fired).toEqual(["first"]);
+	stopFirst();
+	r.Raction_fire("test.stacked", r.R_INVALID_ID);
+	expect(fired).toEqual(["first"]);
+});
+
+test("the same function given twice to a name is two registrations", () => {
+	let fired = 0;
+	const handler = (): void => void fired++;
+	const stopFirst = onAction("test.twice", handler);
+	const stopSecond = onAction("test.twice", handler);
+	stopFirst();
+	r.Raction_fire("test.twice", r.R_INVALID_ID);
+	expect(fired).toBe(1);
+	stopSecond();
+});

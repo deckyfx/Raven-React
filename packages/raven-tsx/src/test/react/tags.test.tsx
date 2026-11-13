@@ -42,10 +42,26 @@ afterAll(() => {
 /** Lets React and the event loop finish, with frames between. */
 async function settle(ms = 30): Promise<void> {
 	const end = performance.now() + ms;
+	// (and some turns of the event loop at least: on a slow machine, a runner of CI, a few frames
+	// take all the time, and React's scheduler, which runs at those turns, would get none)
+	let turns = 0;
 	do {
 		r.Rdraw_frame();
 		await new Promise<void>((resolve) => setImmediate(resolve));
-	} while (performance.now() < end);
+		turns++;
+	} while (performance.now() < end || turns < 10);
+}
+
+/**
+ * Lets React finish until something is so, or a time is over: a commit that opens or closes a
+ * window can take longer than `settle` on a slow machine (a runner of CI).
+ */
+async function settleUntil(done: () => boolean, ms = 2000): Promise<void> {
+	await settle();
+	const end = performance.now() + ms;
+	while (!done() && performance.now() < end) {
+		await settle(10);
+	}
 }
 
 /** Has Raven build some XML into a new window, as a document or a file would. */
@@ -274,11 +290,11 @@ test("the widgets of the children stay alive when the window the component put t
 	const kept = r.Rwidget_find(popups[0] ?? r.R_INVALID_ID, "kept");
 	expect(kept).not.toBe(r.R_INVALID_ID);
 	expect(r.Rwidget_set_attribute(popup, "Open", "false")).toBeTruthy();
-	await settle();
+	await settleUntil(() => !r.Rwindow_is_valid(popups[0] ?? r.R_INVALID_ID));
 	expect(r.Rwindow_is_valid(popups[0] ?? r.R_INVALID_ID)).toBeFalsy();
 	expect(r.Rwidget_is_valid(kept)).toBeTruthy();
 	expect(r.Rwidget_set_attribute(popup, "Open", "true")).toBeTruthy();
-	await settle();
+	await settleUntil(() => r.Rwidget_find(popups[1] ?? r.R_INVALID_ID, "kept") === kept);
 	expect(r.Rwidget_find(popups[1] ?? r.R_INVALID_ID, "kept")).toBe(kept);
 	// and they go with the element, its window with them
 	r.Rwidget_destroy(popup);
@@ -311,11 +327,11 @@ test("the widgets of the children stay alive when the island the component put t
 	const kept = r.Rwidget_find(window, "kept");
 	expect(r.Rwidget_get_parent(kept)).toBe(r.Rwindow_get_island(window));
 	expect(r.Rwidget_set_attribute(islanded, "On", "false")).toBeTruthy();
-	await settle();
+	await settleUntil(() => r.Rwindow_get_island(window) === r.R_INVALID_ID);
 	expect(r.Rwindow_get_island(window)).toBe(r.R_INVALID_ID);
 	expect(r.Rwidget_is_valid(kept)).toBeTruthy();
 	expect(r.Rwidget_set_attribute(islanded, "On", "true")).toBeTruthy();
-	await settle();
+	await settleUntil(() => r.Rwindow_get_island(window) !== r.R_INVALID_ID);
 	expect(r.Rwidget_get_parent(kept)).toBe(r.Rwindow_get_island(window));
 	expect(errors).toEqual([]);
 });

@@ -1,6 +1,6 @@
 # raven-tsx
 
-Native desktop interfaces in TSX, for [Bun](https://bun.com), on the real widgets of [Raven](https://github.com/oscar-soirey/Raven). A core knows only Raven, and an adapter for a framework is built on it; React is the one there is today. No XML and no build step, as Bun compiles TSX itself.
+Native desktop interfaces in TSX, for [Bun](https://bun.com), on the real widgets of [Raven](https://github.com/oscar-soirey/Raven). A core knows only Raven, and an adapter for a framework is built on it: there is one for React and one for [Solid](#solid). No XML, and with React no build step, as Bun compiles TSX itself.
 
 ```tsx
 import { useState } from "react";
@@ -27,11 +27,13 @@ Every C example of Raven has a TSX port in [examples](../../examples), with scre
 
     bun add @decky.fx/raven-tsx react react-reconciler
 
-`react` and `react-reconciler` are optional peer dependencies: `@decky.fx/raven-tsx/react` needs both, and an application that uses only the core installs neither.
+For Solid, see [Solid](#solid). The frameworks are optional peer dependencies: an application installs those of the adapter it uses, and one that uses only the core installs none.
 
 | Import | What it is |
 |---|---|
 | `@decky.fx/raven-tsx/react` | The components, `runApp`, the hooks and `registerTag`, for React, and everything of the core |
+| `@decky.fx/raven-tsx/solid` | The same for Solid, with `create...` functions in place of the hooks |
+| `@decky.fx/raven-tsx/solid/preload`, `/solid/plugin` | The Bun plugin that compiles TSX for Solid: to preload, or to give `Bun.build` |
 | `@decky.fx/raven-tsx` | The core, for code that is not a component: `defineTheme`, `loadTheme`, `raven`, and `onAction`, `onShortcut`, `onFrame`, which each return what stops them |
 
 ```json
@@ -62,6 +64,54 @@ For another platform, install its package first:
 
     bun install --os=win32 --cpu=x64
     bun build --compile --target=bun-windows-x64 src/index.tsx --outfile app.exe
+
+An application of Solid builds with `Bun.build` and the plugin, as [examples/solid-helloworld/build.ts](../../examples/solid-helloworld/build.ts) does.
+
+## Solid
+
+    bun add @decky.fx/raven-tsx solid-js
+    bun add -d babel-preset-solid @babel/core
+
+Solid compiles its JSX itself, with Babel, to calls of a renderer: Bun alone would compile it for React. The plugin of the package does that, and gives Solid's build for clients, as on Bun `solid-js` would otherwise be its build for servers, which does not react. Preload it, for `bun run` and `bun test`:
+
+```toml
+# bunfig.toml
+preload = ["@decky.fx/raven-tsx/solid/preload"]
+
+[test]
+preload = ["@decky.fx/raven-tsx/solid/preload"]
+```
+
+```json
+{ "compilerOptions": { "jsx": "preserve", "jsxImportSource": "solid-js", "types": ["bun"] } }
+```
+
+```tsx
+import { createSignal } from "solid-js";
+import { Button, Label, runApp, VBox } from "@decky.fx/raven-tsx/solid";
+
+function App() {
+	const [count, setCount] = createSignal(0);
+	return (
+		<VBox Spacing={12} Slot={{ Padding: 24 }}>
+			<Label>Clicked {count()} times</Label>
+			<Button Style="Primary" OnClicked={() => setCount(count() + 1)}>Click me</Button>
+		</VBox>
+	);
+}
+
+await runApp(() => <App />, { Title: "Hello", Width: 480, Height: 240 });
+```
+
+The components, their props, events, windows, themes and tags are the same as with React, on the same core; what differs is Solid's:
+
+- `runApp`, `RavenRoot.render` and `createWindow().root.render` take a function that returns the tree, as Solid's `render` does.
+- A component runs once, and a signal changes only the widgets that read it. A handler's change is on the widgets when the handler returns, so a controlled `TextInput` or `Checkbox` works as with React.
+- `ref` receives the `WidgetInstance` once Raven has the widget, placed, as React's does: `ref={(input) => input.focus()}` works. An element never placed gives no ref. The `WindowInstance` of a `<Window>` comes when the element is made; the window opens once it is placed.
+- `createAction(name, handler)`, `createShortcut(() => window, keys, handler)` and `createFrame(handler)` are the hooks of React, and last as long as the component that calls them.
+- `<Portal widget={handle}>` renders into a widget made by hand, as `createPortal` does with React.
+- `registerTag` takes a Solid component, whose props follow the attributes of its element.
+- An element kept in a variable and shown again (`<Show>`) keeps its widget; one whose component is gone is deleted.
 
 ## How props work
 
@@ -340,7 +390,7 @@ An `Image` shows an SVG file like any other: `<Image Source="logo.svg" />`.
 
 ## Working on this package
 
-The repository is a Bun workspace, with this package in `packages/raven-tsx` and the examples in `examples`: `helloworld` tries everything, the others are the examples of Raven in TSX. It expects a Raven checkout two folders up, at `../../raven` from the root:
+The repository is a Bun workspace, with this package in `packages/raven-tsx` and the examples in `examples`: `helloworld` tries everything, `solid-helloworld` is the same with Solid, the others are the examples of Raven in TSX. It expects a Raven checkout two folders up, at `../../raven` from the root:
 
     raven/                 github.com/oscar-soirey/Raven
     bun/raven-tsx/         this repository

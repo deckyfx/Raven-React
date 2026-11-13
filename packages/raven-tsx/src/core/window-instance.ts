@@ -75,9 +75,35 @@ function setWindowEvents(window: r.Rid, handlers: ReadonlyMap<string, EventHandl
  * it can be anywhere in the tree, and goes away when its element does. It opens once it is placed:
  * a render the framework throws away opens nothing.
  */
+/** Throws the first of some failures, once all that could run has run. */
+function throwFirst(failures: readonly unknown[]): void {
+	if (failures.length > 0) {
+		throw failures[0];
+	}
+}
+
+/** Runs a function, and keeps its failure with the others, to go on with what must be done. */
+function attempt(failures: unknown[], run: () => void): void {
+	try {
+		run();
+	} catch (error) {
+		failures.push(error);
+	}
+}
+
+/** A function that runs when a window opens, and what it gave to run when it closes. */
+interface Opening {
+	readonly run: () => (() => void) | void;
+	cleanup: (() => void) | null;
+}
+
 export class WindowInstance implements HostNode {
 	readonly tag = "Window";
 	readonly nativeWidget = null;
+
+	get placed(): boolean {
+		return this.state === "live" && this.isOpen;
+	}
 	private id: r.Rid = r.R_INVALID_ID;
 	/** Where its widgets go, once it is open. */
 	private content: WidgetInstance | null = null;
@@ -85,7 +111,25 @@ export class WindowInstance implements HostNode {
 	private readonly initial: HostNode[] = [];
 	/** Its `<Island>`: it floats above the content, as in XML, and the window owns it. */
 	private island: WidgetInstance | null = null;
-	private state: "pending" | "live" | "gone" = "pending";
+	private state: "pending" | "live" | "closing" | "gone" = "pending";
+	/** A dispose asked for while the window closes: done once it is closed. */
+	private disposeAsked = false;
+	/** Closed because what holds it left the tree (`closeWindows`): `openWindows` opens it again. */
+	private hidden = false;
+	/** What runs each time the window opens, with what it returned to run when it closes. */
+	private readonly opening = new Set<Opening>();
+	/** How many times it opened: a cleanup returned for an opening that is over runs at once. */
+	private openings = 0;
+	/** While it opens, before its opening pass: a function `whenOpen` gets then runs in that pass, once. */
+	private draining = false;
+	/** Its handlers were forgotten (`forgetTree`): placed again alive, it gets them back. */
+	private forgotten = false;
+	/** The widget that holds it in the tree, if any: one at the top of a root, or in a window, has none. */
+	private holder: WidgetInstance | null = null;
+	/** What the application put in its content itself, kept alive while it is closed. */
+	private readonly keptNative: r.Rid[] = [];
+	/** The widgets of its content when it closed, in order: what the application put there goes back to its place. */
+	private keptOrder: r.Rid[] = [];
 
 	private constructor(private resolved: ResolvedProps) {}
 
@@ -104,21 +148,249 @@ export class WindowInstance implements HostNode {
 		if (this.state !== "pending") {
 			return;
 		}
+		// (what holds it was taken out of the tree, alive: it opens once that is placed again, at `openWindows`)
+		if (this.holder && !this.holder.attached) {
+			this.hidden = true;
+			return;
+		}
 		const { window, content } = makeWindow(this.resolved.attributes);
+		// (once it is made: one that could not be made still opens with its tree)
+		this.hidden = false;
 		this.id = window;
 		this.content = WidgetInstance.forContainer(content);
 		this.state = "live";
+		// (user code run by a child may close the window, and open it again: that is another window,
+		// whose opening is done; this one is over)
+		const current = (): boolean => this.state === "live" && this.id === window;
+		this.draining = true;
 		try {
 			closeEvents.set(window, this.resolved.handlers.get("OnClose"));
+			// (with no OnClose, the user closes it at any time: what its openings gave runs then)
+			closeEvents.notice(window, () => this.closedByUser());
 			setWindowEvents(window, this.resolved.handlers);
-			for (const child of this.initial.splice(0)) {
-				this.append(child);
+			// (each child goes in, also past one that fails: then the window goes, with all of them)
+			// (one at a time: one that user code released meanwhile is no longer waiting here. And not
+			// once user code closed the window: what is left waits for the next opening)
+			const failures: unknown[] = [];
+			while (current()) {
+				const child = this.initial.shift();
+				if (!child) {
+					break;
+				}
+				attempt(failures, () => this.append(child));
+			}
+			throwFirst(failures);
+			if (current()) {
+				this.restoreNative(content);
 			}
 		} catch (error) {
-			this.forgetTree();
-			this.dispose();
+			// (only this opening goes: one a child opened again meanwhile, after closing this one, stays)
+			if (!(this.state === "live" && this.id !== window)) {
+				this.forgetTree();
+				this.dispose();
+			}
 			throw error;
 		}
+		// (closed while it opened: that was no opening, and the next placing opens it)
+		if (!current()) {
+			return;
+		}
+		this.draining = false;
+		this.openings++;
+		this.runOpening();
+	}
+
+	/**
+	 * Puts back what the application put in the content itself, each just before the first widget
+	 * that came after it when the window closed: its place among the children of the framework.
+	 */
+	private restoreNative(content: r.Rid): void {
+		const order = this.keptOrder;
+		this.keptOrder = [];
+		for (const widget of this.keptNative.splice(0)) {
+			// (one the application placed elsewhere meanwhile is that place's)
+			if (!this.stillKept(widget)) {
+				continue;
+			}
+			const at = order.indexOf(widget);
+			const after = new Set(at < 0 ? [] : order.slice(at + 1));
+			const count = r.Rwidget_get_child_count(content);
+			let position = count;
+			for (let index = 0; index < count; index++) {
+				if (after.has(r.Rwidget_get_child(content, index))) {
+					position = index;
+					break;
+				}
+			}
+			r.Rwidget_insert_child(content, widget, position);
+		}
+	}
+
+	/** Destroys what the application put in the content, kept while the window was closed. */
+	private destroyKeptNative(): void {
+		this.keptOrder = [];
+		for (const widget of this.keptNative.splice(0)) {
+			if (this.stillKept(widget)) {
+				r.Rwidget_destroy(widget);
+			}
+		}
+	}
+
+	/** Whether a widget kept while the window is closed is still its own: alive, and in no other parent. */
+	private stillKept(widget: r.Rid): boolean {
+		return r.Rwidget_is_valid(widget) !== 0 && r.Rwidget_get_parent(widget) === r.R_INVALID_ID;
+	}
+
+	/** Runs what waits for the window to open, each once: the first that threw says so after. */
+	private runOpening(): void {
+		// (a failure of one is not a failure of the window, which stays. One cancelled meanwhile, or
+		// all once the window is gone, disposed or destroyed in Raven, do not run)
+		const failures: unknown[] = [];
+		const openings = this.openings;
+		for (const opening of [...this.opening]) {
+			// (a function that closed the window and opened it again started a pass of its own)
+			if (this.openings !== openings) {
+				break;
+			}
+			if (!this.opening.has(opening) || !this.isOpen) {
+				continue;
+			}
+			try {
+				this.runOpeningOf(opening);
+			} catch (error) {
+				failures.push(error);
+			}
+		}
+		throwFirst(failures);
+	}
+
+	/**
+	 * Runs one function of an opening, and keeps what it returns for the closing. If the function
+	 * cancelled itself or closed the window, that opening is over: what it returned runs now.
+	 */
+	private runOpeningOf(opening: Opening): void {
+		const openings = this.openings;
+		const cleanup = opening.run() ?? null;
+		if (this.opening.has(opening) && this.state === "live" && this.isOpen && this.openings === openings) {
+			opening.cleanup = cleanup;
+		} else {
+			cleanup?.();
+		}
+	}
+
+	/** Takes the cleanups of the opening that ends, to run once the window is closed. */
+	private takeClosing(): (() => void)[] {
+		const cleanups: (() => void)[] = [];
+		for (const opening of this.opening) {
+			if (opening.cleanup) {
+				cleanups.push(opening.cleanup);
+				opening.cleanup = null;
+			}
+		}
+		return cleanups;
+	}
+
+	/**
+	 * Runs a function each time the window opens: now if it is open, and again if it is closed and
+	 * placed again (`close`). What it returns runs when the window closes. Returns what cancels it,
+	 * running that too. A framework's ref gives the window before it opens.
+	 */
+	whenOpen(run: () => (() => void) | void): () => void {
+		if (this.state === "gone") {
+			return () => {};
+		}
+		const opening: Opening = { run, cleanup: null };
+		this.opening.add(opening);
+		// (a window the user closed, or Raven destroyed, does not open again. One that opens runs it with the rest)
+		if (this.state === "live" && this.isOpen && !this.draining) {
+			try {
+				this.runOpeningOf(opening);
+			} catch (error) {
+				// (the caller gets no way to cancel it: it is not kept. What a run of it gave meanwhile,
+				// opening the window again, runs now: nothing would run it after)
+				this.opening.delete(opening);
+				const cleanup = opening.cleanup;
+				opening.cleanup = null;
+				try {
+					cleanup?.();
+				} catch (cleanupError) {
+					console.error("raven-tsx: a cleanup of whenOpen failed:", cleanupError);
+				}
+				throw error;
+			}
+		}
+		return () => {
+			this.opening.delete(opening);
+			const cleanup = opening.cleanup;
+			opening.cleanup = null;
+			cleanup?.();
+		};
+	}
+
+	/**
+	 * Closes the window and keeps what it holds, alive, to open again when it is placed again: the
+	 * same instance, as its `ref` gave it. A framework that takes a window out of its tree, and may
+	 * put it back, closes it. (`window` is then another handle)
+	 */
+	close(): void {
+		if (this.state !== "live") {
+			return;
+		}
+		if (!this.isOpen) {
+			// (closed by the user, or destroyed in Raven, with what it held: it does not open again)
+			this.forgetTree();
+			this.dispose();
+			return;
+		}
+		// (while it closes, what user code does to it waits: whenOpen for the next opening, dispose for the end)
+		this.state = "closing";
+		const failures: unknown[] = [];
+		const cleanups = this.takeClosing();
+		// (what it holds is not shown from now: a window a cleanup adds in it opens at the next opening)
+		this.content?.setShown(false);
+		this.island?.setShown(false);
+		const content = this.content?.widget ?? r.R_INVALID_ID;
+		// (the order of the content, before the children of the framework leave it)
+		const order = r.Rwidget_is_valid(content) ? Array.from({ length: r.Rwidget_get_child_count(content) }, (_, index) => r.Rwidget_get_child(content, index)) : [];
+		// (the windows in it close too, kept to open with it)
+		attempt(failures, () => this.content?.closeWindows());
+		attempt(failures, () => this.island?.closeWindows());
+		const children = this.content?.releaseChildren() ?? [];
+		const island = this.island;
+		if (island) {
+			this.detachIsland(island);
+		}
+		// (what the application put in the content itself stays alive too. What is still kept from
+		// before, not put back since, keeps its place after)
+		this.keptOrder = [...order, ...this.keptOrder.filter((widget) => !order.includes(widget))];
+		while (r.Rwidget_is_valid(content) && r.Rwidget_get_child_count(content) > 0) {
+			const widget = r.Rwidget_get_child(content, 0);
+			r.Rwidget_remove_child(content, widget);
+			this.keptNative.push(widget);
+		}
+		closeEvents.set(this.id, undefined, false);
+		closeEvents.notice(this.id, undefined, false);
+		for (const event of Object.values(WINDOW_EVENTS)) {
+			event.off(this.id, false);
+		}
+		if (this.isOpen) {
+			r.Rwindow_destroy(this.id);
+		}
+		this.id = r.R_INVALID_ID;
+		this.content = null;
+		this.state = "pending";
+		// (before those that still waited: closed while it opened, it had placed these first. The island
+		// first: another Island among the children would take its place)
+		this.initial.unshift(...(island ? [island] : []), ...children);
+		// (last: a cleanup sees the window closed)
+		for (const cleanup of cleanups) {
+			attempt(failures, cleanup);
+		}
+		if (this.disposeAsked) {
+			this.disposeAsked = false;
+			attempt(failures, () => this.dispose());
+		}
+		throwFirst(failures);
 	}
 
 	/** Whether the window still exists: without an `OnClose`, the user can close it at any time. */
@@ -126,7 +398,49 @@ export class WindowInstance implements HostNode {
 		return this.id !== r.R_INVALID_ID && r.Rwindow_is_valid(this.id) !== 0;
 	}
 
-	setParent(): void {}
+	/** Gives back what `forgetTree` took: a cleanup placed it elsewhere, alive, as its tree was deleted. */
+	rememberTree(): void {
+		if (!this.forgotten) {
+			return;
+		}
+		this.forgotten = false;
+		if (this.state !== "live" || !this.isOpen) {
+			return;
+		}
+		this.content?.rememberTree();
+		this.island?.rememberTree();
+		closeEvents.set(this.id, this.resolved.handlers.get("OnClose"));
+		closeEvents.notice(this.id, () => this.closedByUser());
+		setWindowEvents(this.id, this.resolved.handlers);
+	}
+
+	/** The user closed it, with no OnClose to ask: Raven destroys it now. What its openings gave runs. */
+	private closedByUser(): void {
+		const failures: unknown[] = [];
+		for (const cleanup of this.takeClosing()) {
+			attempt(failures, cleanup);
+		}
+		throwFirst(failures);
+	}
+
+	/** What holds it in the tree, to know whether that is shown: a window opens only then. */
+	setParent(parent: WidgetInstance | null): void {
+		this.holder = parent;
+	}
+
+	closeWindows(): void {
+		if (this.state === "live") {
+			this.hidden = true;
+			this.close();
+		}
+	}
+
+	openWindows(): void {
+		// (only one closed with its tree: one closed by other code stays closed)
+		if (this.hidden) {
+			this.materialize();
+		}
+	}
 
 	applyParentAttributes(): void {}
 
@@ -174,15 +488,25 @@ export class WindowInstance implements HostNode {
 		if (child.tag !== "Island" || this.island || !(child instanceof WidgetInstance)) {
 			return false;
 		}
+		// (shown again: closing the window said it was not)
+		child.setShown(true);
 		child.materialize();
 		const set = (widget: r.Rid): void => r.Rwindow_set_island(this.id, widget);
 		this.island = child;
 		child.setHolder(set);
 		set(child.widget);
+		// (an island kept while the window was closed opens the windows in it again; one a deleted
+		// tree let go, alive, gets back its handlers first)
+		child.rememberTree();
+		child.openWindows();
 		return true;
 	}
 
 	append(child: HostNode): void {
+		if (this.state !== "live") {
+			this.appendInitial(child);
+			return;
+		}
 		if (child !== this.island && !this.takeIsland(child)) {
 			this.open.append(child);
 		}
@@ -192,11 +516,60 @@ export class WindowInstance implements HostNode {
 		if (this.state === "live") {
 			this.append(child);
 		} else {
+			this.releaseInitial(child);
 			this.initial.push(child);
 		}
 	}
 
+	/** Takes a child out of those that go in when the window opens. */
+	private releaseInitial(child: HostNode): void {
+		const index = this.initial.indexOf(child);
+		if (index >= 0) {
+			this.initial.splice(index, 1);
+		}
+	}
+
+	release(child: HostNode): void {
+		// (also while it opens: what waits to go in is let go too)
+		this.releaseInitial(child);
+		// (while it closes too, it has its content: what it keeps to open again is read from there)
+		if (!this.content) {
+			return;
+		}
+		if (child !== this.island) {
+			this.content.release(child);
+			return;
+		}
+		this.detachIsland(child);
+	}
+
+	/** Takes the island out of the window, alive. */
+	private detachIsland(child: HostNode): void {
+		this.island = null;
+		(child as WidgetInstance).setHolder(null);
+		const widget = child.nativeWidget;
+		if (this.isOpen && widget !== null && r.Rwidget_is_valid(widget)) {
+			// (Rwindow_set_island would delete it: a widget added elsewhere leaves its window alive)
+			const holder = r.Rwidget_create_from_xml("<VBox/>");
+			r.Rwidget_add_child(holder, widget);
+			r.Rwidget_remove_child(holder, widget);
+			r.Rwidget_destroy(holder);
+		}
+	}
+
 	insertBefore(child: HostNode, before: HostNode): void {
+		// (while it closes, its children are still in its content, to wait for the next opening in
+		// their order: one put before one of them goes there, and waits with them)
+		if (this.state === "closing" && this.content && before !== this.island && this.content.has(before)) {
+			this.content.insertBefore(child, before);
+			return;
+		}
+		if (this.state !== "live") {
+			this.releaseInitial(child);
+			const index = this.initial.indexOf(before);
+			this.initial.splice(index < 0 ? this.initial.length : index, 0, child);
+			return;
+		}
 		if (child === this.island || this.takeIsland(child)) {
 			return;
 		}
@@ -209,8 +582,16 @@ export class WindowInstance implements HostNode {
 	}
 
 	remove(child: HostNode): void {
+		// (also while it opens: what waits to go in goes from there, and does not go in after)
+		this.releaseInitial(child);
+		if (!this.content) {
+			// (a child can be live already, moved here: its handlers go before it does)
+			child.forgetTree();
+			child.dispose();
+			return;
+		}
 		if (child !== this.island) {
-			this.open.remove(child);
+			this.content.remove(child);
 			return;
 		}
 		child.forgetTree();
@@ -228,29 +609,63 @@ export class WindowInstance implements HostNode {
 		if (this.state !== "live") {
 			return;
 		}
+		this.forgotten = true;
 		this.content?.forgetTree();
 		this.island?.forgetTree();
 		closeEvents.set(this.id, undefined, false);
+		closeEvents.notice(this.id, undefined, false);
 		for (const event of Object.values(WINDOW_EVENTS)) {
 			event.off(this.id, false);
 		}
 	}
 
 	dispose(): void {
-		const state = this.state;
-		this.state = "gone";
-		if (state !== "live") {
+		if (this.state === "closing") {
+			this.disposeAsked = true;
 			return;
 		}
+		const state = this.state;
+		const cleanups = state === "live" ? this.takeClosing() : [];
+		this.state = "gone";
+		this.opening.clear();
+		const failures: unknown[] = [];
+		// (what waited to go in: what a framework placed in it and took back, alive, goes with it. Also
+		// while it opens: a child that disposed it stopped the others going in)
+		// (one at a time: a cleanup of one may take another away first, which then is no longer here)
+		for (let child = this.initial.shift(); child; child = this.initial.shift()) {
+			const next = child;
+			attempt(failures, () => {
+				next.forgetTree();
+				next.dispose();
+			});
+		}
+		if (state !== "live") {
+			this.destroyKeptNative();
+			throwFirst(failures);
+			return;
+		}
+		// (what it holds is not shown from now: a window a cleanup adds in it does not open)
+		this.content?.setShown(false);
+		this.island?.setShown(false);
 		if (this.isOpen) {
 			// (the window destroys what it holds: those of registered tags are theirs)
 			this.content?.releaseAdopted();
 			this.island?.releaseAdopted();
 		}
-		this.content?.disposeDetached();
-		this.island?.disposeDetached();
+		attempt(failures, () => this.content?.disposeDetached());
+		attempt(failures, () => this.island?.disposeDetached());
+		// (what it asked of Raven goes: a window forgotten first has none, one disposed directly still does)
+		closeEvents.set(this.id, undefined, false);
+		closeEvents.notice(this.id, undefined, false);
 		if (this.isOpen) {
 			r.Rwindow_destroy(this.id);
 		}
+		// (what the application put in the content, kept while it was closed, and not put back: opening failed)
+		this.destroyKeptNative();
+		// (last, as for close: a cleanup that closes or disposes the window finds it gone)
+		for (const cleanup of cleanups) {
+			attempt(failures, cleanup);
+		}
+		throwFirst(failures);
 	}
 }

@@ -1,8 +1,8 @@
 # Plan: raven-tsx
 
-raven-tsx is one library that makes Raven's native widgets from TSX. It is split into a core, which knows only Raven, and an adapter for each framework. React is the first adapter. Solid is the second, if a short test of its compiler on Bun works out.
+raven-tsx is one library that makes Raven's native widgets from TSX. It is split into a core, which knows only Raven, and an adapter for each framework. React is the first adapter, and Solid the second.
 
-Nothing has been published to npm yet.
+0.1.0 was published to npm on 2026-11-12, with React only. Solid comes with 0.1.1.
 
 ## Where things stand
 
@@ -55,6 +55,13 @@ This is the Node-API binding recommended on 2026-11-08: `bindings/node` upstream
 Its first step is in `src/core`: move the direct uses of `bun:ffi` (`events.ts`, `frame.ts`, `tags.ts`), `web.ts` (`dlopen`) and `native.ts` (`Bun.file`, `Bun.hash`) behind a backend interface.
 
 ## Phase 4: Solid adapter
+
+**Done, for 0.1.1.** What was built, and where it differs from the plan below:
+- The compiler test passed, with our own plugin (`solid/plugin.ts`): Babel and `babel-preset-solid` in universal mode, through `preload` for `bun run` and `bun test`, and given to `Bun.build` for one executable. Bun 1.4.4 runs no `onResolve` of a runtime plugin for a package, so the plugin cannot send `solid-js` to its build for clients: it loads the client's file in place of the server's, as Solid's `exports` pair them. Babel keeps the lines of the source (`retainLines`), as Bun does not read its source maps.
+- No flush: a node gives the core all its props at each change, at once. A controlled `TextInput` needs its value set before the put-back that follows an event, and a microtask would come after it.
+- `removeNode` does not dispose. A node goes when it is out of the tree and the Solid owner that made it is gone, so an element kept in a variable can be shown again.
+- The core takes props and children on a node not yet placed (`update` and `append` on a pending node), and gives a child back alive (`release`). An island cannot leave its window alive: Raven deletes the island it replaces.
+- 32 tests in `test/solid/`, `examples/solid-helloworld` (the React `helloworld`'s basics, one executable), and `check:consumer` builds and runs a Solid application from the packed tarballs.
 
 ### 4a. Test the compiler first (half a day, decides whether to go on)
 
@@ -119,11 +126,10 @@ If one of these fails, stop and write down why. React stays the only adapter.
 | 1. Rename | nothing | done |
 | 2. Core and React separated | nothing | done |
 | 3. Node.js backend | an upstream binding | its own plan |
-| 4a. Solid compiler test | nothing | half a day |
-| 4b–d. Solid adapter, tests, two examples | 4a works | 3–5 days |
+| 4. Solid adapter | nothing | done |
 
 ## Decisions for the user
 
 1. **Package layout.** Decided: one package with subpaths.
 2. **Repository name.** Decided: `raven-tsx`, all lowercase.
-3. **Whether to do Solid**, or stop at a clean core until someone asks for it.
+3. **Whether to do Solid.** Decided: done, in 0.1.1.

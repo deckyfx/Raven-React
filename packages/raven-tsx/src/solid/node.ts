@@ -147,6 +147,13 @@ export class SolidNode {
 		this.parent?.refresh();
 	}
 
+	/** Gives the Text again when widgets came or went beside an empty text: see `textChildren`. */
+	private refreshTextOf(): void {
+		if (this.children.some((node) => node.isText)) {
+			this.refresh();
+		}
+	}
+
 	/** Text beside widgets is an error, as with React: said before anything changes, whichever comes first. */
 	private checkMixed(child: SolidNode): void {
 		// (as with React: text at the top of a tree, in a root or a portal, has no widget to be the Text of)
@@ -183,15 +190,15 @@ export class SolidNode {
 			return;
 		}
 		const host = this.instance;
-		const childHost = child.instance;
-		// (making a `<Separator>` ran its ref, which may have taken the child away, or deleted it or
-		// this, or put others beside it: what comes after it is read after)
-		if (child.parent !== this || child.destroyed || this.destroyed) {
-			return;
-		}
-		const next = this.children.slice(this.children.indexOf(child) + 1).find((node) => !node.isText);
-		const beforeHost = next?.instance;
 		try {
+			// (making a `<Separator>` runs its ref, which may throw, or take the child away, or delete
+			// it or this, or put others beside it: what comes after it is read after)
+			const childHost = child.instance;
+			if (child.parent !== this || child.destroyed || this.destroyed) {
+				return;
+			}
+			const next = this.children.slice(this.children.indexOf(child) + 1).find((node) => !node.isText);
+			const beforeHost = next?.instance;
 			if (beforeHost) {
 				host.insertBefore(childHost, beforeHost);
 			} else {
@@ -210,8 +217,10 @@ export class SolidNode {
 			}
 			child.parent = null;
 			try {
-				host.release(childHost);
-				childHost.closeWindows();
+				if (child.host) {
+					host.release(child.host);
+					child.host.closeWindows();
+				}
 			} catch (cleanup) {
 				console.error("raven-tsx: cleaning up a child that failed:", cleanup);
 			} finally {
@@ -228,8 +237,10 @@ export class SolidNode {
 		}
 		// (moved to a parent not placed: its windows close, to open with it)
 		if (moved && !host.placed) {
-			childHost.closeWindows();
+			child.host?.closeWindows();
 		}
+		// (an empty text beside widgets is no Text, and alone it is: the Text follows what is here)
+		this.refreshTextOf();
 		// (what was made now has its parent: the attributes of its place go to it)
 		finishPlacing();
 	}
@@ -246,6 +257,7 @@ export class SolidNode {
 			this.refresh();
 		} else if (child.host) {
 			this.instance.release(child.host);
+			this.refreshTextOf();
 			// (a window is no widget of its parent: out of the tree, it closes, and those it holds, to open when placed again)
 			if (closing) {
 				child.host.closeWindows();

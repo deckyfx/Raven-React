@@ -5,6 +5,7 @@ import { afterAll, afterEach, beforeAll, expect, test } from "bun:test";
 import { createRoot, createSignal, ErrorBoundary, For, onCleanup, onMount, Show, type JSX } from "solid-js";
 import * as r from "../../core/raven";
 import { eventStats } from "../../core/events";
+import { resolveProps, type RavenProps } from "../../core/props";
 import { SolidNode } from "../../solid/node";
 import {
 	Border, Button, Checkbox, createAction, createFrame, createShortcut, createWindow, HBox, Island, Label, Menu, MenuBar, MenuItem, Portal, RavenRoot, Separator, TextInput, VBox, Window,
@@ -940,6 +941,48 @@ test("a tree a render in the code made stays when that code then throws", async 
 		}),
 	).toThrow("after the render");
 	expect(text("inner")).toBe("inner");
+});
+
+test("a Separator whose ref throws is not kept in the tree, and the next ones go in", async () => {
+	await mount(() => <VBox Name="list" />);
+	const list = SolidNode.container(find("list"));
+	const line = SolidNode.element("Separator");
+	line.withInstance(() => {
+		throw new Error("from the ref");
+	});
+	expect(() => list.insert(line, null)).toThrow("from the ref");
+	expect(list.children).toEqual([]);
+	const after = SolidNode.element("Label");
+	after.setProp("Name", "after");
+	list.insert(after, null);
+	expect(namesUnder("list")).toEqual(["after"]);
+	list.clear();
+});
+
+test("an empty text beside a widget that goes is the Text again", async () => {
+	const [shown, setShown] = createSignal(true);
+	// (what the node gives the core as Text, each time: a Button holds widgets, but says no Text back)
+	const given: (string | undefined)[] = [];
+	const watch = (instance: WidgetInstance): void => {
+		const update = instance.update.bind(instance);
+		instance.update = <Child,>(props: RavenProps<Child>): void => {
+			// (as the core reads it: text in the children is the Text)
+			given.push(resolveProps(props).attributes.get("Text"));
+			update(props);
+		};
+	};
+	await mount(() => (
+		<Button Name="b" Text="prop" ref={watch}>
+			{""}
+			{shown() && <Label Name="inner" />}
+		</Button>
+	));
+	setShown(false);
+	// (alone, the empty text is the Text the code wrote)
+	expect(given.at(-1)).toBe("");
+	setShown(true);
+	// (beside a widget, it is no Text: the prop is)
+	expect(given.at(-1)).toBe("prop");
 });
 
 test("an element kept in a variable, shown in a Portal, keeps its widget when the Portal comes back", async () => {

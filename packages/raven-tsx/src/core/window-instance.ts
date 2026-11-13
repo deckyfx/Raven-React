@@ -346,7 +346,8 @@ export class WindowInstance implements HostNode {
 		this.id = r.R_INVALID_ID;
 		this.content = null;
 		this.state = "pending";
-		this.initial.push(...children, ...(island ? [island] : []));
+		// (before those that still waited: closed while it opened, it had placed these first)
+		this.initial.unshift(...children, ...(island ? [island] : []));
 		// (last: a cleanup sees the window closed)
 		for (const cleanup of cleanups) {
 			attempt(failures, cleanup);

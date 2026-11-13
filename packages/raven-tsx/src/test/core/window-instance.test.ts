@@ -457,6 +457,32 @@ test("a child removed while it waits to go in does not go in", () => {
 	expect(errors).toEqual([]);
 });
 
+test("children placed before the window closed as it opened keep their place before the others", () => {
+	const outer = WindowInstance.create(WINDOW);
+	const first = WidgetInstance.create("Label", { Name: "first", Text: "first" });
+	const middle = WidgetInstance.create("VBox", { Name: "middle" });
+	const last = WidgetInstance.create("Label", { Name: "last", Text: "last" });
+	const inner = WindowInstance.create(WINDOW);
+	let closed = false;
+	inner.whenOpen(() => {
+		if (!closed) {
+			closed = true;
+			outer.close();
+		}
+	});
+	middle.append(inner);
+	outer.appendInitial(first);
+	outer.appendInitial(middle);
+	outer.appendInitial(last);
+	outer.materialize();
+	expect(outer.isOpen).toBe(false);
+	outer.materialize();
+	const content = r.Rwidget_find(outer.window, CONTENT_NAME);
+	expect(Array.from({ length: r.Rwidget_get_child_count(content) }, (_, index) => r.Rwidget_get_name(r.Rwidget_get_child(content, index)))).toEqual(["first", "middle", "last"]);
+	outer.forgetTree();
+	outer.dispose();
+});
+
 test("a function that throws as soon as whenOpen runs it is not kept", () => {
 	const window = WindowInstance.create(WINDOW);
 	window.materialize();

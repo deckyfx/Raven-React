@@ -823,6 +823,40 @@ test("a child that a closing window moved elsewhere while its parent is cleared 
 	});
 });
 
+test("a window that opens with a failure leaves both trees, and closes when it has no owner", () => {
+	const windows = SolidNode.container(r.R_INVALID_ID);
+	// (made with no owner: out of a tree, nothing keeps it)
+	const node = SolidNode.element("Window");
+	let host: WindowInstance | undefined;
+	node.withInstance((instance) => {
+		host = instance as WindowInstance;
+		host.whenOpen(() => {
+			throw new Error("from whenOpen");
+		});
+	});
+	expect(() => windows.insert(node, null)).toThrow("from whenOpen");
+	expect(windows.children).toEqual([]);
+	expect(host?.isOpen).toBe(false);
+	// (the core has nothing of it left either: clearing it touches nothing)
+	expect(() => windows.clear()).not.toThrow();
+});
+
+test("a render that a render inside its code replaced shows nothing of its own", async () => {
+	let again = true;
+	await mount(() => <Label Name="before">before</Label>);
+	root?.render(() => {
+		if (again) {
+			again = false;
+			root?.render(() => <Label Name="inner">inner</Label>);
+		}
+		return <Label Name="outer">outer</Label>;
+	});
+	expect(find("outer")).toBe(r.R_INVALID_ID);
+	expect(text("inner")).toBe("inner");
+	root?.unmount();
+	expect(find("inner")).toBe(r.R_INVALID_ID);
+});
+
 test("an element kept in a variable, shown in a Portal, keeps its widget when the Portal comes back", async () => {
 	const [shown, setShown] = createSignal(true);
 	const box = r.Rwidget_create_from_xml('<VBox Name="by-hand"/>');

@@ -34,7 +34,11 @@ export class RavenRoot {
 		try {
 			createRoot((dispose) => {
 				this.dispose = dispose;
-				insert(this.node, code());
+				const view = code();
+				// (a render in the code replaced this one, its root with it: what it made went then)
+				if (this.dispose === dispose) {
+					insert(this.node, view);
+				}
 			});
 		} catch (error) {
 			try {

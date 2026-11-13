@@ -198,12 +198,22 @@ export class SolidNode {
 				host.append(childHost);
 			}
 		} catch (error) {
-			// (the core did not take it: it is not in this tree either)
+			// (it is not in this tree: nor in the core, which keeps one placed with a failure, a window
+			// open whose function threw. It closes there, and goes if nothing in Solid owns it)
 			const index = this.children.indexOf(child);
 			if (index >= 0) {
 				this.children.splice(index, 1);
 			}
 			child.parent = null;
+			try {
+				host.release(childHost);
+				childHost.closeWindows();
+				if (child.ownerGone) {
+					child.destroy();
+				}
+			} catch (cleanup) {
+				console.error("raven-tsx: cleaning up a child that failed:", cleanup);
+			}
 			throw error;
 		}
 		// (moved to a parent not placed: its windows close, to open with it)

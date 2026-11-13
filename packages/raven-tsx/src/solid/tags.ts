@@ -66,7 +66,17 @@ const solidAdapter: TagAdapter<Component<TagProps>> = {
 		const [owner, disposeNodes] = createRoot((dispose) => [getOwner(), dispose] as const);
 		const props = propsOf(current, owner);
 		const root = new RavenRoot(container);
-		root.render(() => createComponent(component, props));
+		try {
+			root.render(() => createComponent(component, props));
+		} catch (error) {
+			// (the render cleaned up its tree; the nodes of the children have a root of their own)
+			try {
+				disposeNodes();
+			} catch (cleanup) {
+				console.error("raven-tsx: cleaning up a tag that failed:", cleanup);
+			}
+			throw error;
+		}
 		return {
 			update: (next) => setCurrent(next),
 			unmount: () => {

@@ -44,10 +44,14 @@ afterAll(() => {
 /** Lets the event loop finish, with frames between. */
 async function settle(ms = 30): Promise<void> {
 	const end = performance.now() + ms;
+	// (and some turns of the event loop at least: on a slow machine, a runner of CI, a few frames
+	// take all the time, and React's scheduler, which runs at those turns, would get none)
+	let turns = 0;
 	do {
 		r.Rdraw_frame();
 		await new Promise<void>((resolve) => setImmediate(resolve));
-	} while (performance.now() < end);
+		turns++;
+	} while (performance.now() < end || turns < 10);
 }
 
 /** Has Raven build some XML into a new window, as a document or a file would. */

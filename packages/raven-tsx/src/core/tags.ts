@@ -10,7 +10,8 @@
  * A framework comes in through a `TagAdapter`, which only knows how to render a component into a widget.
  */
 
-import { CString, JSCallback, type Pointer } from "bun:ffi";
+import type { Pointer } from "bun:ffi";
+import { nativeCallback } from "#backend";
 import { RavenError } from "./errors";
 import * as r from "./raven";
 
@@ -235,33 +236,33 @@ let callbacks: NativeCallbacks | null = null;
 /** The pointers of the callbacks, made on first use. */
 function nativeCallbacks(): NativeCallbacks {
 	if (!callbacks) {
-		const make = new JSCallback((tag: Pointer | null): number => {
+		const make = nativeCallback(["text"], "u32", (tag) => {
 			try {
-				return create(tag ? new CString(tag).toString() : "");
+				return create(typeof tag === "string" ? tag : "");
 			} catch (error) {
 				console.error("raven-tsx: error making a registered tag:", error);
 				return r.R_INVALID_ID;
 			}
-		}, { args: ["ptr", "ptr"], returns: "u32" });
-		const attribute = new JSCallback((widget: number, name: Pointer | null, value: Pointer | null): number => {
+		});
+		const attribute = nativeCallback(["u32", "text", "text"], "i32", (widget, name, value) => {
 			try {
-				return name && value && setAttribute(widget, new CString(name).toString(), new CString(value).toString()) ? 1 : 0;
+				return typeof name === "string" && typeof value === "string" && setAttribute(Number(widget), name, value) ? 1 : 0;
 			} catch (error) {
 				console.error("raven-tsx: error giving an attribute to a registered tag:", error);
 				return 0;
 			}
-		}, { args: ["u32", "ptr", "ptr", "ptr"], returns: "i32" });
-		const destroy = new JSCallback((widget: number): void => {
+		});
+		const destroy = nativeCallback(["u32"], "void", (widget) => {
 			try {
-				destroyed(widget);
+				destroyed(Number(widget));
 			} catch (error) {
 				console.error("raven-tsx: error unmounting a registered tag:", error);
 			}
-		}, { args: ["u32", "ptr"], returns: "void" });
-		if (!make.ptr || !attribute.ptr || !destroy.ptr) {
+		});
+		if (!make || !attribute || !destroy) {
 			RavenError.throw("raven-tsx: cannot make the callbacks of registered tags");
 		}
-		callbacks = { create: make.ptr, attribute: attribute.ptr, destroy: destroy.ptr };
+		callbacks = { create: make, attribute, destroy };
 	}
 	return callbacks;
 }

@@ -22,10 +22,10 @@ export type NativeArg = "u32" | "i32" | "f32" | "f64" | "pointer" | "text" | "fl
 /** A value as the function receives it: a text as a string, a float to write as a `Float32Array`. */
 export type NativeValue = number | string | Float32Array | object | Pointer | null;
 
-/** What C reads back: nothing, a number, or a text that must stay valid until the next call. */
-export type NativeReturn = "void" | "i32" | "text";
+/** What C reads back: nothing, a number (an `int`, or an `Rid`), or a text valid until the next call. */
+export type NativeReturn = "void" | "i32" | "u32" | "text";
 
-/** What the function returns for C: a number for "i32", a text for "text". */
+/** What the function returns for C: a number for "i32" and "u32", a text for "text". */
 export type NativeResult = number | string | null | void;
 
 /** A callback for C as a setter of Raven takes it: on Bun an address, on Node.js the function. */

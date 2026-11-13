@@ -1,6 +1,6 @@
 {
   "name": "@decky.fx/raven-tsx",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "description": "Raven's native widgets from TSX, for Bun: a core that knows only Raven and adapters for React and Solid, with typed components made from Raven's schema",
   "license": "Apache-2.0",
   "type": "module",

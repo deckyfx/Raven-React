@@ -76,6 +76,11 @@ export interface HostNode {
 	remove(child: HostNode): void;
 	/** Forgets the handlers of this node and of everything under it. */
 	forgetTree(): void;
+	/**
+	 * Gives back the handlers `forgetTree` took, to what is still alive: a cleanup run while its tree
+	 * was deleted placed it elsewhere. Nothing to do for a node never forgotten.
+	 */
+	rememberTree(): void;
 	/** Deletes it, after its parent let it go. */
 	dispose(): void;
 	/** Closes the windows in this tree, keeping them to open again: what holds them left the tree, alive. */
@@ -297,6 +302,10 @@ export class WidgetInstance implements HostNode {
 	private shown = true;
 	/** What waits for it to be placed, at the end of the batch that placed it: a ref of a framework. */
 	private readonly placedWaiting: ((instance: WidgetInstance) => void)[] = [];
+	/** Made, and not placed yet: what waits for it to be placed waits for the end of the batch. */
+	private placing = false;
+	/** Its handlers were forgotten (`forgetTree`): placed again alive, it gets them back. */
+	private forgotten = false;
 
 	private constructor(
 		private id: r.Rid,
@@ -338,6 +347,8 @@ export class WidgetInstance implements HostNode {
 		this.madeChildren = r.Rwidget_get_child_count(this.id);
 		this.state = "live";
 		this.pending = null;
+		this.placing = true;
+		this.forgotten = false;
 		try {
 			this.applyAll(resolved);
 			for (const child of [...this.children]) {
@@ -350,8 +361,14 @@ export class WidgetInstance implements HostNode {
 					continue;
 				}
 				child.materialize();
+				// (making it ran user code, which may have taken it away from here, or deleted this: its
+				// windows are not this one's to open then)
+				if (this.state !== "live" || !this.children.includes(child)) {
+					continue;
+				}
+				child.rememberTree();
 				child.openWindows();
-				// (opening its windows ran user code, which may have taken it away from here, or deleted this)
+				// (opening its windows ran user code too)
 				if (this.state !== "live" || !this.children.includes(child)) {
 					continue;
 				}
@@ -486,7 +503,8 @@ export class WidgetInstance implements HostNode {
 		if (this.state === "gone") {
 			return;
 		}
-		if (this.state === "live" && !placedInThisBatch.includes(this)) {
+		// (one being made, or made in a batch not over, is not placed yet: it waits for `finishPlacing`)
+		if (this.state === "live" && !this.placing) {
 			run(this);
 			return;
 		}
@@ -495,6 +513,7 @@ export class WidgetInstance implements HostNode {
 
 	/** Runs what waited for it to be placed: see `whenPlaced`. */
 	runPlaced(): void {
+		this.placing = false;
 		const waiting = this.placedWaiting.splice(0);
 		if (this.state !== "live") {
 			return;
@@ -816,6 +835,7 @@ export class WidgetInstance implements HostNode {
 		}
 		// (making it ran user code, which may have taken it away from here)
 		if (this.children.includes(child)) {
+			child.rememberTree();
 			place();
 			// (in a tree that is not shown, its windows stay closed: they open when it is placed again)
 			attempt(failures, () => (this.attached ? child.openWindows() : child.closeWindows()));
@@ -915,6 +935,7 @@ export class WidgetInstance implements HostNode {
 	}
 
 	forgetTree(): void {
+		this.forgotten = true;
 		// (what it holds may be made, added to it while it waited)
 		for (const child of this.children) {
 			child.forgetTree();
@@ -922,6 +943,22 @@ export class WidgetInstance implements HostNode {
 		// (a node Raven has not made has no handlers: it gets them at `materialize`)
 		if (this.state === "live") {
 			forgetHandlers(this.tag, this.id, false);
+		}
+	}
+
+	rememberTree(): void {
+		if (!this.forgotten) {
+			return;
+		}
+		this.forgotten = false;
+		for (const child of [...this.children]) {
+			child.rememberTree();
+		}
+		// (an adopted widget has no handlers of the framework: those of its element are its own)
+		if (this.state === "live" && this.tag !== ADOPTED_TAG && r.Rwidget_is_valid(this.id)) {
+			applyHandlers(this.tag, this.id, new Map(), this.resolved.handlers);
+			this.applyVirtualItems(null, this.resolved);
+			this.watchControlled();
 		}
 	}
 

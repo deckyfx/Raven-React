@@ -122,6 +122,8 @@ export class WindowInstance implements HostNode {
 	private openings = 0;
 	/** While it opens, before its opening pass: a function `whenOpen` gets then runs in that pass, once. */
 	private draining = false;
+	/** Its handlers were forgotten (`forgetTree`): placed again alive, it gets them back. */
+	private forgotten = false;
 	/** The widget that holds it in the tree, if any: one at the top of a root, or in a window, has none. */
 	private holder: WidgetInstance | null = null;
 	/** What the application put in its content itself, kept alive while it is closed. */
@@ -179,8 +181,11 @@ export class WindowInstance implements HostNode {
 				this.restoreNative(content);
 			}
 		} catch (error) {
-			this.forgetTree();
-			this.dispose();
+			// (only this opening goes: one a child opened again meanwhile, after closing this one, stays)
+			if (!(this.state === "live" && this.id !== window)) {
+				this.forgetTree();
+				this.dispose();
+			}
 			throw error;
 		}
 		// (closed while it opened: that was no opening, and the next placing opens it)
@@ -292,8 +297,16 @@ export class WindowInstance implements HostNode {
 			try {
 				this.runOpeningOf(opening);
 			} catch (error) {
-				// (the caller gets no way to cancel it: it is not kept)
+				// (the caller gets no way to cancel it: it is not kept. What a run of it gave meanwhile,
+				// opening the window again, runs now: nothing would run it after)
 				this.opening.delete(opening);
+				const cleanup = opening.cleanup;
+				opening.cleanup = null;
+				try {
+					cleanup?.();
+				} catch (cleanupError) {
+					console.error("raven-tsx: a cleanup of whenOpen failed:", cleanupError);
+				}
 				throw error;
 			}
 		}
@@ -372,6 +385,21 @@ export class WindowInstance implements HostNode {
 	/** Whether the window still exists: without an `OnClose`, the user can close it at any time. */
 	get isOpen(): boolean {
 		return this.id !== r.R_INVALID_ID && r.Rwindow_is_valid(this.id) !== 0;
+	}
+
+	/** Gives back what `forgetTree` took: a cleanup placed it elsewhere, alive, as its tree was deleted. */
+	rememberTree(): void {
+		if (!this.forgotten) {
+			return;
+		}
+		this.forgotten = false;
+		if (this.state !== "live" || !this.isOpen) {
+			return;
+		}
+		this.content?.rememberTree();
+		this.island?.rememberTree();
+		closeEvents.set(this.id, this.resolved.handlers.get("OnClose"));
+		setWindowEvents(this.id, this.resolved.handlers);
 	}
 
 	/** What holds it in the tree, to know whether that is shown: a window opens only then. */
@@ -552,6 +580,7 @@ export class WindowInstance implements HostNode {
 		if (this.state !== "live") {
 			return;
 		}
+		this.forgotten = true;
 		this.content?.forgetTree();
 		this.island?.forgetTree();
 		closeEvents.set(this.id, undefined, false);

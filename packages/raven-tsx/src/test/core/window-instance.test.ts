@@ -633,6 +633,110 @@ test("a child waiting in a window that is disposed can be taken elsewhere by a c
 	host.dispose();
 });
 
+test("a widget a cleanup takes out of a tree being deleted keeps its handlers where it goes", () => {
+	const window = WindowInstance.create(WINDOW);
+	window.materialize();
+	const elsewhere = WidgetInstance.create("VBox", { Name: "elsewhere" });
+	const box = WidgetInstance.create("VBox", { Name: "box" });
+	window.append(elsewhere);
+	window.append(box);
+	let clicks = 0;
+	const button = WidgetInstance.create("Button", { Name: "button", OnClicked: () => void clicks++ });
+	const inner = WindowInstance.create(WINDOW);
+	box.append(inner);
+	box.append(button);
+	inner.whenOpen(() => () => {
+		box.release(button);
+		elsewhere.append(button);
+	});
+	window.remove(box);
+	expect(r.Rwidget_get_parent(button.widget)).toBe(elsewhere.widget);
+	r.Raction_fire(r.Rwidget_get_action(button.widget) ?? "", button.widget);
+	expect(clicks).toBe(1);
+	window.forgetTree();
+	window.dispose();
+});
+
+test("a window a child releases and closes as it opens stays closed", () => {
+	const window = WindowInstance.create(WINDOW);
+	window.materialize();
+	const parent = WidgetInstance.create("VBox", { Name: "parent" });
+	const child = WindowInstance.create(WINDOW);
+	let once = true;
+	child.whenOpen(() => {
+		if (once) {
+			once = false;
+			parent.release(child);
+			child.closeWindows();
+		}
+	});
+	parent.append(child);
+	window.append(parent);
+	expect(child.isOpen).toBe(false);
+	child.forgetTree();
+	child.dispose();
+	window.forgetTree();
+	window.dispose();
+});
+
+test("what waits for a widget asked while it is made runs once it is placed", () => {
+	const window = WindowInstance.create(WINDOW);
+	window.materialize();
+	const parent = WidgetInstance.create("VBox", { Name: "parent" });
+	const child = WindowInstance.create(WINDOW);
+	let parentAtCall = r.R_INVALID_ID;
+	child.whenOpen(() => parent.whenPlaced((placed) => {
+		parentAtCall = r.Rwidget_get_parent(placed.widget);
+	}));
+	parent.append(child);
+	window.append(parent);
+	finishPlacing();
+	expect(parentAtCall).toBe(r.Rwidget_find(window.window, CONTENT_NAME));
+	window.forgetTree();
+	window.dispose();
+});
+
+test("a window a child closed, opened again and then failed in stays open, as opened again", () => {
+	const outer = WindowInstance.create(WINDOW);
+	const inner = WindowInstance.create(WINDOW);
+	let once = true;
+	inner.whenOpen(() => {
+		if (once) {
+			once = false;
+			outer.close();
+			outer.materialize();
+			throw new Error("after opening it again");
+		}
+	});
+	outer.appendInitial(inner);
+	expect(() => outer.materialize()).toThrow("after opening it again");
+	expect([outer.isOpen, inner.isOpen]).toEqual([true, true]);
+	outer.forgetTree();
+	outer.dispose();
+});
+
+test("a function that opens its window again and then throws has what it gave then run", () => {
+	const window = WindowInstance.create(WINDOW);
+	window.materialize();
+	let calls = 0;
+	let cleanups = 0;
+	expect(() =>
+		window.whenOpen(() => {
+			calls++;
+			if (calls === 1) {
+				window.close();
+				window.materialize();
+				throw new Error("first run");
+			}
+			return () => void cleanups++;
+		}),
+	).toThrow("first run");
+	expect(cleanups).toBe(1);
+	window.close();
+	expect(cleanups).toBe(1);
+	window.dispose();
+});
+
 test("a function that throws as soon as whenOpen runs it is not kept", () => {
 	const window = WindowInstance.create(WINDOW);
 	window.materialize();

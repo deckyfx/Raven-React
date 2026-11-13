@@ -153,8 +153,9 @@ export class WindowInstance implements HostNode {
 			this.hidden = true;
 			return;
 		}
-		this.hidden = false;
 		const { window, content } = makeWindow(this.resolved.attributes);
+		// (once it is made: one that could not be made still opens with its tree)
+		this.hidden = false;
 		this.id = window;
 		this.content = WidgetInstance.forContainer(content);
 		this.state = "live";
@@ -205,7 +206,8 @@ export class WindowInstance implements HostNode {
 		const order = this.keptOrder;
 		this.keptOrder = [];
 		for (const widget of this.keptNative.splice(0)) {
-			if (!r.Rwidget_is_valid(widget)) {
+			// (one the application placed elsewhere meanwhile is that place's)
+			if (!this.stillKept(widget)) {
 				continue;
 			}
 			const at = order.indexOf(widget);
@@ -226,10 +228,15 @@ export class WindowInstance implements HostNode {
 	private destroyKeptNative(): void {
 		this.keptOrder = [];
 		for (const widget of this.keptNative.splice(0)) {
-			if (r.Rwidget_is_valid(widget)) {
+			if (this.stillKept(widget)) {
 				r.Rwidget_destroy(widget);
 			}
 		}
+	}
+
+	/** Whether a widget kept while the window is closed is still its own: alive, and in no other parent. */
+	private stillKept(widget: r.Rid): boolean {
+		return r.Rwidget_is_valid(widget) !== 0 && r.Rwidget_get_parent(widget) === r.R_INVALID_ID;
 	}
 
 	/** Runs what waits for the window to open, each once: the first that threw says so after. */

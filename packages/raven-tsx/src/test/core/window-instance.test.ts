@@ -784,6 +784,65 @@ test("an island whose handlers were forgotten gets them back in the window that 
 	second.dispose();
 });
 
+test("what waits for a widget stops once one of it deleted a parent, and the widget with it", () => {
+	const window = WindowInstance.create(WINDOW);
+	window.materialize();
+	const parent = WidgetInstance.create("VBox", { Name: "parent" });
+	const child = WidgetInstance.create("Label", { Name: "child", Text: "child" });
+	parent.append(child);
+	let after = false;
+	child.whenPlaced(() => window.remove(parent));
+	child.whenPlaced(() => {
+		after = true;
+	});
+	window.append(parent);
+	finishPlacing();
+	expect(after).toBe(false);
+	window.forgetTree();
+	window.dispose();
+});
+
+test("a tree a cleanup moves elsewhere while it is deleted keeps the windows not deleted yet", () => {
+	const window = WindowInstance.create(WINDOW);
+	window.materialize();
+	const outer = WidgetInstance.create("VBox", { Name: "outer" });
+	const moved = WidgetInstance.create("VBox", { Name: "moved" });
+	const elsewhere = WidgetInstance.create("VBox", { Name: "elsewhere" });
+	window.append(elsewhere);
+	window.append(outer);
+	outer.append(moved);
+	const first = WindowInstance.create(WINDOW);
+	const second = WindowInstance.create(WINDOW);
+	moved.append(first);
+	moved.append(second);
+	first.whenOpen(() => () => {
+		outer.release(moved);
+		elsewhere.append(moved);
+	});
+	window.remove(outer);
+	expect(r.Rwidget_get_parent(moved.widget)).toBe(elsewhere.widget);
+	expect(second.isOpen).toBe(true);
+	window.forgetTree();
+	window.dispose();
+});
+
+test("a widget the application moved from a closed window to another is not taken back, nor deleted", () => {
+	const first = WindowInstance.create(WINDOW);
+	const second = WindowInstance.create(WINDOW);
+	first.materialize();
+	second.materialize();
+	const own = r.Rwidget_create_from_xml('<Label Name="own" Text="own"/>');
+	r.Rwidget_add_child(r.Rwidget_find(first.window, CONTENT_NAME), own);
+	first.close();
+	r.Rwidget_add_child(r.Rwidget_find(second.window, CONTENT_NAME), own);
+	first.materialize();
+	expect(r.Rwidget_find(second.window, "own")).toBe(own);
+	first.close();
+	first.dispose();
+	expect(r.Rwidget_is_valid(own)).toBe(1);
+	second.dispose();
+});
+
 test("a function that throws as soon as whenOpen runs it is not kept", () => {
 	const window = WindowInstance.create(WINDOW);
 	window.materialize();

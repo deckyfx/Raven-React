@@ -507,7 +507,10 @@ export class WidgetInstance implements HostNode {
 		}
 		// (one being made, or made in a batch not over, is not placed yet: it waits for `finishPlacing`)
 		if (this.state === "live" && !this.placing) {
-			run(this);
+			// (a parent deleted with it leaves it live here, with no widget: it gets nothing)
+			if (r.Rwidget_is_valid(this.id)) {
+				run(this);
+			}
 			return;
 		}
 		this.placedWaiting.push(run);
@@ -522,8 +525,8 @@ export class WidgetInstance implements HostNode {
 		}
 		const failures: unknown[] = [];
 		for (const run of waiting) {
-			// (one of them may have deleted it: the others get nothing)
-			if (this.state !== "live") {
+			// (one of them may have deleted it, or a parent with it: the others get nothing)
+			if (this.state !== "live" || !r.Rwidget_is_valid(this.id)) {
 				break;
 			}
 			attempt(failures, () => run(this));
@@ -978,8 +981,13 @@ export class WidgetInstance implements HostNode {
 	disposeDetached(): void {
 		// (all of them, also past one whose cleanup throws)
 		const failures: unknown[] = [];
+		const parent = this.parent;
 		for (const child of [...this.children]) {
-			// (a cleanup of one may have taken another away: it is no longer this one's)
+			// (a cleanup of one may have placed this tree elsewhere: what is left is that place's now)
+			if (this.parent !== parent) {
+				break;
+			}
+			// (or taken another away: it is no longer this one's)
 			if (!this.children.includes(child)) {
 				continue;
 			}

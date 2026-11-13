@@ -843,6 +843,20 @@ test("a widget the application moved from a closed window to another is not take
 	second.dispose();
 });
 
+test("a window a cleanup adds while the window that holds it is disposed does not open", () => {
+	const outer = WindowInstance.create(WINDOW);
+	outer.materialize();
+	const box = WidgetInstance.create("VBox", { Name: "box" });
+	outer.append(box);
+	const inner = WindowInstance.create(WINDOW);
+	const added = WindowInstance.create(WINDOW);
+	inner.whenOpen(() => () => box.append(added));
+	box.append(inner);
+	outer.forgetTree();
+	outer.dispose();
+	expect([inner.isOpen, added.isOpen]).toEqual([false, false]);
+});
+
 test("a function that throws as soon as whenOpen runs it is not kept", () => {
 	const window = WindowInstance.create(WINDOW);
 	window.materialize();

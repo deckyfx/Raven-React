@@ -623,6 +623,9 @@ export class WindowInstance implements HostNode {
 			throwFirst(failures);
 			return;
 		}
+		// (what it holds is not shown from now: a window a cleanup adds in it does not open)
+		this.content?.setShown(false);
+		this.island?.setShown(false);
 		if (this.isOpen) {
 			// (the window destroys what it holds: those of registered tags are theirs)
 			this.content?.releaseAdopted();

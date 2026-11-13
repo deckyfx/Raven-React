@@ -1,4 +1,4 @@
-import { createComponent, createRoot, type JSX } from "solid-js";
+import { createComponent, createRoot, getOwner, type JSX, type Owner } from "solid-js";
 import * as r from "../core/raven";
 import { RavenError } from "../core/errors";
 import { resolveProps, type RavenProps } from "../core/props";
@@ -7,6 +7,7 @@ import { makeWindow } from "../core/window-instance";
 import { Window } from "./components.generated";
 import { SolidNode } from "./node";
 import { insert } from "./renderer";
+import { stopLeft, trackRoot } from "./teardown";
 
 /**
  * A tree of Solid, as `render` of solid-js/web. Given a widget, it renders into it.
@@ -15,6 +16,8 @@ import { insert } from "./renderer";
 export class RavenRoot {
 	private readonly node: SolidNode;
 	private dispose: (() => void) | null = null;
+	/** The owner of the tree, which keeps what it subscribed to in Raven: see `teardown`. */
+	private owner: Owner | null = null;
 
 	constructor(parent: r.Rid = r.R_INVALID_ID) {
 		this.node = SolidNode.container(parent);
@@ -36,6 +39,10 @@ export class RavenRoot {
 			createRoot((dispose) => {
 				own = dispose;
 				this.dispose = dispose;
+				this.owner = getOwner();
+				if (this.owner) {
+					trackRoot(this.owner);
+				}
 				const view = code();
 				// (a render in the code replaced this one, its root with it: what it made went then)
 				if (this.dispose === dispose) {
@@ -58,10 +65,16 @@ export class RavenRoot {
 	/** Removes the tree: its cleanups run, and its widgets and windows go. */
 	unmount(): void {
 		const dispose = this.dispose;
+		const owner = this.owner;
 		this.dispose = null;
+		this.owner = null;
 		try {
 			dispose?.();
 		} finally {
+			// (what it subscribed to stops, also what a cleanup that threw kept from stopping)
+			if (owner) {
+				stopLeft(owner);
+			}
 			// (the widgets and windows go, also when a cleanup threw. Unless a cleanup rendered a tree
 			// again: that one stays, and it took this one away first)
 			if (this.dispose === null) {

@@ -3,18 +3,19 @@
  * calls it, and goes with its cleanup.
  */
 
-import { createEffect, onCleanup } from "solid-js";
+import { createEffect } from "solid-js";
 import type * as r from "../core/raven";
 import type { FrameHandler } from "../core/frame";
 import { onAction, onFrame, onShortcut } from "../core/subscriptions";
 import type { WindowInstance } from "../core/window-instance";
+import { onTeardown } from "./teardown";
 
 /**
  * Gives a name to a function, for what fires actions by name: `Rwidget_set_action`, the
  * `Action` of a widget made from XML, `Raction_fire`. It receives the widget that fired the action.
  */
 export function createAction(name: string, handler: (sender: r.Rid) => void): void {
-	onCleanup(onAction(name, handler));
+	onTeardown(onAction(name, handler));
 }
 
 /**
@@ -27,7 +28,7 @@ export function createShortcut(window: () => WindowInstance | null | undefined, 
 		const owner = window();
 		if (owner) {
 			// (each time the window opens: a window taken out of the tree closes, and opens when shown again)
-			onCleanup(owner.whenOpen(() => onShortcut(owner.window, keys, handler)));
+			onTeardown(owner.whenOpen(() => onShortcut(owner.window, keys, handler)));
 		}
 	});
 }
@@ -38,5 +39,5 @@ export function createShortcut(window: () => WindowInstance | null | undefined, 
  * Bun's timers run beside Raven. Any number of them can live side by side, and with `Rset_frame_callback`.
  */
 export function createFrame(handler: FrameHandler): void {
-	onCleanup(onFrame(handler));
+	onTeardown(onFrame(handler));
 }

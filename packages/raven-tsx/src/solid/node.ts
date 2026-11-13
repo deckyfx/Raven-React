@@ -29,6 +29,8 @@ export class SolidNode {
 	private destroyed = false;
 	/** The top of a tree: its widget is the application's, which a tree never changes. */
 	private isContainer = false;
+	/** A child that waits for the node it replaces to go: see `insert`. */
+	private held: { readonly child: SolidNode; readonly before: SolidNode } | null = null;
 	/** What waits for the node of the core: the `ref` of a `<Separator>` not placed yet. */
 	private readonly waiting: ((instance: HostNode) => void)[] = [];
 
@@ -154,6 +156,15 @@ export class SolidNode {
 		}
 	}
 
+	/** What conflicts with a child here: the widgets beside a text, or the texts beside a widget. */
+	private conflictsOf(child: SolidNode): SolidNode[] {
+		const others = this.children.filter((node) => node !== child);
+		if (child.isText) {
+			return child.text !== "" ? others.filter((node) => !node.isText) : [];
+		}
+		return others.filter((node) => node.isText && node.text !== "");
+	}
+
 	/** Text beside widgets is an error, as with React: said before anything changes, whichever comes first. */
 	private checkMixed(child: SolidNode): void {
 		// (as with React: text at the top of a tree, in a root or a portal, has no widget to be the Text of)
@@ -172,6 +183,46 @@ export class SolidNode {
 		if (child === before) {
 			return;
 		}
+		this.placeHeld();
+		// (Solid replaces a node by putting the new one before it, then taking it away: a widget in
+		// place of a text, `{busy() ? <Spinner /> : "Save"}`. Side by side they would be refused: the
+		// new one waits for that, see `release`. Anything else first places it as it is, refused or not)
+		if (before && !this.isContainer && this.children.includes(before)) {
+			const conflicts = this.conflictsOf(child);
+			if (conflicts.length === 1 && conflicts[0] === before) {
+				this.held = { child, before };
+				queueMicrotask(() => this.placeHeldLater());
+				return;
+			}
+		}
+		this.place(child, before);
+	}
+
+	/** Places a child that waited for the node it replaces to go, as it is: one beside text is refused. */
+	private placeHeld(): void {
+		const held = this.held;
+		if (!held) {
+			return;
+		}
+		this.held = null;
+		this.place(held.child, this.children.includes(held.before) ? held.before : null);
+	}
+
+	/** Places a child still waiting at the end of the task: Solid replaces in one go, so it was no replacement. */
+	private placeHeldLater(): void {
+		if (this.destroyed) {
+			this.held = null;
+			return;
+		}
+		try {
+			this.placeHeld();
+		} catch (error) {
+			console.error("raven-tsx:", error);
+		}
+	}
+
+	/** Places a child, as `insert` does, with no waiting. */
+	private place(child: SolidNode, before: SolidNode | null): void {
 		this.checkMixed(child);
 		const moved = child.parent !== null && child.parent !== this;
 		if (child.parent && moved) {
@@ -267,6 +318,21 @@ export class SolidNode {
 
 	/** Takes a child out of the tree. It stays alive while what made it in Solid is there, and goes after. */
 	release(child: SolidNode): void {
+		// (the node a waiting child replaces goes: the child takes its place)
+		if (this.held?.before === child) {
+			const replacement = this.held.child;
+			this.held = null;
+			const after = this.children[this.children.indexOf(child) + 1] ?? null;
+			this.releaseNow(child);
+			this.place(replacement, after && this.children.includes(after) ? after : null);
+			return;
+		}
+		this.placeHeld();
+		this.releaseNow(child);
+	}
+
+	/** Takes a child out of the tree, as `release` does. */
+	private releaseNow(child: SolidNode): void {
 		if (!this.children.includes(child)) {
 			return;
 		}
@@ -293,6 +359,8 @@ export class SolidNode {
 
 	/** Takes every child out, all of them, and then says the first failure. */
 	private releaseEach(deleting: boolean): void {
+		// (a child waiting to replace another is not placed: its owner deletes it)
+		this.held = null;
 		const failures: unknown[] = [];
 		for (const child of [...this.children]) {
 			try {

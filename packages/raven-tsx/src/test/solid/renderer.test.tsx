@@ -1003,6 +1003,56 @@ test("the ref of a widget comes once Raven has it, placed, as React's does", asy
 	expect(parent).toBe(find("box"));
 });
 
+test("a widget can take the place of the text in a widget, and the text its place again", async () => {
+	const [busy, setBusy] = createSignal(false);
+	// (the widgets the tree put in it: a Button shows its Text in one of its own, with no name)
+	const placed = (): string[] => namesUnder("b").filter((name) => name !== "");
+	await mount(() => <Button Name="b">{busy() ? <Label Name="spinning">...</Label> : "Save"}</Button>);
+	expect(placed()).toEqual([]);
+	setBusy(true);
+	expect(placed()).toEqual(["spinning"]);
+	setBusy(false);
+	expect(placed()).toEqual([]);
+	setBusy(true);
+	expect(placed()).toEqual(["spinning"]);
+});
+
+test("a widget put before the text of a widget, the text staying, is refused at the end of the task", async () => {
+	const button = SolidNode.element("Button");
+	const text = SolidNode.text("Save");
+	const label = SolidNode.element("Label");
+	button.insert(text, null);
+	const said: string[] = [];
+	const errorLog = console.error;
+	console.error = (...parts: unknown[]) => void said.push(parts.map(String).join(" "));
+	try {
+		// (as Solid replaces: the old one would go right after. It does not here)
+		button.insert(label, text);
+		await Promise.resolve();
+	} finally {
+		console.error = errorLog;
+	}
+	expect(said.join("\n")).toContain('text must be alone in a widget: "Save"');
+	expect(button.children).toEqual([text]);
+});
+
+test("a component whose cleanup throws still stops its actions", async () => {
+	let fired = 0;
+	function Stale(): JSX.Element {
+		createAction("test.stale", () => void fired++);
+		onCleanup(() => {
+			throw new Error("from a cleanup");
+		});
+		return <Label>stale</Label>;
+	}
+	await mount(() => <Stale />);
+	r.Raction_fire("test.stale", r.R_INVALID_ID);
+	expect(fired).toBe(1);
+	expect(() => root?.unmount()).toThrow("from a cleanup");
+	r.Raction_fire("test.stale", r.R_INVALID_ID);
+	expect(fired).toBe(1);
+});
+
 test("an element kept in a variable, shown in a Portal, keeps its widget when the Portal comes back", async () => {
 	const [shown, setShown] = createSignal(true);
 	const box = r.Rwidget_create_from_xml('<VBox Name="by-hand"/>');

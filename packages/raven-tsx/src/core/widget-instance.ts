@@ -448,6 +448,19 @@ export class WidgetInstance implements HostNode {
 		this.parent = parent;
 	}
 
+	/**
+	 * Whether it is in a tree that is shown: its parents lead to the top of a root (or to the
+	 * content of a window), or to an island a window holds. One a framework took out, alive, is not:
+	 * the windows in it stay closed until it is placed again.
+	 */
+	get attached(): boolean {
+		let top: WidgetInstance = this;
+		while (top.parent) {
+			top = top.parent;
+		}
+		return top.tag === "" || top.holder !== null;
+	}
+
 	/** Says who to tell of a new handle, when what holds this widget is not a parent. */
 	setHolder(holder: ((widget: r.Rid) => void) | null): void {
 		this.holder = holder;
@@ -747,7 +760,8 @@ export class WidgetInstance implements HostNode {
 		// (making it ran user code, which may have taken it away from here)
 		if (this.children.includes(child)) {
 			place();
-			attempt(failures, () => child.openWindows());
+			// (in a tree that is not shown, its windows stay closed: they open when it is placed again)
+			attempt(failures, () => (this.attached ? child.openWindows() : child.closeWindows()));
 		}
 		throwFirst(failures);
 	}

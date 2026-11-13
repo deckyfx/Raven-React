@@ -857,6 +857,91 @@ test("a render that a render inside its code replaced shows nothing of its own",
 	expect(find("inner")).toBe(r.R_INVALID_ID);
 });
 
+test("a window added in a tree that is not shown opens only once the tree is shown", async () => {
+	const [shown, setShown] = createSignal(true);
+	const [late, setLate] = createSignal(false);
+	let added: WindowInstance | undefined;
+	function Kept(): JSX.Element {
+		const kept = <VBox Name="kept">{late() && <Window ref={added} Title="late" Width={120} Height={80} />}</VBox>;
+		return (
+			<VBox Name="outer">
+				<Show when={shown()}>{kept}</Show>
+			</VBox>
+		);
+	}
+	await mount(() => <Kept />);
+	setShown(false);
+	setLate(true);
+	expect(added?.isOpen).toBe(false);
+	setShown(true);
+	expect(added?.isOpen).toBe(true);
+});
+
+test("a window moved elsewhere by its own function, which then throws, stays where it went", () => {
+	const first = SolidNode.container(r.R_INVALID_ID);
+	const second = SolidNode.container(r.R_INVALID_ID);
+	// (made with no owner: a cleanup that took it for its own would delete it)
+	const node = SolidNode.element("Window");
+	let host: WindowInstance | undefined;
+	let once = true;
+	node.withInstance((instance) => {
+		host = instance as WindowInstance;
+		host.whenOpen(() => {
+			if (once) {
+				once = false;
+				second.insert(node, null);
+				throw new Error("after the move");
+			}
+		});
+	});
+	expect(() => first.insert(node, null)).toThrow("after the move");
+	expect([first.children, second.children]).toEqual([[], [node]]);
+	expect(host?.isOpen).toBe(true);
+	second.clear();
+	expect(host?.isOpen).toBe(false);
+});
+
+test("a window that fails to open and then to close is still deleted when nothing owns it", () => {
+	const windows = SolidNode.container(r.R_INVALID_ID);
+	const node = SolidNode.element("Window");
+	const label = SolidNode.element("Label");
+	label.setProp("Name", "held");
+	let held: WidgetInstance | undefined;
+	label.withInstance((instance) => {
+		held = instance as WidgetInstance;
+	});
+	node.insert(label, null);
+	node.withInstance((instance) => {
+		const window = instance as WindowInstance;
+		window.whenOpen(() => () => {
+			throw new Error("from the cleanup");
+		});
+		window.whenOpen(() => {
+			throw new Error("from the opening");
+		});
+	});
+	const errorLog = console.error;
+	console.error = () => {};
+	try {
+		expect(() => windows.insert(node, null)).toThrow("from the opening");
+	} finally {
+		console.error = errorLog;
+	}
+	expect(windows.children).toEqual([]);
+	expect(r.Rwidget_is_valid(held?.widget ?? r.R_INVALID_ID)).toBe(0);
+});
+
+test("a tree a render in the code made stays when that code then throws", async () => {
+	await mount(() => <Label Name="before">before</Label>);
+	expect(() =>
+		root?.render(() => {
+			root?.render(() => <Label Name="inner">inner</Label>);
+			throw new Error("after the render");
+		}),
+	).toThrow("after the render");
+	expect(text("inner")).toBe("inner");
+});
+
 test("an element kept in a variable, shown in a Portal, keeps its widget when the Portal comes back", async () => {
 	const [shown, setShown] = createSignal(true);
 	const box = r.Rwidget_create_from_xml('<VBox Name="by-hand"/>');

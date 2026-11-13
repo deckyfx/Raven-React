@@ -122,6 +122,8 @@ export class WindowInstance implements HostNode {
 	private openings = 0;
 	/** While it opens, before its opening pass: a function `whenOpen` gets then runs in that pass, once. */
 	private draining = false;
+	/** The widget that holds it in the tree, if any: one at the top of a root, or in a window, has none. */
+	private holder: WidgetInstance | null = null;
 	/** What the application put in its content itself, kept alive while it is closed. */
 	private readonly keptNative: r.Rid[] = [];
 	/** The widgets of its content when it closed, in order: what the application put there goes back to its place. */
@@ -142,6 +144,11 @@ export class WindowInstance implements HostNode {
 	/** Opens the window, with its children. If any of it fails, the window is deleted. */
 	materialize(): void {
 		if (this.state !== "pending") {
+			return;
+		}
+		// (what holds it was taken out of the tree, alive: it opens once that is placed again, at `openWindows`)
+		if (this.holder && !this.holder.attached) {
+			this.hidden = true;
 			return;
 		}
 		this.hidden = false;
@@ -364,7 +371,10 @@ export class WindowInstance implements HostNode {
 		return this.id !== r.R_INVALID_ID && r.Rwindow_is_valid(this.id) !== 0;
 	}
 
-	setParent(): void {}
+	/** What holds it in the tree, to know whether that is shown: a window opens only then. */
+	setParent(parent: WidgetInstance | null): void {
+		this.holder = parent;
+	}
 
 	closeWindows(): void {
 		if (this.state === "live") {

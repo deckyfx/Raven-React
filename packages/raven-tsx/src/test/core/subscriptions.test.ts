@@ -93,6 +93,18 @@ test("a name given again belongs to the last one: the first one stopping leaves 
 	expect(fired).toEqual(["second"]);
 });
 
+test("the last one of a name stopping first gives the name back to the one before", () => {
+	const fired: string[] = [];
+	const stopFirst = onAction("test.stacked", () => fired.push("first"));
+	const stopSecond = onAction("test.stacked", () => fired.push("second"));
+	stopSecond();
+	r.Raction_fire("test.stacked", r.R_INVALID_ID);
+	expect(fired).toEqual(["first"]);
+	stopFirst();
+	r.Raction_fire("test.stacked", r.R_INVALID_ID);
+	expect(fired).toEqual(["first"]);
+});
+
 test("the same function given twice to a name is two registrations", () => {
 	let fired = 0;
 	const handler = (): void => void fired++;

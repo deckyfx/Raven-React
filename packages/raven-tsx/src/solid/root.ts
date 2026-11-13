@@ -31,8 +31,10 @@ export class RavenRoot {
 		while (this.dispose !== null) {
 			this.unmount();
 		}
+		let own: (() => void) | null = null;
 		try {
 			createRoot((dispose) => {
+				own = dispose;
 				this.dispose = dispose;
 				const view = code();
 				// (a render in the code replaced this one, its root with it: what it made went then)
@@ -42,7 +44,10 @@ export class RavenRoot {
 			});
 		} catch (error) {
 			try {
-				this.unmount();
+				// (a render in the code that failed replaced it: that tree stays, this one went then)
+				if (this.dispose === own) {
+					this.unmount();
+				}
 			} catch (cleanup) {
 				console.error("raven-tsx: cleaning up a tree that failed:", cleanup);
 			}

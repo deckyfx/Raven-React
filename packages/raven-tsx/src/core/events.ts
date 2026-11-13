@@ -692,6 +692,8 @@ export const COMMON_PROPS: readonly string[] = [
 class ActionEvents {
 	private readonly handlers = new Map<string, (sender: r.Rid) => void>();
 	private readonly nameOf = new Map<r.Rid, string>();
+	/** The functions given to each name the application chose, in order: the last one has the name. */
+	private readonly named = new Map<string, ((sender: r.Rid) => void)[]>();
 	private callback: JSCallback | null = null;
 	private next = 0;
 
@@ -722,18 +724,35 @@ class ActionEvents {
 		this.handlers.set(name, () => (handler as () => void)());
 	}
 
-	/** Gives a function to an action of a name chosen by the application. It receives the sender. */
+	/**
+	 * Gives a function to an action of a name chosen by the application. It receives the sender.
+	 * A name given again belongs to the last one, until it stops: then to the one before.
+	 */
 	bind(name: string, handler: (sender: r.Rid) => void): void {
+		const registrations = this.named.get(name) ?? [];
+		registrations.push(handler);
+		this.named.set(name, registrations);
 		this.handlers.set(name, handler);
 		r.Raction_bind(name, this.pointer());
 	}
 
-	/** Takes the function of such an action away. */
+	/** Takes such a function away: the one given, or all of the name. */
 	unbind(name: string, handler?: (sender: r.Rid) => void): void {
-		// (a name given again since belongs to the one that gave it last: the first one going leaves it)
-		if (handler !== undefined && this.handlers.get(name) !== handler) {
-			return;
+		const registrations = this.named.get(name) ?? [];
+		if (handler !== undefined) {
+			const index = registrations.indexOf(handler);
+			if (index < 0) {
+				return;
+			}
+			registrations.splice(index, 1);
+			// (the last one still there has the name again)
+			const active = registrations.at(-1);
+			if (active) {
+				this.handlers.set(name, active);
+				return;
+			}
 		}
+		this.named.delete(name);
 		this.handlers.delete(name);
 		r.Raction_unbind(name);
 	}

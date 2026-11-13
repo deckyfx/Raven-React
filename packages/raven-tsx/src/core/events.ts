@@ -254,6 +254,44 @@ function requestEvent(connect: Connect, args: readonly FFITypeOrString[]): Nativ
 /** A right click: what is under the pointer, and where. */
 const contextEvent = (connect: Connect, item: FFITypeOrString): NativeEvent => directEvent(connect, [item, "f32", "f32"]);
 
+/** A point of a NodeGraph, with what is there: a pin. Or only the point, for the empty canvas. */
+function pointEvent(connect: Connect, withItem: boolean): NativeEvent {
+	return new NativeEvent(connect, (handlerOf) => new JSCallback(
+		(widget: number, item: number, x: number, y: number): void => {
+			const handler = handlerOf(widget) as ((...values: number[]) => void) | undefined;
+			if (handler) {
+				eventScope.run(() => (withItem ? handler(item, x, y) : handler(x, y)));
+			}
+		},
+		{ args: ["u32", "i32", "f32", "f32", "ptr"], returns: "void" },
+	));
+}
+
+/**
+ * An event whose function answers with a text, which C copies before it calls again: the
+ * tooltip of a TextEditor. Nothing, or "", is no text.
+ */
+function textAnswerEvent(connect: Connect, args: readonly FFITypeOrString[]): NativeEvent {
+	return new NativeEvent(connect, (handlerOf) => {
+		// (valid until the next call, as C asks: it copies the text at once)
+		let answer = Buffer.from([0]);
+		return new JSCallback(
+			(widget: number, ...values: number[]): Pointer | null => {
+				const handler = handlerOf(widget) as ((...values: number[]) => string | null | void) | undefined;
+				let text = "";
+				if (handler) {
+					eventScope.run(() => {
+						text = handler(...values.slice(0, args.length)) ?? "";
+					});
+				}
+				answer = Buffer.from(`${text}\0`);
+				return ptr(answer);
+			},
+			{ args: ["u32", ...args, "ptr"], returns: "ptr" },
+		);
+	});
+}
+
 /**
  * An event that gives a structure, valid during the call, and consumes what it receives when
  * the function returns true.
@@ -413,6 +451,8 @@ const WIDGET_EVENTS: Readonly<Record<string, Readonly<Record<string, NativeEvent
 		OnChanged: readEvent(r.Rtext_editor_set_changed_callback, [], (widget) => r.Rtext_editor_get_text(widget) ?? ""),
 		OnZoom: floatEvent(r.Rtext_editor_set_zoom_callback),
 		OnCompletion: textEvent(r.Rtext_editor_set_completion_callback),
+		// (the tooltip for the text under the pointer where no marker is: nothing, or "", for none)
+		OnHover: textAnswerEvent(r.Rtext_editor_set_hover_callback, ["i32", "i32"]),
 	},
 	ColorPicker: { OnChanged: readEvent(r.Rcolor_picker_set_changed_callback, ["f32", "f32", "f32", "f32"], (widget) => r.Rcolor_picker_get_hex(widget) ?? "") },
 	Label: { OnLink: textEvent(r.Rlabel_set_link_callback) },
@@ -444,6 +484,11 @@ const WIDGET_EVENTS: Readonly<Record<string, Readonly<Record<string, NativeEvent
 		OnActivated: indexEvent(r.Rnode_graph_set_activated_callback),
 		OnContext: contextEvent(r.Rnode_graph_set_context_callback, "i32"),
 		OnConnect: requestEvent(r.Rnode_graph_set_connect_callback, ["i32", "i32"]),
+		// (a double click on the empty canvas: given, it no longer frames all the nodes)
+		OnCanvasActivated: pointEvent(r.Rnode_graph_set_canvas_activated_callback, false),
+		// (a wire dropped on no pin, where; a pin clicked without dragging a wire from it)
+		OnWireDropped: pointEvent(r.Rnode_graph_set_wire_dropped_callback, true),
+		OnPinClicked: pointEvent(r.Rnode_graph_set_pin_clicked_callback, true),
 	},
 	BlockEditor: {
 		OnChanged: indexEvent(r.Rblock_editor_set_changed_callback),
@@ -640,7 +685,11 @@ export const EXTRA_PROPS: Readonly<Record<string, readonly string[]>> = {
 		"readonly OnContext?: (item: Rid, x: number, y: number) => void",
 		MARKUP,
 	],
-	TextEditor: ["readonly OnZoom?: (zoom: number) => void", "readonly OnCompletion?: (prefix: string) => void"],
+	TextEditor: [
+		"readonly OnZoom?: (zoom: number) => void",
+		"readonly OnCompletion?: (prefix: string) => void",
+		"readonly OnHover?: (line: number, column: number) => string | null | void",
+	],
 	Label: ['readonly FontStyle?: "Regular" | "Bold" | "Italic" | "BoldItalic"', "readonly OnLink?: (url: string) => void"],
 	Island: ["readonly OnChanged?: (expanded: boolean) => void"],
 	Viewport: ["readonly OnResize?: (width: number, height: number) => void"],
@@ -670,6 +719,9 @@ export const EXTRA_PROPS: Readonly<Record<string, readonly string[]>> = {
 		"readonly OnActivated?: (node: number) => void",
 		"readonly OnContext?: (node: number, x: number, y: number) => void",
 		"readonly OnConnect?: (outputPin: number, inputPin: number) => boolean",
+		"readonly OnCanvasActivated?: (x: number, y: number) => void",
+		"readonly OnWireDropped?: (pin: number, x: number, y: number) => void",
+		"readonly OnPinClicked?: (pin: number, x: number, y: number) => void",
 		MARKUP,
 	],
 	BlockEditor: [

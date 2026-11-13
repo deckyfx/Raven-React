@@ -227,6 +227,7 @@ const _symbols = {
 	Rwindow_get_scale: { args: ["u32"], returns: "f32" },
 	Rwindow_show: { args: ["u32"], returns: "void" },
 	Rwindow_hide: { args: ["u32"], returns: "void" },
+	Rwindow_focus: { args: ["u32"], returns: "void" },
 	Rwindow_maximize: { args: ["u32"], returns: "void" },
 	Rwindow_minimize: { args: ["u32"], returns: "void" },
 	Rwindow_restore: { args: ["u32"], returns: "void" },
@@ -829,10 +830,13 @@ const _symbols = {
 	Rtext_editor_is_completing: { args: ["u32"], returns: "i32" },
 	Rtext_editor_set_completion_callback: { args: ["u32", "ptr", "ptr"], returns: "void" },
 	Rtext_editor_add_completion: { args: ["u32", "ptr", "ptr"], returns: "void" },
+	Rtext_editor_add_completion_insert: { args: ["u32", "ptr", "ptr", "ptr"], returns: "void" },
+	Rtext_editor_set_completion_words: { args: ["u32", "i32"], returns: "void" },
 	Rtext_editor_set_auto_pairs: { args: ["u32", "i32"], returns: "void" },
 	Rtext_editor_add_marker: { args: ["u32", "i32", "i32", "i32", "i32", "ptr"], returns: "void" },
 	Rtext_editor_clear_markers: { args: ["u32"], returns: "void" },
 	Rtext_editor_get_marker_count: { args: ["u32"], returns: "i32" },
+	Rtext_editor_set_hover_callback: { args: ["u32", "ptr", "ptr"], returns: "void" },
 	Rtheme_set_token_color: { args: ["i32", "f32", "f32", "f32", "f32"], returns: "void" },
 	Rtheme_get_token_color: { args: ["i32", "ptr", "ptr", "ptr", "ptr"], returns: "void" },
 	Rtheme_clear_token_colors: { args: [], returns: "void" },
@@ -893,6 +897,8 @@ const _symbols = {
 	Rtray_set_tooltip: { args: ["u32", "ptr"], returns: "void" },
 	Rtray_set_menu: { args: ["u32", "u32"], returns: "void" },
 	Rtray_set_clicked_callback: { args: ["u32", "ptr", "ptr"], returns: "void" },
+	Rtray_set_title: { args: ["u32", "ptr"], returns: "void" },
+	Rtray_get_rect: { args: ["u32", "ptr", "ptr", "ptr", "ptr"], returns: "i32" },
 	Rcolor_picker_create: { args: [], returns: "u32" },
 	Rcolor_picker_set_color: { args: ["u32", "f32", "f32", "f32", "f32"], returns: "void" },
 	Rcolor_picker_get_color: { args: ["u32", "ptr", "ptr", "ptr", "ptr"], returns: "void" },
@@ -1034,11 +1040,28 @@ const _symbols = {
 	Rnode_graph_set_removed_callback: { args: ["u32", "ptr", "ptr"], returns: "void" },
 	Rnode_graph_set_activated_callback: { args: ["u32", "ptr", "ptr"], returns: "void" },
 	Rnode_graph_set_context_callback: { args: ["u32", "ptr", "ptr"], returns: "void" },
+	Rnode_graph_set_canvas_activated_callback: { args: ["u32", "ptr", "ptr"], returns: "void" },
+	Rnode_graph_set_wire_dropped_callback: { args: ["u32", "ptr", "ptr"], returns: "void" },
+	Rnode_graph_set_pin_clicked_callback: { args: ["u32", "ptr", "ptr"], returns: "void" },
+	Rnode_graph_get_node_at: { args: ["u32", "f32", "f32"], returns: "i32" },
+	Rnode_graph_get_pin_at: { args: ["u32", "f32", "f32"], returns: "i32" },
+	Rnode_graph_get_link_at: { args: ["u32", "f32", "f32"], returns: "i32" },
 	Rnode_graph_set_pin_multiple: { args: ["u32", "i32", "i32"], returns: "void" },
 	Rnode_graph_set_node_active: { args: ["u32", "i32", "i32"], returns: "void" },
 	Rnode_graph_set_node_active_color: { args: ["u32", "i32", "f32", "f32", "f32"], returns: "void" },
 	Rnode_graph_set_node_deletable: { args: ["u32", "i32", "i32"], returns: "void" },
+	Rnode_graph_set_node_shown: { args: ["u32", "i32"], returns: "void" },
+	Rnode_graph_set_link_shown: { args: ["u32", "i32"], returns: "void" },
+	Rnode_graph_set_node_icon: { args: ["u32", "i32", "u32"], returns: "void" },
 	Rnode_graph_set_node_badge: { args: ["u32", "i32", "ptr"], returns: "void" },
+	Rnode_graph_set_pin_tag: { args: ["u32", "i32", "ptr"], returns: "void" },
+	Rnode_graph_set_link_hidden: { args: ["u32", "i32", "i32"], returns: "void" },
+	Rnode_graph_set_pin_emphasis: { args: ["u32", "i32", "i32"], returns: "void" },
+	Rnode_graph_get_tag_at: { args: ["u32", "f32", "f32"], returns: "i32" },
+	Rnode_graph_set_pin_tag_lit: { args: ["u32", "i32", "i32"], returns: "void" },
+	Rnode_graph_set_pin_label_width: { args: ["u32", "f32"], returns: "void" },
+	Rnode_graph_get_pin_label_width: { args: ["u32"], returns: "f32" },
+	Rnode_graph_set_node_badge_color: { args: ["u32", "i32", "f32", "f32", "f32"], returns: "void" },
 	Rblock_editor_create: { args: [], returns: "u32" },
 	Rblock_editor_add_kind: { args: ["u32", "ptr", "ptr", "i32", "ptr"], returns: "i32" },
 	Rblock_editor_set_category_color: { args: ["u32", "ptr", "f32", "f32", "f32"], returns: "void" },
@@ -1078,6 +1101,9 @@ const _symbols = {
 	Rdialog_open: { args: ["u32", "u32", "ptr", "ptr"], returns: "void" },
 	Rdialog_close: { args: ["u32", "i32"], returns: "void" },
 	Rdialog_run: { args: ["u32", "u32"], returns: "i32" },
+	Rpopup_open: { args: ["u32", "u32", "f32", "f32", "ptr", "ptr"], returns: "void" },
+	Rpopup_close: { args: ["u32", "i32"], returns: "void" },
+	Rpopup_is_open: { args: ["u32"], returns: "i32" },
 	Rwindow_has_dialog: { args: ["u32"], returns: "i32" },
 	Rmessage_box: { args: ["u32", "ptr", "ptr", "i32"], returns: "i32" },
 	Rfile_dialog_open: { args: ["ptr"], returns: "cstring" },
@@ -5906,6 +5932,31 @@ function _adapt_RCompletionCallback(function_: RCompletionCallback | Pointer | n
 }
 
 /**
+ * Called while the pointer moves over the text where no marker
+ * is, with the position under it: the text returned (NULL or "" for
+ * none) is shown as the tooltip, as a marker's message is (what a name
+ * stands for, the value of a variable). The text must stay valid until
+ * the next call.
+ */
+export type RTextEditorHoverCallback = (editor: Rid, line: number, column: number, user_data: Pointer | null) => string | null;
+
+function _adapt_RTextEditorHoverCallback(function_: RTextEditorHoverCallback | Pointer | null, threadsafe = false): Pointer | null {
+	if (typeof function_ !== "function") {
+		return function_;
+	}
+	let text: Buffer = Buffer.from([0]);
+	return _keep(new _JSCallback((editor: number, line: number, column: number, user_data: Pointer | null): Pointer | null => {
+		try {
+			text = Buffer.from((function_(editor, line, column, user_data) ?? "") + "\0");
+			return _ptr(text);
+		} catch (error) {
+			_report(error as Error);
+			return _ptr(text);
+		}
+	}, { args: ["u32", "i32", "i32", "ptr"], returns: "ptr", threadsafe }));
+}
+
+/**
  * Called after each change made by the user (typing, pasting,
  * undoing...) or by Rtext_editor_insert_text. The action of the widget
  * (OnChanged in XML) fires at the same time.
@@ -6095,6 +6146,25 @@ function _adapt_RNodeGraphContextCallback(function_: RNodeGraphContextCallback |
 	return _keep(new _JSCallback((graph: number, node: number, x: number, y: number, user_data: Pointer | null): void => {
 		try {
 			function_(graph, node, x, y, user_data);
+		} catch (error) {
+			_report(error as Error);
+		}
+	}, { args: ["u32", "i32", "f32", "f32", "ptr"], returns: "void", threadsafe }));
+}
+
+/**
+ * Something happened at a point of the canvas: `item` depends on the
+ * function the callback was given to; x, y are in canvas units (as node positions).
+ */
+export type RNodeGraphPointCallback = (graph: Rid, item: number, x: number, y: number, user_data: Pointer | null) => void;
+
+function _adapt_RNodeGraphPointCallback(function_: RNodeGraphPointCallback | Pointer | null, threadsafe = false): Pointer | null {
+	if (typeof function_ !== "function") {
+		return function_;
+	}
+	return _keep(new _JSCallback((graph: number, item: number, x: number, y: number, user_data: Pointer | null): void => {
+		try {
+			function_(graph, item, x, y, user_data);
 		} catch (error) {
 			_report(error as Error);
 		}
@@ -6817,6 +6887,18 @@ export function Rwindow_show(window: Rid): void {
 
 export function Rwindow_hide(window: Rid): void {
 	_lib.Rwindow_hide(window);
+}
+
+/**
+ * Shows the window in front of the others with the keyboard, and
+ * makes the application the active one. Rwindow_show alone does not take
+ * the keyboard from another application (a prompt that appears while the
+ * user types elsewhere); this is for a window the user just asked for (a
+ * card opened from a tray icon). Where the system has no such request,
+ * the same as Rwindow_show.
+ */
+export function Rwindow_focus(window: Rid): void {
+	_lib.Rwindow_focus(window);
 }
 
 export function Rwindow_maximize(window: Rid): void {
@@ -10127,6 +10209,25 @@ export function Rtext_editor_add_completion(editor: Rid, text: string | null, de
 }
 
 /**
+ * Adds a proposal that writes another text than the one it shows
+ * and is matched on: "Threshold", listed and filtered as such, that
+ * writes "Threshold(" when chosen. Only from a completion callback.
+ * insert What replaces the word being typed; NULL or "" is `text`.
+ */
+export function Rtext_editor_add_completion_insert(editor: Rid, text: string | null, detail: string | null, insert: string | null): void {
+	_lib.Rtext_editor_add_completion_insert(editor, _s(text), _s(detail), _s(insert));
+}
+
+/**
+ * R_FALSE leaves the words of the language and the names of the
+ * text out of the proposals: only the completion callback's are listed
+ * (a language server that knows better). On by default.
+ */
+export function Rtext_editor_set_completion_words(editor: Rid, enabled: number): void {
+	_lib.Rtext_editor_set_completion_words(editor, enabled);
+}
+
+/**
  * R_FALSE stops the editor from closing brackets and quotes and
  * from indenting after them. On by default; it only acts with a language.
  */
@@ -10151,6 +10252,10 @@ export function Rtext_editor_clear_markers(editor: Rid): void {
 
 export function Rtext_editor_get_marker_count(editor: Rid): number {
 	return _lib.Rtext_editor_get_marker_count(editor);
+}
+
+export function Rtext_editor_set_hover_callback(editor: Rid, callback: RTextEditorHoverCallback | Pointer | null, user_data: RPointer = null): void {
+	_lib.Rtext_editor_set_hover_callback(editor, _adapt_RTextEditorHoverCallback(callback), user_data);
 }
 
 /**
@@ -10575,6 +10680,30 @@ export function Rtray_set_menu(tray: Rid, menu: Rid): void {
  */
 export function Rtray_set_clicked_callback(tray: Rid, callback: RTrayClickedCallback | Pointer | null, user_data: RPointer = null): void {
 	_lib.Rtray_set_clicked_callback(tray, _adapt_RTrayClickedCallback(callback), user_data);
+}
+
+/**
+ * A short text shown beside the icon (macOS menu bar), drawn by the
+ * system in its own font and colors; the item widens to fit it. NULL or
+ * "": the icon alone. Systems that show no text there ignore it (the
+ * tooltip is the place for it).
+ */
+export function Rtray_set_title(tray: Rid, text: string | null): void {
+	_lib.Rtray_set_title(tray, _s(text));
+}
+
+/**
+ * Where the icon is on the screen, in the units and coordinates of
+ * Rwindow_set_position (a window can then open just under it).
+ * Returns: R_FALSE when the system does not tell (the outputs are then 0).
+ */
+export function Rtray_get_rect(tray: Rid): [result: number, x: number, y: number, width: number, height: number] {
+	const x_ = new Int32Array(1);
+	const y_ = new Int32Array(1);
+	const width_ = new Int32Array(1);
+	const height_ = new Int32Array(1);
+	const result_ = _lib.Rtray_get_rect(tray, x_, y_, width_, height_);
+	return [result_, x_[0]!, y_[0]!, width_[0]!, height_[0]!];
 }
 
 export function Rcolor_picker_create(): Rid {
@@ -11328,6 +11457,48 @@ export function Rnode_graph_set_context_callback(graph: Rid, callback: RNodeGrap
 }
 
 /**
+ * Double click on the empty canvas (`item` 0): the application acts
+ * there (a search to add a node...). Without this callback it frames all nodes.
+ */
+export function Rnode_graph_set_canvas_activated_callback(graph: Rid, callback: RNodeGraphPointCallback | Pointer | null, user_data: RPointer = null): void {
+	_lib.Rnode_graph_set_canvas_activated_callback(graph, _adapt_RNodeGraphPointCallback(callback), user_data);
+}
+
+/**
+ * A wire the user pulled from a pin was released on nothing: `item` is
+ * that pin, x, y where it was dropped (to offer a node to connect it to). The
+ * wire draws back as usual.
+ */
+export function Rnode_graph_set_wire_dropped_callback(graph: Rid, callback: RNodeGraphPointCallback | Pointer | null, user_data: RPointer = null): void {
+	_lib.Rnode_graph_set_wire_dropped_callback(graph, _adapt_RNodeGraphPointCallback(callback), user_data);
+}
+
+/**
+ * A pin was clicked, not dragged (`item` is the pin, x, y on the canvas):
+ * the application may link in two clicks (Rnode_graph_set_pin_emphasis shows where
+ * the second may go). With this callback such a click neither detaches the wire
+ * of an input nor counts as a wire dropped on nothing.
+ */
+export function Rnode_graph_set_pin_clicked_callback(graph: Rid, callback: RNodeGraphPointCallback | Pointer | null, user_data: RPointer = null): void {
+	_lib.Rnode_graph_set_pin_clicked_callback(graph, _adapt_RNodeGraphPointCallback(callback), user_data);
+}
+
+/** The node under a point of the widget (x, y as in the events: Rnode_graph_to_canvas), or 0. */
+export function Rnode_graph_get_node_at(graph: Rid, x: number, y: number): number {
+	return _lib.Rnode_graph_get_node_at(graph, x, y);
+}
+
+/** The pin near a point of the widget (or whose tag is under it: Rnode_graph_set_pin_tag), or 0 (a menu for a pin). */
+export function Rnode_graph_get_pin_at(graph: Rid, x: number, y: number): number {
+	return _lib.Rnode_graph_get_pin_at(graph, x, y);
+}
+
+/** The link under a point of the widget, or 0 (hidden links are never under it). */
+export function Rnode_graph_get_link_at(graph: Rid, x: number, y: number): number {
+	return _lib.Rnode_graph_get_link_at(graph, x, y);
+}
+
+/**
  * R_TRUE: this input keeps every link made to it (a state that several
  * transitions enter) instead of one. Pulling a wire from it starts a new one.
  */
@@ -11350,9 +11521,81 @@ export function Rnode_graph_set_node_deletable(graph: Rid, node: number, deletab
 	_lib.Rnode_graph_set_node_deletable(graph, node, deletable);
 }
 
+/** Shows a node at once, without the animation a node added to a shown graph pops in with (an application that rebuilds its graph). */
+export function Rnode_graph_set_node_shown(graph: Rid, node: number): void {
+	_lib.Rnode_graph_set_node_shown(graph, node);
+}
+
+/** The same for a link made with Rnode_graph_connect: drawn whole at once instead of growing from its output. */
+export function Rnode_graph_set_link_shown(graph: Rid, link: number): void {
+	_lib.Rnode_graph_set_link_shown(graph, link);
+}
+
+/** An icon before the title: a texture of the application, shared by many nodes and not deleted with them (the "Icon" style loads one per node from a file). R_INVALID_ID removes it. */
+export function Rnode_graph_set_node_icon(graph: Rid, node: number, texture: Rid): void {
+	_lib.Rnode_graph_set_node_icon(graph, node, texture);
+}
+
 /** A short text in a pill on the top right corner of the node ("1", "!"...); NULL or "" removes it. */
 export function Rnode_graph_set_node_badge(graph: Rid, node: number, text: string | null): void {
 	_lib.Rnode_graph_set_node_badge(graph, node, _s(text));
+}
+
+/**
+ * A short text in a chip of the pin's color outside the node, beside the pin
+ * (left of an input, right of an output): the name of what goes out or comes in
+ * there, as a net label of a schematic. NULL or "" removes it.
+ */
+export function Rnode_graph_set_pin_tag(graph: Rid, pin: number, text: string | null): void {
+	_lib.Rnode_graph_set_pin_tag(graph, pin, _s(text));
+}
+
+/**
+ * R_TRUE: the link stays (its pins are linked, the application keeps
+ * it) but is not drawn and not picked: its two ends are shown otherwise (pin
+ * tags naming it, as the labels of a schematic stand for a wire).
+ */
+export function Rnode_graph_set_link_hidden(graph: Rid, link: number, hidden: number): void {
+	_lib.Rnode_graph_set_link_hidden(graph, link, hidden);
+}
+
+/**
+ * How much a pin stands out, as while a wire is pulled: 1 shows it as a pin
+ * to go to, -1 steps it back, 0 as usual (an application that links in two clicks).
+ */
+export function Rnode_graph_set_pin_emphasis(graph: Rid, pin: number, emphasis: number): void {
+	_lib.Rnode_graph_set_pin_emphasis(graph, pin, emphasis);
+}
+
+/** The pin whose tag (Rnode_graph_set_pin_tag) is under a point of the widget, or 0: the chip only, not the pin. */
+export function Rnode_graph_get_tag_at(graph: Rid, x: number, y: number): number {
+	return _lib.Rnode_graph_get_tag_at(graph, x, y);
+}
+
+/**
+ * R_TRUE: the pin's tag is drawn as under the pointer (a stronger fill, a
+ * thicker edge) — every tag of one net lit while the pointer is on one of them.
+ */
+export function Rnode_graph_set_pin_tag_lit(graph: Rid, pin: number, lit: number): void {
+	_lib.Rnode_graph_set_pin_tag_lit(graph, pin, lit);
+}
+
+/**
+ * Pin labels wider than `width` (logical units) are cut short with an
+ * ellipsis and the nodes are laid out with them so (compact ports); 0, the
+ * default, shows every label whole.
+ */
+export function Rnode_graph_set_pin_label_width(graph: Rid, width: number): void {
+	_lib.Rnode_graph_set_pin_label_width(graph, width);
+}
+
+export function Rnode_graph_get_pin_label_width(graph: Rid): number {
+	return _lib.Rnode_graph_get_pin_label_width(graph);
+}
+
+/** Color of the badge pill of one node (Rnode_graph_set_node_badge); its text turns dark or light to suit it. */
+export function Rnode_graph_set_node_badge_color(graph: Rid, node: number, r: number, g: number, b: number): void {
+	_lib.Rnode_graph_set_node_badge_color(graph, node, r, g, b);
 }
 
 export function Rblock_editor_create(): Rid {
@@ -11555,6 +11798,29 @@ export function Rdialog_close(widget: Rid, result: number): void {
 /** Shows a dialog and waits until it closes. Returns its result. */
 export function Rdialog_run(window: Rid, content: Rid): number {
 	return _lib.Rdialog_run(window, content);
+}
+
+/**
+ * Shows a widget as a popup over the window, its top-left corner at
+ * x, y (window coordinates; moved to stay inside the window): a search box,
+ * a palette, a picker. Unlike a dialog it does not block the window: a click
+ * outside it, or Escape, closes it. The application keeps the content (it is
+ * not deleted on close) and can open it again. `closed` (may be NULL) is
+ * called when it closes, with the result given to Rpopup_close (0 when dismissed).
+ * The content draws its own background (a Border with a Background...).
+ */
+export function Rpopup_open(window: Rid, content: Rid, x: number, y: number, closed: RDialogClosedCallback | Pointer | null, user_data: RPointer = null): void {
+	_lib.Rpopup_open(window, content, x, y, _adapt_RDialogClosedCallback(closed), user_data);
+}
+
+/** Closes the popup that contains a widget (the content or anything inside it). */
+export function Rpopup_close(widget: Rid, result: number): void {
+	_lib.Rpopup_close(widget, result);
+}
+
+/** Returns: R_TRUE while the widget is shown as a popup. */
+export function Rpopup_is_open(content: Rid): number {
+	return _lib.Rpopup_is_open(content);
 }
 
 /** Returns: R_TRUE while a dialog is shown in the window. */

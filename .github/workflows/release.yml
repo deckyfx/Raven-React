@@ -66,21 +66,35 @@ jobs:
             -DRAVEN_BUILD_TOOLS=OFF
           cmake --build build --config Release --parallel
 
-      # Node.js: the headers its addon is built with, and the application check:consumer runs under it
+      # Node.js: the headers its addon is built with, and the applications check:consumer runs under it
       - uses: actions/setup-node@v7
-        if: runner.os != 'Windows'
         with:
           node-version: 24
           package-manager-cache: false
 
-      # the addon of Raven's Node.js binding, for the package of this platform. Raven's CMake leaves
-      # it out on Windows, whose package then works on Bun only
+      # the addon of Raven's Node.js binding, for the package of this platform
       - name: Build the addon of the Node.js binding
         if: runner.os != 'Windows'
         working-directory: raven-source
         run: |
           cmake -S bindings/node -B build-node ${{ matrix.cmake }} -DCMAKE_BUILD_TYPE=Release
           cmake --build build-node --config Release --parallel
+
+      # Raven's CMake leaves it out on Windows, where it links against node.lib: the one of the
+      # Node.js above, with its headers, from nodejs.org, and a CMake project of this package
+      - name: Build the addon of the Node.js binding (Windows)
+        if: runner.os == 'Windows'
+        run: |
+          version="$(node -v)"
+          mkdir -p node-api
+          curl -fsSL "https://nodejs.org/dist/$version/node-$version-headers.tar.gz" | tar -xz -C node-api
+          curl -fsSL -o node-api/node.lib "https://nodejs.org/dist/$version/win-x64/node.lib"
+          here="$(cygpath -m "$PWD")"
+          cmake -S packages/raven-tsx/addon -B raven-source/build-node -A x64 \
+            -DRAVEN_SOURCE="$here/raven-source" \
+            -DNODE_INCLUDE_DIR="$here/node-api/node-$version/include/node" \
+            -DNODE_LIBRARY="$here/node-api/node.lib"
+          cmake --build raven-source/build-node --config Release
 
       - uses: oven-sh/setup-bun@v2
         with:
@@ -124,7 +138,7 @@ jobs:
       - name: Make the package of this platform
         working-directory: packages/raven-tsx
         run: |
-          bun run pack:platform --target ${{ matrix.target }} --lib "../../raven-source/${{ matrix.library }}" --raven ../../raven-source --out ../../dist/npm ${{ runner.os != 'Windows' && '--addon ../../raven-source/build-node/raven_napi.node' || '' }}
+          bun run pack:platform --target ${{ matrix.target }} --lib "../../raven-source/${{ matrix.library }}" --raven ../../raven-source --out ../../dist/npm --addon ../../raven-source/build-node/${{ runner.os == 'Windows' && 'Release/' || '' }}raven_napi.node
 
       # the packages as npm gives them, in an application that compiles our sources with its strict
       # settings (skipLibCheck does not skip a .ts file), and loads the library of this platform. And

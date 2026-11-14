@@ -169,11 +169,21 @@ export async function buildLibrary(build: string): Promise<void> {
 
 /**
  * Builds the addon of Raven's Node.js binding from a checkout, in its folder `build-node`, and
- * says where it is. None on Windows, which Raven's CMake leaves out, nor without the headers of
- * Node.js: the package of the platform then works on Bun only, which is said.
+ * says where it is. On Windows, which Raven's CMake leaves out, it takes the one built there by
+ * `packages/raven-tsx/addon`, if any. Without one, nor the headers of Node.js elsewhere, the
+ * package of the platform works on Bun only, which is said.
  */
 export async function buildAddon(checkout: string): Promise<string | undefined> {
 	const build = `${checkout}/build-node`;
+	const built = (): string | undefined => [`${build}/${ADDON_FILE}`, `${build}/Release/${ADDON_FILE}`].find((path) => existsSync(path));
+	if (process.platform === "win32") {
+		// (Raven's CMake leaves it out here: it is built by packages/raven-tsx/addon, with node.lib, as the release workflow does)
+		const addon = built();
+		if (!addon) {
+			console.warn(`no ${ADDON_FILE} in ${build}: build it with packages/raven-tsx/addon (see its CMakeLists.txt), or the package of this platform works on Bun only`);
+		}
+		return addon;
+	}
 	for (const command of [
 		["cmake", "-S", `${checkout}/bindings/node`, "-B", build, "-DCMAKE_BUILD_TYPE=Release"],
 		["cmake", "--build", build, "--config", "Release", "--parallel"],
@@ -184,7 +194,7 @@ export async function buildAddon(checkout: string): Promise<string | undefined> 
 			fail(`building the addon of the Node.js binding failed:\n${output}${errors}`);
 		}
 	}
-	const addon = [`${build}/${ADDON_FILE}`, `${build}/Release/${ADDON_FILE}`].find((path) => existsSync(path));
+	const addon = built();
 	if (!addon) {
 		console.warn(`no ${ADDON_FILE} built (Windows, or no node_api.h): the package of this platform works on Bun only`);
 	}

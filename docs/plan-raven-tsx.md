@@ -54,6 +54,15 @@ This is the Node-API binding recommended on 2026-11-08: `bindings/node` upstream
 
 Its first step is in `src/core`: move the direct uses of `bun:ffi` (`events.ts`, `frame.ts`, `tags.ts`), `web.ts` (`dlopen`) and `native.ts` (`Bun.file`, `Bun.hash`) behind a backend interface.
 
+**React on Node.js done, for 0.2.0** (Linux and macOS):
+
+- `#backend` makes the native callbacks: a JSCallback on Bun, the function itself on Node.js, which Raven's addon decodes the same way. Only `core/backend/bun.ts` imports `bun:ffi` at run time, which a test keeps.
+- `#raven` and `#native` choose the binding and its loader by runtime. Raven's Node.js binding is carried in `src/vendor/node`, from the pin, and checked as the Bun one is.
+- The package of a platform holds the addon (`raven_napi.node`) and an `index.js` for Node.js. The main package has a bundle for Node.js (`dist/node`, `build:node`), which its `exports` give under `node`.
+- `check:consumer` runs an application of Node.js installed by npm, in CI on Linux and macOS.
+
+Still to do: Windows (Raven's CMake leaves the addon out there: it needs the import library of `node.exe`), Solid on Node.js (its TSX needs a compiler other than our plugin for Bun), `WebView` (Raven's Node.js binding has no `raven_web.h`), and types that do not need those of `bun:ffi`.
+
 ## Phase 4: Solid adapter
 
 **Done, for 0.1.1.** What was built, and where it differs from the plan below:
@@ -125,7 +134,7 @@ If one of these fails, stop and write down why. React stays the only adapter.
 |---|---|---|
 | 1. Rename | nothing | done |
 | 2. Core and React separated | nothing | done |
-| 3. Node.js backend | an upstream binding | its own plan |
+| 3. Node.js backend | an upstream binding | React on Linux and macOS done; Windows, Solid, WebView, types to do |
 | 4. Solid adapter | nothing | done |
 
 ## Decisions for the user

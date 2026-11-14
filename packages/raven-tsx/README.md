@@ -113,6 +113,31 @@ The components, their props, events, windows, themes and tags are the same as wi
 - `registerTag` takes a Solid component, whose props follow the attributes of its element.
 - An element kept in a variable and shown again (`<Show>`) keeps its widget; one whose component is gone is deleted.
 
+## Node.js
+
+The package also runs under Node.js, with React, on Linux and macOS. Raven's Node-API binding replaces bun:ffi there; it comes in the package of the platform, as the library does.
+
+    npm install @decky.fx/raven-tsx react react-reconciler
+
+```js
+import { createElement as h, useState } from "react";
+import { Button, Label, runApp, VBox } from "@decky.fx/raven-tsx/react";
+
+function App() {
+	const [count, setCount] = useState(0);
+	return h(VBox, { Spacing: 12 }, h(Label, null, `Clicked ${count} times`), h(Button, { OnClicked: () => setCount(count + 1) }, "Click me"));
+}
+
+await runApp(h(App), { Title: "Hello", Width: 480, Height: 240 });
+```
+
+TSX works through any compiler that turns it into JavaScript for Node.js, as with React elsewhere. What is not there yet:
+
+- Windows: Raven's build leaves the addon of its Node.js binding out there.
+- Solid: its TSX is compiled by the plugin of this package, which is one for Bun.
+- `WebView`: Raven's Node.js binding has no `raven_web.h` yet. It says so when asked.
+- The types: they are the sources, TypeScript, and a few raw values have their types from `bun:ffi`. A project of Node.js type-checks with `@types/bun` among its development dependencies and `"moduleResolution": "bundler"`, as with tsx, esbuild or Vite. `"NodeNext"` needs declarations of their own, which are not made yet.
+
 ## How props work
 
 The components, with their props, are generated from Raven's own schema.

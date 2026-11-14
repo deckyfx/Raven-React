@@ -1,5 +1,5 @@
 import { createElement, type ReactNode, type ReactPortal } from "react";
-import { ConcurrentRoot } from "react-reconciler/constants";
+import { ConcurrentRoot } from "react-reconciler/constants.js";
 import * as r from "../core/raven";
 import { RavenError } from "../core/errors";
 import { resolveProps, type RavenProps } from "../core/props";

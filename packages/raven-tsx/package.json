@@ -1,17 +1,52 @@
 {
   "name": "@decky.fx/raven-tsx",
-  "version": "0.1.2",
+  "version": "0.2.0",
   "description": "Raven's native widgets from TSX, for Bun: a core that knows only Raven and adapters for React and Solid, with typed components made from Raven's schema",
   "license": "Apache-2.0",
   "type": "module",
   "module": "src/core/index.ts",
   "exports": {
-    ".": "./src/core/index.ts",
-    "./react": "./src/react/index.ts",
-    "./solid": "./src/solid/index.ts",
+    ".": {
+      "types": "./src/core/index.ts",
+      "bun": "./src/core/index.ts",
+      "node": "./dist/node/core/index.js",
+      "default": "./src/core/index.ts"
+    },
+    "./react": {
+      "types": "./src/react/index.ts",
+      "bun": "./src/react/index.ts",
+      "node": "./dist/node/react/index.js",
+      "default": "./src/react/index.ts"
+    },
+    "./solid": {
+      "types": "./src/solid/index.ts",
+      "bun": "./src/solid/index.ts",
+      "node": "./dist/node/solid/index.js",
+      "default": "./src/solid/index.ts"
+    },
     "./solid/renderer": "./src/solid/renderer.ts",
     "./solid/plugin": "./src/solid/plugin.ts",
     "./solid/preload": "./src/solid/preload.ts"
+  },
+  "imports": {
+    "#backend": {
+      "types": "./src/core/backend/bun.ts",
+      "bun": "./src/core/backend/bun.ts",
+      "node": "./src/core/backend/node.ts",
+      "default": "./src/core/backend/bun.ts"
+    },
+    "#native": {
+      "types": "./src/core/native.ts",
+      "bun": "./src/core/native.ts",
+      "node": "./src/core/native-node.ts",
+      "default": "./src/core/native.ts"
+    },
+    "#raven": {
+      "types": "./src/vendor/raven.ts",
+      "bun": "./src/vendor/raven.ts",
+      "node": "./src/vendor/node/raven.js",
+      "default": "./src/vendor/raven.ts"
+    }
   },
   "engines": {
     "bun": ">=1.4.4"
@@ -20,7 +55,19 @@
     "type": "git",
     "url": "git+https://github.com/deckyfx/raven-tsx.git"
   },
-  "keywords": ["raven", "tsx", "bun", "gui", "desktop", "native", "widgets", "react", "solid", "solidjs", "vulkan"],
+  "keywords": [
+    "raven",
+    "tsx",
+    "bun",
+    "gui",
+    "desktop",
+    "native",
+    "widgets",
+    "react",
+    "solid",
+    "solidjs",
+    "vulkan"
+  ],
   "scripts": {
     "generate": "bun run src/tools/generate-components.ts",
     "native:local": "bun run src/tools/native-local.ts",
@@ -34,7 +81,8 @@
     "prepare:publish": "bun run src/tools/prepare-publish.ts",
     "check:consumer": "bun run src/tools/check-consumer.ts",
     "test": "bun test",
-    "typecheck": "bun check"
+    "typecheck": "bun check",
+    "build:node": "bun run src/tools/build-node.ts"
   },
   "dependencies": {
     "@types/babel__core": "^7.20",

@@ -24,7 +24,7 @@ test("the check sees every way of importing a framework", () => {
 		'import type { ReactNode } from "react";',
 		'export type { ReactNode } from "react";',
 		'import ReactReconciler from "react-reconciler";',
-		'import { DefaultEventPriority } from "react-reconciler/constants";',
+		'import { DefaultEventPriority } from "react-reconciler/constants.js";',
 		'import { createSignal } from "solid-js";',
 		'import "react";',
 		'const dynamic = await import("solid-js/universal");',
@@ -44,6 +44,26 @@ test("nothing in the core imports a framework or an adapter", async () => {
 		found.push(...forbiddenImports(await Bun.file(`${CORE}/${file}`).text()).map((name) => `${file}: ${name}`));
 	}
 	expect(found).toEqual([]);
+});
+
+test("only the backend of Bun imports bun:ffi to run: the rest runs on Node.js too", async () => {
+	// (a type is erased: `import type` and `type` names are allowed anywhere)
+	const runtimeImport = /^\s*import\s+(?!type\b)(?:[^"';]*\bfrom\s*)?["']bun:ffi["']/m;
+	const found: string[] = [];
+	for (const folder of ["core", "react", "solid"]) {
+		const base = `${import.meta.dir}/../../${folder}`;
+		for (const file of await Array.fromAsync(new Bun.Glob("**/*.ts").scan({ cwd: base }))) {
+			const source = await Bun.file(`${base}/${file}`).text();
+			// (with the separators of every system: Windows gives backend\bun.ts)
+			const path = `${folder}/${file.replaceAll("\\", "/")}`;
+			if (runtimeImport.test(source) && path !== "core/backend/bun.ts") {
+				found.push(path);
+			}
+		}
+	}
+	expect(found).toEqual([]);
+	expect(runtimeImport.test('import { dlopen } from "bun:ffi";')).toBe(true);
+	expect(runtimeImport.test('import type { Pointer } from "bun:ffi";')).toBe(false);
 });
 
 test("importing the core loads no framework", () => {

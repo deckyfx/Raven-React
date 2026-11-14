@@ -1,6 +1,6 @@
 import { createContext, type ReactNode } from "react";
 import ReactReconciler from "react-reconciler";
-import { DefaultEventPriority, DiscreteEventPriority } from "react-reconciler/constants";
+import { DefaultEventPriority, DiscreteEventPriority } from "react-reconciler/constants.js";
 import { RavenError } from "../core/errors";
 import * as r from "../core/raven";
 import { eventScope } from "../core/events";
@@ -125,7 +125,7 @@ const hostConfig: RavenHostConfig = {
 	bindToConsole: (_method, args) => console.log.bind(console, ...args),
 	getSuspendedCommitReason: () => null,
 	resetFormInstance: () => {},
-	rendererVersion: "0.1.2",
+	rendererVersion: "0.2.0",
 	rendererPackageName: "raven-tsx-react",
 	extraDevToolsConfig: null,
 };

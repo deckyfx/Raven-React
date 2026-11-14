@@ -66,6 +66,22 @@ jobs:
             -DRAVEN_BUILD_TOOLS=OFF
           cmake --build build --config Release --parallel
 
+      # Node.js: the headers its addon is built with, and the application check:consumer runs under it
+      - uses: actions/setup-node@v7
+        if: runner.os != 'Windows'
+        with:
+          node-version: 24
+          package-manager-cache: false
+
+      # the addon of Raven's Node.js binding, for the package of this platform. Raven's CMake leaves
+      # it out on Windows, whose package then works on Bun only
+      - name: Build the addon of the Node.js binding
+        if: runner.os != 'Windows'
+        working-directory: raven-source
+        run: |
+          cmake -S bindings/node -B build-node ${{ matrix.cmake }} -DCMAKE_BUILD_TYPE=Release
+          cmake --build build-node --config Release --parallel
+
       - uses: oven-sh/setup-bun@v2
         with:
           bun-version: 1.4.4
@@ -108,10 +124,11 @@ jobs:
       - name: Make the package of this platform
         working-directory: packages/raven-tsx
         run: |
-          bun run pack:platform --target ${{ matrix.target }} --lib "../../raven-source/${{ matrix.library }}" --raven ../../raven-source --out ../../dist/npm
+          bun run pack:platform --target ${{ matrix.target }} --lib "../../raven-source/${{ matrix.library }}" --raven ../../raven-source --out ../../dist/npm ${{ runner.os != 'Windows' && '--addon ../../raven-source/build-node/raven_napi.node' || '' }}
 
       # the packages as npm gives them, in an application that compiles our sources with its strict
-      # settings (skipLibCheck does not skip a .ts file), and loads the library of this platform
+      # settings (skipLibCheck does not skip a .ts file), and loads the library of this platform. And
+      # where the package has the addon, an application of Node.js, installed by npm, that runs
       - name: Install the packages into an application, and compile it strictly
         if: matrix.test
         working-directory: packages/raven-tsx

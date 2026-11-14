@@ -8,10 +8,12 @@
  * The main package is made here, by prepare:publish. There are two applications, one of React and
  * one of Solid: each is a Hello World example, with a file that passes `undefined` to optional props
  * (`exactOptionalPropertyTypes`). The one of Solid runs through the plugin of the package, as its
- * bunfig.toml preloads it, and renders a signal.
+ * bunfig.toml preloads it, and renders a signal. A third runs under Node.js, installed by npm: React
+ * rendered headless, an action fired, the state it changed shown. It needs the addon of Raven's
+ * Node.js binding in the package of the platform, which Windows does not have yet.
  */
 
-import { cpSync, mkdtempSync, rmSync } from "node:fs";
+import { cpSync, existsSync, mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { resolve } from "node:path";
 import ts from "typescript";
@@ -186,6 +188,83 @@ try {
 	console.log(`it compiles with ${strict}`);
 	const rendered = await run(["bun", "run", "src/check.tsx"], solid);
 	console.log(`a signal reaches its widget, through the plugin of the package: Raven ${rendered.trim()}`);
+
+	if (existsSync(`${platform}/raven_napi.node`)) {
+		const node = `${work}/node`;
+		const nodeManifest = {
+			name: "consumer-node",
+			private: true,
+			type: "module",
+			dependencies: { [manifest.name]: `file:${main}`, react: manifest.devDependencies.react, "react-reconciler": manifest.devDependencies["react-reconciler"] },
+			// (the types of a few raw values come from bun:ffi: see the README)
+			devDependencies: { "@types/bun": manifest.devDependencies["@types/bun"], "@types/react": manifest.dependencies["@types/react"], typescript: manifest.devDependencies.typescript },
+			overrides: { [nativeName]: `file:${native}` },
+		};
+		// (resolved as a bundler would, as tsx, esbuild or Vite do: the condition "types" gives the
+		// sources. "NodeNext" needs declarations of their own, which are not made yet: see the README)
+		await Bun.write(`${node}/tsconfig.json`, JSON.stringify({
+			compilerOptions: { target: "ESNext", module: "ESNext", moduleResolution: "Bundler", types: ["bun"], noEmit: true, skipLibCheck: true, ...strictOptions() },
+			include: ["types.ts"],
+		}, null, 2));
+		await Bun.write(`${node}/types.ts`, [
+			'import { createElement } from "react";',
+			'import { raven as r } from "@decky.fx/raven-tsx";',
+			'import { Button, createWindow, type WidgetInstance } from "@decky.fx/raven-tsx/react";',
+			"",
+			"/** What an application of Node.js writes, typed. */",
+			"export function open(onPress: () => void): r.Rid {",
+			'	const { window, root } = createWindow({ Title: "typed", Width: 200, Height: 100 });',
+			'	root.render(createElement(Button, { OnClicked: onPress, ref: (made: WidgetInstance | null) => void made?.focus() }, "ok"));',
+			"	return window;",
+			"}",
+			"",
+		].join("\n"));
+		await Bun.write(`${node}/package.json`, JSON.stringify(nodeManifest, null, 2));
+		await Bun.write(`${node}/check.mjs`, [
+			'import { createElement as h, useState } from "react";',
+			'import { raven as r } from "@decky.fx/raven-tsx";',
+			'import { Button, createWindow, Label, VBox } from "@decky.fx/raven-tsx/react";',
+			"",
+			"const desc = new r.RInitDesc();",
+			"desc.backend = r.R_BACKEND_NULL;",
+			"desc.headless = 1;",
+			"if (!r.Rinit_ex(desc)) {",
+			'	throw new Error("Raven cannot start");',
+			"}",
+			"function App() {",
+			"	const [count, setCount] = useState(0);",
+			'	return h(VBox, null, h(Label, { Name: "count" }, String(count)), h(Button, { Name: "add", OnClicked: () => setCount((value) => value + 1) }, "add"));',
+			"}",
+			'const { window, root } = createWindow({ Title: "check", Width: 200, Height: 100 });',
+			"root.render(h(App));",
+			"const settle = async () => {",
+			"	for (let turn = 0; turn < 20; turn++) {",
+			"		r.Rdraw_frame();",
+			"		await new Promise((resolve) => setImmediate(resolve));",
+			"	}",
+			"};",
+			"await settle();",
+			'const add = r.Rwidget_find(window, "add");',
+			"r.Raction_fire(r.Rwidget_get_action(add), add);",
+			"await settle();",
+			'const shown = r.Rlabel_get_text(r.Rwidget_find(window, "count"));',
+			"root.unmount();",
+			"r.Rwindow_destroy(window);",
+			"r.Rshutdown();",
+			'if (shown !== "1") {',
+			'	throw new Error(`the label shows ${shown}, not what the click changed`);',
+			"}",
+			"console.log(r.Rget_version());",
+			"",
+		].join("\n"));
+		await run(["npm", "install", "--no-audit", "--no-fund"], node);
+		await run(["npx", "tsc", "-p", "."], node);
+		console.log("its TypeScript compiles, resolved as a bundler does, with " + Object.keys(strictOptions()).join(", "));
+		const clicked = await run(["node", "check.mjs"], node);
+		console.log(`installed by npm, React runs under Node.js, and a click reaches its state: Raven ${clicked.trim()}`);
+	} else {
+		console.log(`${nativeName} has no addon of the Node.js binding: nothing runs under Node.js here`);
+	}
 } catch (error) {
 	// (a failed command says what it printed; anything else keeps its stack)
 	console.error(error instanceof CommandFailed ? error.message : error);

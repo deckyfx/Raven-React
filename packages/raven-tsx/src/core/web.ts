@@ -6,7 +6,8 @@
  *     await runApp(<WebView Url="https://example.com" Slot={{ Fill: 1 }} />, options, { setup: registerWebView });
  */
 
-import { dlopen } from "bun:ffi";
+import type { ConvertFns } from "bun:ffi";
+import { openLibrary } from "#backend";
 import * as r from "./raven";
 import { RavenError } from "./errors";
 import type { CustomProps } from "./props.generated";
@@ -60,7 +61,7 @@ export type WebViewProps = Omit<CustomProps, "OnPaint" | "OnMeasure" | "OnEvent"
 	readonly OnChanged?: string | (() => void) | undefined;
 };
 
-let opened: ReturnType<typeof dlopen<typeof SYMBOLS>>["symbols"] | null = null;
+let opened: ConvertFns<typeof SYMBOLS> | null = null;
 
 /** The functions of `raven_web.h`, as bun:ffi gives them: a text is a `Buffer` that ends with a zero. */
 export function webFunctions(): NonNullable<typeof opened> {
@@ -70,8 +71,12 @@ export function webFunctions(): NonNullable<typeof opened> {
 			RavenError.throw("raven-tsx: RAVEN_LIBRARY should say where the library is, and it does not");
 		}
 		try {
-			opened = dlopen(library, SYMBOLS).symbols;
+			opened = openLibrary(library, SYMBOLS);
 		} catch (error) {
+			// (the backend says itself why it cannot: Node.js, for now)
+			if (error instanceof RavenError) {
+				throw error;
+			}
 			RavenError.throw(`raven-tsx: this library has no web pages: build Raven without -DRAVEN_BUILD_WEB=OFF (${error instanceof Error ? error.message : String(error)})`);
 		}
 	}

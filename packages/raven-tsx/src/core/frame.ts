@@ -5,9 +5,11 @@
  * would keep every function it was given alive for ever.
  */
 
-import "./native";
-import { CFunction, JSCallback, ptr, type Pointer } from "bun:ffi";
-import { Rset_frame_callback as connectNative, type RFrameCallback, type RPointer } from "../vendor/raven";
+import "#native";
+import type { Pointer } from "bun:ffi";
+import { addressOf, callFunction, nativeCallback } from "#backend";
+import type { NativeCallback } from "./backend/types";
+import { Rset_frame_callback as connectNative, type RFrameCallback, type RPointer } from "#raven";
 
 /** What is called at each frame, with the seconds since the last one. */
 export type FrameHandler = (deltaSeconds: number) => void;
@@ -15,15 +17,15 @@ export type FrameHandler = (deltaSeconds: number) => void;
 class FrameSlot {
 	private readonly subscribers = new Set<FrameHandler>();
 	private application: FrameHandler | null = null;
-	private callback: JSCallback | null = null;
+	private callback: NativeCallback | null = null;
 	private connected = false;
 
 	/** Connects the native callback when something needs it, and takes it away when nothing does. */
 	private sync(): void {
 		const wanted = this.application !== null || this.subscribers.size > 0;
 		if (wanted !== this.connected) {
-			this.callback ??= new JSCallback((delta: number): void => this.dispatch(delta), { args: ["f64", "ptr"], returns: "void" });
-			connectNative(wanted ? this.callback.ptr : null);
+			this.callback ??= nativeCallback(["f64"], "void", (delta) => this.dispatch(Number(delta)));
+			connectNative(wanted ? this.callback : null);
 			this.connected = wanted;
 		}
 	}
@@ -43,11 +45,10 @@ class FrameSlot {
 	setApplication(callback: RFrameCallback | Pointer | null, userData: RPointer): void {
 		if (typeof callback === "number") {
 			// a function of C: called from here, as it no longer has the slot to itself
-			const native = CFunction({ ptr: callback, args: ["f64", "ptr"], returns: "void" });
-			this.application = (delta) => void native(delta, userData);
+			this.application = (delta) => callFunction(callback, delta, addressOf(userData));
 		} else if (callback) {
 			// an address, as C would give it. An array stays alive for as long as this function does.
-			this.application = (delta) => void callback(delta, userData === null || typeof userData === "number" ? userData : ptr(userData));
+			this.application = (delta) => void callback(delta, addressOf(userData));
 		} else {
 			this.application = null;
 		}

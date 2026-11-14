@@ -115,7 +115,7 @@ The components, their props, events, windows, themes and tags are the same as wi
 
 ## Node.js
 
-The package also runs under Node.js, with React, on Linux and macOS. Raven's Node-API binding replaces bun:ffi there; it comes in the package of the platform, as the library does.
+The package also runs under Node.js, with React and Solid, on Linux and macOS. Raven's Node-API binding replaces bun:ffi there; it comes in the package of the platform, as the library does.
 
     npm install @decky.fx/raven-tsx react react-reconciler
 
@@ -131,10 +131,19 @@ function App() {
 await runApp(h(App), { Title: "Hello", Width: 480, Height: 240 });
 ```
 
-TSX works through any compiler that turns it into JavaScript for Node.js, as with React elsewhere. For TypeScript the package has declarations of its own under Node.js (`"moduleResolution": "NodeNext"`), which need no types of Bun; resolved as a bundler (tsx, esbuild, Vite), the sources are the types, with `@types/bun`. What is not there yet:
+TSX works through any compiler that turns it into JavaScript for Node.js, as with React elsewhere.
+
+Solid compiles its TSX itself: the register of the package does it under Node.js (24 or newer), as the preload does on Bun, and gives Solid's build for clients. The TypeScript of an application is then taken away by Node.js, so it must be erasable, as Node.js runs TypeScript:
+
+    npm install @decky.fx/raven-tsx solid-js
+    npm install -D babel-preset-solid @babel/core
+    node --import @decky.fx/raven-tsx/solid/register src/index.tsx
+
+The files are those of [Solid](#solid) on Bun, unchanged.
+
+For TypeScript the package has declarations of its own under Node.js (`"moduleResolution": "NodeNext"`), which need no types of Bun; resolved as a bundler (tsx, esbuild, Vite), the sources are the types, with `@types/bun`. What is not there yet:
 
 - Windows: Raven's build leaves the addon of its Node.js binding out there.
-- Solid: its TSX is compiled by the plugin of this package, which is one for Bun.
 - `WebView`: Raven's Node.js binding has no `raven_web.h` yet. It says so when asked.
 
 ## How props work

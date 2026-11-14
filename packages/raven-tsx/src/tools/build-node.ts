@@ -21,6 +21,9 @@ export const NODE_ENTRIES: Readonly<Record<string, string>> = {
 	".": "src/core/index.ts",
 	"./react": "src/react/index.ts",
 	"./solid": "src/solid/index.ts",
+	// (what compiled Solid imports: the same chunk as ./solid, so one renderer)
+	"./solid/renderer": "src/solid/renderer.ts",
+	"./solid/register": "src/solid/register.ts",
 };
 
 /** What the bundle imports instead of holding. */

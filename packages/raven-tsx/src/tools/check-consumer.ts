@@ -265,6 +265,21 @@ try {
 		console.log("its TypeScript compiles, resolved as Node.js resolves (NodeNext), without the types of Bun, with " + Object.keys(strictOptions()).join(", "));
 		const clicked = await run(["node", "check.mjs"], node);
 		console.log(`installed by npm, React runs under Node.js, and a click reaches its state: Raven ${clicked.trim()}`);
+
+		// (Solid under Node.js: the check of the application of Solid on Bun, as it is, run through the register)
+		const nodeSolid = `${work}/node-solid`;
+		cpSync(`${solid}/src/check.tsx`, `${nodeSolid}/src/check.tsx`);
+		await Bun.write(`${nodeSolid}/package.json`, JSON.stringify({
+			name: "consumer-node-solid",
+			private: true,
+			type: "module",
+			dependencies: { [manifest.name]: `file:${main}`, "solid-js": manifest.devDependencies["solid-js"] },
+			devDependencies: { "@babel/core": manifest.devDependencies["@babel/core"], "babel-preset-solid": manifest.devDependencies["babel-preset-solid"] },
+			overrides: { [nativeName]: `file:${native}` },
+		}, null, 2));
+		await run(["npm", "install", "--no-audit", "--no-fund"], nodeSolid);
+		const signalled = await run(["node", "--import", `${manifest.name}/solid/register`, "src/check.tsx"], nodeSolid);
+		console.log(`installed by npm, Solid runs under Node.js through its register, and a signal reaches its widget: Raven ${signalled.trim()}`);
 	} else {
 		console.log(`${nativeName} has no addon of the Node.js binding: nothing runs under Node.js here`);
 	}

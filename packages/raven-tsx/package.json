@@ -33,7 +33,23 @@
       "types": "./src/solid/index.ts",
       "default": "./src/solid/index.ts"
     },
-    "./solid/renderer": "./src/solid/renderer.ts",
+    "./solid/renderer": {
+      "bun": "./src/solid/renderer.ts",
+      "node": {
+        "types": "./dist/types/solid/renderer.d.ts",
+        "default": "./dist/node/solid/renderer.js"
+      },
+      "types": "./src/solid/renderer.ts",
+      "default": "./src/solid/renderer.ts"
+    },
+    "./solid/register": {
+      "node": {
+        "types": "./dist/types/solid/register.d.ts",
+        "default": "./dist/node/solid/register.js"
+      },
+      "types": "./src/solid/register.ts",
+      "default": "./src/solid/register.ts"
+    },
     "./solid/plugin": "./src/solid/plugin.ts",
     "./solid/preload": "./src/solid/preload.ts"
   },

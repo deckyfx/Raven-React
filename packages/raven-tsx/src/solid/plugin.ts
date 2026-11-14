@@ -1,4 +1,3 @@
-/// <reference path="./babel-preset-solid.d.ts" />
 /**
  * The Bun plugin that runs an application of `@decky.fx/raven-tsx/solid`. Bun compiles JSX as
  * React does; Solid compiles it to calls of its renderer, with Babel (`babel-preset-solid`, in its
@@ -13,6 +12,7 @@
 import type { BunPlugin } from "bun";
 import { readFileSync } from "node:fs";
 import { resolve, sep } from "node:path";
+import { isTypeScript, solidBabelOptions, SOURCES } from "./compile";
 
 /** What the plugin can be told. */
 export interface SolidPluginOptions {
@@ -21,9 +21,6 @@ export interface SolidPluginOptions {
 	/** Takes the development builds of Solid, which warn of mistakes. */
 	readonly development?: boolean | undefined;
 }
-
-/** The files compiled by default: `.tsx` and `.jsx`, but those of node_modules, which come compiled. */
-const SOURCES = /^(?!.*[\\/]node_modules[\\/]).*\.[jt]sx$/;
 
 /** What `exports` of a package.json gives for a subpath, or a choice of conditions. */
 type ExportsEntry = string | null | { readonly [condition: string]: ExportsEntry };
@@ -87,21 +84,12 @@ export function solidPlugin(options: SolidPluginOptions = {}): BunPlugin {
 			build.onLoad({ filter: options.filter ?? SOURCES }, async ({ path }) => {
 				// (loaded here, so that an application of React never needs Babel)
 				const [{ transformAsync }, { default: solid }] = await Promise.all([import("@babel/core"), import("babel-preset-solid")]);
-				const typescript = /\.tsx$/.test(path);
-				const result = await transformAsync(await Bun.file(path).text(), {
-					filename: path,
-					babelrc: false,
-					configFile: false,
-					// (an error says the line of the source: Bun does not read Babel's source maps)
-					retainLines: true,
-					// (the types stay, for Bun to take away: Babel only compiles the JSX)
-					parserOpts: { plugins: typescript ? ["jsx", "typescript"] : ["jsx"] },
-					presets: [[solid, { generate: "universal", moduleName: "@decky.fx/raven-tsx/solid/renderer" }]],
-				});
+				// (the types stay, for Bun to take away: Babel only compiles the JSX)
+				const result = await transformAsync(await Bun.file(path).text(), solidBabelOptions(path, solid));
 				if (typeof result?.code !== "string") {
 					throw new Error(`raven-tsx: Babel compiled nothing from ${path}`);
 				}
-				return { contents: result.code, loader: typescript ? "ts" : "js" };
+				return { contents: result.code, loader: isTypeScript(path) ? "ts" : "js" };
 			});
 		},
 	};

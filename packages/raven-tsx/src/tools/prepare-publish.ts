@@ -29,7 +29,7 @@ mkdirSync(directory, { recursive: true });
 cpSync(`${root}/src`, `${directory}/src`, { recursive: true });
 rmSync(`${directory}/src/test`, { recursive: true, force: true });
 rmSync(`${directory}/src/tools`, { recursive: true, force: true });
-await buildForNode(root, `${directory}/dist/node`);
+await buildForNode(root, `${directory}/dist`);
 for (const name of ["README.md", "LICENSE", "NOTICE", "RAVEN_VERSION"]) {
 	await Bun.write(`${directory}/${name}`, Bun.file(`${root}/${name}`));
 }

@@ -115,7 +115,7 @@ const react = [
 	'import type { WindowInstance } from "../core/window-instance";',
 	"",
 	"/** The props every component has from React. */",
-	"interface ReactProps<R> {",
+	"export interface ReactProps<R> {",
 	"\treadonly key?: Key;",
 	"\treadonly ref?: Ref<R>;",
 	"\treadonly children?: ReactNode;",

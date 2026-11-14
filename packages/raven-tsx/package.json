@@ -1,30 +1,55 @@
 {
   "name": "@decky.fx/raven-tsx",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "description": "Raven's native widgets from TSX, for Bun: a core that knows only Raven and adapters for React and Solid, with typed components made from Raven's schema",
   "license": "Apache-2.0",
   "type": "module",
   "module": "src/core/index.ts",
   "exports": {
     ".": {
-      "types": "./src/core/index.ts",
       "bun": "./src/core/index.ts",
-      "node": "./dist/node/core/index.js",
+      "node": {
+        "types": "./dist/types/core/index.d.ts",
+        "default": "./dist/node/core/index.js"
+      },
+      "types": "./src/core/index.ts",
       "default": "./src/core/index.ts"
     },
     "./react": {
-      "types": "./src/react/index.ts",
       "bun": "./src/react/index.ts",
-      "node": "./dist/node/react/index.js",
+      "node": {
+        "types": "./dist/types/react/index.d.ts",
+        "default": "./dist/node/react/index.js"
+      },
+      "types": "./src/react/index.ts",
       "default": "./src/react/index.ts"
     },
     "./solid": {
-      "types": "./src/solid/index.ts",
       "bun": "./src/solid/index.ts",
-      "node": "./dist/node/solid/index.js",
+      "node": {
+        "types": "./dist/types/solid/index.d.ts",
+        "default": "./dist/node/solid/index.js"
+      },
+      "types": "./src/solid/index.ts",
       "default": "./src/solid/index.ts"
     },
-    "./solid/renderer": "./src/solid/renderer.ts",
+    "./solid/renderer": {
+      "bun": "./src/solid/renderer.ts",
+      "node": {
+        "types": "./dist/types/solid/renderer.d.ts",
+        "default": "./dist/node/solid/renderer.js"
+      },
+      "types": "./src/solid/renderer.ts",
+      "default": "./src/solid/renderer.ts"
+    },
+    "./solid/register": {
+      "node": {
+        "types": "./dist/types/solid/register.d.ts",
+        "default": "./dist/node/solid/register.js"
+      },
+      "types": "./src/solid/register.ts",
+      "default": "./src/solid/register.ts"
+    },
     "./solid/plugin": "./src/solid/plugin.ts",
     "./solid/preload": "./src/solid/preload.ts"
   },

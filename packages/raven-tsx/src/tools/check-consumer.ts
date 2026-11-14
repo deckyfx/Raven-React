@@ -196,14 +196,13 @@ try {
 			private: true,
 			type: "module",
 			dependencies: { [manifest.name]: `file:${main}`, react: manifest.devDependencies.react, "react-reconciler": manifest.devDependencies["react-reconciler"] },
-			// (the types of a few raw values come from bun:ffi: see the README)
-			devDependencies: { "@types/bun": manifest.devDependencies["@types/bun"], "@types/react": manifest.dependencies["@types/react"], typescript: manifest.devDependencies.typescript },
+			// (no types of Bun: the declarations for Node.js name none)
+			devDependencies: { "@types/node": "^26", "@types/react": manifest.dependencies["@types/react"], typescript: manifest.devDependencies.typescript },
 			overrides: { [nativeName]: `file:${native}` },
 		};
-		// (resolved as a bundler would, as tsx, esbuild or Vite do: the condition "types" gives the
-		// sources. "NodeNext" needs declarations of their own, which are not made yet: see the README)
+		// (resolved as Node.js resolves, "NodeNext": the condition "node" gives the declarations of dist/types)
 		await Bun.write(`${node}/tsconfig.json`, JSON.stringify({
-			compilerOptions: { target: "ESNext", module: "ESNext", moduleResolution: "Bundler", types: ["bun"], noEmit: true, skipLibCheck: true, ...strictOptions() },
+			compilerOptions: { target: "ESNext", module: "NodeNext", moduleResolution: "NodeNext", types: ["node"], noEmit: true, skipLibCheck: true, ...strictOptions() },
 			include: ["types.ts"],
 		}, null, 2));
 		await Bun.write(`${node}/types.ts`, [
@@ -217,6 +216,10 @@ try {
 			'	root.render(createElement(Button, { OnClicked: onPress, ref: (made: WidgetInstance | null) => void made?.focus() }, "ok"));',
 			"	return window;",
 			"}",
+			"",
+			"// (the types are real, not any: a prop a Button does not have is refused)",
+			"// @ts-expect-error",
+			'createElement(Button, { NoSuchProp: 1 }, "no");',
 			"",
 		].join("\n"));
 		await Bun.write(`${node}/package.json`, JSON.stringify(nodeManifest, null, 2));
@@ -259,9 +262,24 @@ try {
 		].join("\n"));
 		await run(["npm", "install", "--no-audit", "--no-fund"], node);
 		await run(["npx", "tsc", "-p", "."], node);
-		console.log("its TypeScript compiles, resolved as a bundler does, with " + Object.keys(strictOptions()).join(", "));
+		console.log("its TypeScript compiles, resolved as Node.js resolves (NodeNext), without the types of Bun, with " + Object.keys(strictOptions()).join(", "));
 		const clicked = await run(["node", "check.mjs"], node);
 		console.log(`installed by npm, React runs under Node.js, and a click reaches its state: Raven ${clicked.trim()}`);
+
+		// (Solid under Node.js: the check of the application of Solid on Bun, as it is, run through the register)
+		const nodeSolid = `${work}/node-solid`;
+		cpSync(`${solid}/src/check.tsx`, `${nodeSolid}/src/check.tsx`);
+		await Bun.write(`${nodeSolid}/package.json`, JSON.stringify({
+			name: "consumer-node-solid",
+			private: true,
+			type: "module",
+			dependencies: { [manifest.name]: `file:${main}`, "solid-js": manifest.devDependencies["solid-js"] },
+			devDependencies: { "@babel/core": manifest.devDependencies["@babel/core"], "babel-preset-solid": manifest.devDependencies["babel-preset-solid"] },
+			overrides: { [nativeName]: `file:${native}` },
+		}, null, 2));
+		await run(["npm", "install", "--no-audit", "--no-fund"], nodeSolid);
+		const signalled = await run(["node", "--import", `${manifest.name}/solid/register`, "src/check.tsx"], nodeSolid);
+		console.log(`installed by npm, Solid runs under Node.js through its register, and a signal reaches its widget: Raven ${signalled.trim()}`);
 	} else {
 		console.log(`${nativeName} has no addon of the Node.js binding: nothing runs under Node.js here`);
 	}

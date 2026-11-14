@@ -115,7 +115,7 @@ The components, their props, events, windows, themes and tags are the same as wi
 
 ## Node.js
 
-The package also runs under Node.js, with React and Solid, on Linux and macOS. Raven's Node-API binding replaces bun:ffi there; it comes in the package of the platform, as the library does.
+The package also runs under Node.js, with React and Solid, on Linux, macOS and Windows. Raven's Node-API binding replaces bun:ffi there; it comes in the package of the platform, as the library does.
 
     npm install @decky.fx/raven-tsx react react-reconciler
 
@@ -141,10 +141,7 @@ Solid compiles its TSX itself: the register of the package does it under Node.js
 
 The files are those of [Solid](#solid) on Bun, unchanged.
 
-For TypeScript the package has declarations of its own under Node.js (`"moduleResolution": "NodeNext"`), which need no types of Bun; resolved as a bundler (tsx, esbuild, Vite), the sources are the types, with `@types/bun`. What is not there yet:
-
-- Windows: Raven's build leaves the addon of its Node.js binding out there.
-- `WebView`: Raven's Node.js binding has no `raven_web.h` yet. It says so when asked.
+For TypeScript the package has declarations of its own under Node.js (`"moduleResolution": "NodeNext"`), which need no types of Bun; resolved as a bundler (tsx, esbuild, Vite), the sources are the types, with `@types/bun`. What is not there yet: `WebView`, as Raven's Node.js binding has no `raven_web.h` yet. It says so when asked.
 
 ## How props work
 

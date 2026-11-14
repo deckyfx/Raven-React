@@ -61,9 +61,9 @@ Its first step is in `src/core`: move the direct uses of `bun:ffi` (`events.ts`,
 - The package of a platform holds the addon (`raven_napi.node`) and an `index.js` for Node.js. The main package has a bundle for Node.js (`dist/node`, `build:node`), which its `exports` give under `node`.
 - `check:consumer` runs an application of Node.js installed by npm, in CI on Linux and macOS.
 
-**Then, for 0.3.0:** declarations of their own for Node.js (`dist/types`, resolved under "NodeNext" with no types of Bun), and Solid on Node.js (`@decky.fx/raven-tsx/solid/register`: the Babel of the plugin, Node.js stripping the types, `solid-js` with the condition "browser").
+**Then, for 0.3.0:** declarations of their own for Node.js (`dist/types`, resolved under "NodeNext" with no types of Bun), Solid on Node.js (`@decky.fx/raven-tsx/solid/register`: the Babel of the plugin, Node.js stripping the types, `solid-js` with the condition "browser"), and Windows (the addon built by `packages/raven-tsx/addon` against `node.lib` from nodejs.org, as Raven's CMake leaves it out there).
 
-Still to do: Windows (Raven's CMake leaves the addon out there: it needs the import library of `node.exe`), and `WebView` (Raven's Node.js binding has no `raven_web.h`).
+Still to do: `WebView` (Raven's Node.js binding has no `raven_web.h`).
 
 ## Phase 4: Solid adapter
 
@@ -136,7 +136,7 @@ If one of these fails, stop and write down why. React stays the only adapter.
 |---|---|---|
 | 1. Rename | nothing | done |
 | 2. Core and React separated | nothing | done |
-| 3. Node.js backend | an upstream binding | React and Solid on Linux and macOS, with types; Windows and WebView to do |
+| 3. Node.js backend | an upstream binding | React and Solid on Linux, macOS and Windows, with types; WebView to do |
 | 4. Solid adapter | nothing | done |
 
 ## Decisions for the user

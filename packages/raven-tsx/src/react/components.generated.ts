@@ -5,7 +5,7 @@ import type { WidgetInstance } from "../core/widget-instance";
 import type { WindowInstance } from "../core/window-instance";
 
 /** The props every component has from React. */
-interface ReactProps<R> {
+export interface ReactProps<R> {
 	readonly key?: Key | undefined;
 	readonly ref?: Ref<R> | undefined;
 	readonly children?: ReactNode | undefined;

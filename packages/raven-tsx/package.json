@@ -7,21 +7,30 @@
   "module": "src/core/index.ts",
   "exports": {
     ".": {
-      "types": "./src/core/index.ts",
       "bun": "./src/core/index.ts",
-      "node": "./dist/node/core/index.js",
+      "node": {
+        "types": "./dist/types/core/index.d.ts",
+        "default": "./dist/node/core/index.js"
+      },
+      "types": "./src/core/index.ts",
       "default": "./src/core/index.ts"
     },
     "./react": {
-      "types": "./src/react/index.ts",
       "bun": "./src/react/index.ts",
-      "node": "./dist/node/react/index.js",
+      "node": {
+        "types": "./dist/types/react/index.d.ts",
+        "default": "./dist/node/react/index.js"
+      },
+      "types": "./src/react/index.ts",
       "default": "./src/react/index.ts"
     },
     "./solid": {
-      "types": "./src/solid/index.ts",
       "bun": "./src/solid/index.ts",
-      "node": "./dist/node/solid/index.js",
+      "node": {
+        "types": "./dist/types/solid/index.d.ts",
+        "default": "./dist/node/solid/index.js"
+      },
+      "types": "./src/solid/index.ts",
       "default": "./src/solid/index.ts"
     },
     "./solid/renderer": "./src/solid/renderer.ts",
